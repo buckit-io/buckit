@@ -1,5 +1,4 @@
-//go:build ignore
-// +build ignore
+//go:
 
 //
 // MinIO Object Storage (c) 2022 MinIO, Inc.

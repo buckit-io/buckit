@@ -5,6 +5,10 @@ on:
     branches:
       - master
 
+  push:
+    branches:
+      - master
+
 # This ensures that previous jobs for the PR are canceled when the PR is
 # updated.
 concurrency:
@@ -20,7 +24,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        go-version: [1.24.x]
+        go-version: [1.25.x]
         os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
