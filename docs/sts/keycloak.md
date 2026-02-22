@@ -1,6 +1,6 @@
 # Keycloak Quickstart Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
 
-Keycloak is an open source Identity and Access Management solution aimed at modern applications and services, this document covers configuring Keycloak identity provider support with MinIO.
+Keycloak is an open source Identity and Access Management solution aimed at modern applications and services, this document covers configuring Keycloak identity provider support with BuckIt.
 
 ## Prerequisites
 
@@ -16,11 +16,11 @@ For a quick installation, docker-compose reference configs are also available on
     - Save
   - Click on credentials tab
     - Copy the `Secret` to clipboard.
-    - This value is needed for `MINIO_IDENTITY_OPENID_CLIENT_SECRET` for MinIO.
+    - This value is needed for `MINIO_IDENTITY_OPENID_CLIENT_SECRET` for BuckIt.
 
 - Go to Users
   - Click on the user
-  - Attribute, add a new attribute `Key` is `policy`, `Value` is name of the `policy` on MinIO (ex: `readwrite`)
+  - Attribute, add a new attribute `Key` is `policy`, `Value` is name of the `policy` on BuckIt (ex: `readwrite`)
   - Add and Save
 
 - Go to Clients
@@ -78,7 +78,7 @@ curl \
   "http://localhost:8080/auth/admin/realms/{realm}/users/{userid}"
 ```
 
-### Configure MinIO
+### Configure BuckIt
 
 ```
 export MINIO_ROOT_USER=minio
@@ -120,15 +120,15 @@ MINIO_IDENTITY_OPENID_SCOPES        (csv)       Comma separated list of OpenID s
 MINIO_IDENTITY_OPENID_COMMENT       (sentence)  optionally add a comment to this setting
 ```
 
-Set `identity_openid` config with `config_url`, `client_id` and restart MinIO
+Set `identity_openid` config with `config_url`, `client_id` and restart BuckIt
 
 ```
 ~ mc admin config set myminio identity_openid config_url="http://localhost:8080/auth/realms/{your-realm-name}/.well-known/openid-configuration" client_id="account"
 ```
 
-> NOTE: You can configure the `scopes` parameter to restrict the OpenID scopes requested by minio to the IdP, for example, `"openid,policy_role_attribute"`, being `policy_role_attribute` a client_scope / client_mapper that maps a role attribute called policy to a `policy` claim returned by Keycloak
+> NOTE: You can configure the `scopes` parameter to restrict the OpenID scopes requested by buckit to the IdP, for example, `"openid,policy_role_attribute"`, being `policy_role_attribute` a client_scope / client_mapper that maps a role attribute called policy to a `policy` claim returned by Keycloak
 
-Once successfully set restart the MinIO instance.
+Once successfully set restart the BuckIt instance.
 
 ```
 mc admin service restart myminio
@@ -161,16 +161,16 @@ This will open the login page of keycloak, upon successful login, STS credential
 
 > NOTE: You can use the `-cscopes` parameter to restrict the requested scopes, for example to `"openid,policy_role_attribute"`, being `policy_role_attribute` a client_scope / client_mapper that maps a role attribute called policy to a `policy` claim returned by Keycloak.
 
-These credentials can now be used to perform MinIO API operations.
+These credentials can now be used to perform BuckIt API operations.
 
-### Using MinIO Console
+### Using BuckIt Console
 
-- Open MinIO URL on the browser, lets say <http://localhost:9000/>
+- Open BuckIt URL on the browser, lets say <http://localhost:9000/>
 - Click on `Login with SSO`
-- User will be redirected to the Keycloak user login page, upon successful login the user will be redirected to MinIO page and logged in automatically,
+- User will be redirected to the Keycloak user login page, upon successful login the user will be redirected to BuckIt page and logged in automatically,
   the user should see now the buckets and objects they have access to.
 
 ## Explore Further
 
-- [MinIO STS Quickstart Guide](https://docs.min.io/community/minio-object-store/developers/security-token-service.html)
-- [The MinIO documentation website](https://docs.min.io/community/minio-object-store/index.html)
+- [BuckIt STS Quickstart Guide](https://docs.min.io/community/minio-object-store/developers/security-token-service.html)
+- [The BuckIt documentation website](https://docs.min.io/community/minio-object-store/index.html)

@@ -1,4 +1,4 @@
-# MinIO Multi-Tenant Deployment Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io) [![Docker Pulls](https://img.shields.io/docker/pulls/minio/minio.svg?maxAge=604800)](https://hub.docker.com/r/minio/minio/)
+# BuckIt Multi-Tenant Deployment Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io) [![Docker Pulls](https://img.shields.io/docker/pulls/minio/minio.svg?maxAge=604800)](https://hub.docker.com/r/minio/minio/)
 
 This topic provides commands to set up different configurations of hosts, nodes, and drives. The examples provided here can be used as a starting point for other configurations.
 
@@ -8,7 +8,7 @@ This topic provides commands to set up different configurations of hosts, nodes,
 
 ## 1. Standalone Deployment
 
-To host multiple tenants on a single machine, run one MinIO Server per tenant with a dedicated HTTPS port, configuration, and data directory.
+To host multiple tenants on a single machine, run one BuckIt Server per tenant with a dedicated HTTPS port, configuration, and data directory.
 
 ### 1.1 Host Multiple Tenants on a Single Drive
 
@@ -36,7 +36,7 @@ minio server --address :9003 /disk{1...4}/data/tenant3
 
 ## 2. Distributed Deployment
 
-To host multiple tenants in a distributed environment, run several distributed MinIO Server instances concurrently.
+To host multiple tenants in a distributed environment, run several distributed BuckIt Server instances concurrently.
 
 ### 2.1 Host Multiple Tenants on Multiple Drives (Erasure Code)
 
@@ -60,8 +60,8 @@ minio server --address :9003 http://192.168.10.1{1...4}/data/tenant3
 
 ![Example-3](https://github.com/minio/minio/blob/master/docs/screenshots/Example-3.jpg?raw=true)
 
-**Note**: On distributed systems, root credentials are recommend to be defined by exporting the `MINIO_ROOT_USER` and  `MINIO_ROOT_PASSWORD` environment variables. If no value is set MinIO setup will assume `minioadmin/minioadmin` as default credentials. If a domain is required, it must be specified by defining and exporting the `MINIO_DOMAIN` environment variable.
+**Note**: On distributed systems, root credentials are recommend to be defined by exporting the `MINIO_ROOT_USER` and  `MINIO_ROOT_PASSWORD` environment variables. If no value is set BuckIt setup will assume `minioadmin/minioadmin` as default credentials. If a domain is required, it must be specified by defining and exporting the `MINIO_DOMAIN` environment variable.
 
 ## Cloud Scale Deployment
 
-A container orchestration platform (e.g. Kubernetes) is recommended for large-scale, multi-tenant MinIO deployments. See the [MinIO Deployment Quickstart Guide](https://docs.min.io/community/minio-object-store/operations/deployments/kubernetes.html) to get started with MinIO on orchestration platforms.
+A container orchestration platform (e.g. Kubernetes) is recommended for large-scale, multi-tenant BuckIt deployments. See the [BuckIt Deployment Quickstart Guide](https://docs.min.io/community/minio-object-store/operations/deployments/kubernetes.html) to get started with BuckIt on orchestration platforms.

@@ -20,7 +20,7 @@ sudo mkdir -p /usr/lib/tuned/minio/
 sudo mv tuned.conf /usr/lib/tuned/minio
 ```
 
-#### Step 3 - to enable minio performance profile on all the nodes
+#### Step 3 - to enable buckit performance profile on all the nodes
 ```
 sudo tuned-adm profile minio
 ```

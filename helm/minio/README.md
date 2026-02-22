@@ -1,16 +1,16 @@
-# MinIO Community Helm Chart
+# BuckIt Community Helm Chart
 
 [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io) [![license](https://img.shields.io/badge/license-AGPL%20V3-blue)](https://github.com/minio/minio/blob/master/LICENSE)
 
-MinIO is a High Performance Object Storage released under GNU Affero General Public License v3.0. It is API compatible with Amazon S3 cloud storage service. Use MinIO to build high performance infrastructure for machine learning, analytics and application data workloads.
+BuckIt is a High Performance Object Storage released under GNU Affero General Public License v3.0. It is API compatible with Amazon S3 cloud storage service. Use BuckIt to build high performance infrastructure for machine learning, analytics and application data workloads.
 
 | IMPORTANT |
 | -------------------------- |
-| This Helm chart is community built, maintained, and supported. MinIO does not guarantee support for any given bug, feature request, or update referencing this chart. <br/><br/> MinIO publishes a separate [MinIO Kubernetes Operator and Tenant Helm Chart](https://github.com/minio/operator/tree/master/helm) that is officially maintained and supported. MinIO strongly recommends using the MinIO Kubernetes Operator for production deployments. See [Deploy Operator With Helm](https://docs.min.io/community/minio-object-store/operations/deployments/k8s-deploy-operator-helm-on-kubernetes.html?ref=github) for additional documentation. |
+| This Helm chart is community built, maintained, and supported. BuckIt does not guarantee support for any given bug, feature request, or update referencing this chart. <br/><br/> BuckIt publishes a separate [BuckIt Kubernetes Operator and Tenant Helm Chart](https://github.com/minio/operator/tree/master/helm) that is officially maintained and supported. BuckIt strongly recommends using the BuckIt Kubernetes Operator for production deployments. See [Deploy Operator With Helm](https://docs.min.io/community/minio-object-store/operations/deployments/k8s-deploy-operator-helm-on-kubernetes.html?ref=github) for additional documentation. |
 
 ## Introduction
 
-This chart bootstraps MinIO Cluster on [Kubernetes](http://kubernetes.io) using the [Helm](https://helm.sh) package manager.
+This chart bootstraps BuckIt Cluster on [Kubernetes](http://kubernetes.io) using the [Helm](https://helm.sh) package manager.
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ This chart bootstraps MinIO Cluster on [Kubernetes](http://kubernetes.io) using 
 - PV provisioner support in the underlying infrastructure. (We recommend using <https://github.com/minio/direct-csi>)
 - Use Kubernetes version v1.19 and later for best experience.
 
-## Configure MinIO Helm repo
+## Configure BuckIt Helm repo
 
 ```bash
 helm repo add minio https://charts.min.io/
@@ -32,7 +32,7 @@ Install this chart using:
 helm install --namespace minio --set rootUser=rootuser,rootPassword=rootpass123 --generate-name minio/minio
 ```
 
-The command deploys MinIO on the Kubernetes cluster in the default configuration. The [configuration](#configuration) section lists the parameters that can be configured during installation.
+The command deploys BuckIt on the Kubernetes cluster in the default configuration. The [configuration](#configuration) section lists the parameters that can be configured during installation.
 
 ### Installing the Chart (toy-setup)
 
@@ -44,13 +44,13 @@ helm install --set resources.requests.memory=512Mi --set replicas=1 --set persis
 
 ### Upgrading the Chart
 
-You can use Helm to update MinIO version in a live release. Assuming your release is named as `my-release`, get the values using the command:
+You can use Helm to update BuckIt version in a live release. Assuming your release is named as `my-release`, get the values using the command:
 
 ```bash
 helm get values my-release > old_values.yaml
 ```
 
-Then change the field `image.tag` in `old_values.yaml` file with MinIO image tag you want to use. Now update the chart using
+Then change the field `image.tag` in `old_values.yaml` file with BuckIt image tag you want to use. Now update the chart using
 
 ```bash
 helm upgrade -f old_values.yaml my-release minio/minio
@@ -68,7 +68,7 @@ You can specify each parameter using the `--set key=value[,key=value]` argument 
 helm install --name my-release --set persistence.size=1Ti minio/minio
 ```
 
-The above command deploys MinIO server with a 1Ti backing persistent volume.
+The above command deploys BuckIt server with a 1Ti backing persistent volume.
 
 Alternately, you can provide a YAML file that specifies parameter values while installing the chart. For example,
 
@@ -100,7 +100,7 @@ helm install --set persistence.existingClaim=PVC_NAME minio/minio
 
 ### NetworkPolicy
 
-To enable network policy for MinIO,
+To enable network policy for BuckIt,
 install [a networking plugin that implements the Kubernetes
 NetworkPolicy spec](https://kubernetes.io/docs/tasks/administer-cluster/declare-network-policy#before-you-begin),
 and set `networkPolicy.enabled` to `true`.
@@ -117,7 +117,7 @@ When using `Cilium` as a CNI in your cluster, please edit the `flavor` field to 
 With NetworkPolicy enabled, traffic will be limited to just port 9000.
 
 For more precise policy, set `networkPolicy.allowExternal=true`. This will
-only allow pods with the generated client label to connect to MinIO.
+only allow pods with the generated client label to connect to BuckIt.
 This label will be displayed in the output of a successful install.
 
 ### Existing secret
@@ -148,7 +148,7 @@ All corresponding variables will be ignored in values file.
 
 ### Configure TLS
 
-To enable TLS for MinIO containers, acquire TLS certificates from a CA or create self-signed certificates. While creating / acquiring certificates ensure the corresponding domain names are set as per the standard [DNS naming conventions](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#pod-identity) in a Kubernetes StatefulSet (for a distributed MinIO setup). Then create a secret using
+To enable TLS for BuckIt containers, acquire TLS certificates from a CA or create self-signed certificates. While creating / acquiring certificates ensure the corresponding domain names are set as per the standard [DNS naming conventions](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#pod-identity) in a Kubernetes StatefulSet (for a distributed BuckIt setup). Then create a secret using
 
 ```bash
 kubectl create secret generic tls-ssl-minio --from-file=path/to/private.key --from-file=path/to/public.crt
@@ -162,9 +162,9 @@ helm install --set tls.enabled=true,tls.certSecret=tls-ssl-minio minio/minio
 
 ### Installing certificates from third party CAs
 
-MinIO can connect to other servers, including MinIO nodes or other server types such as NATs and Redis. If these servers use certificates that were not registered with a known CA, add trust for these certificates to MinIO Server by bundling these certificates into a Kubernetes secret and providing it to Helm via the `trustedCertsSecret` value. If `.Values.tls.enabled` is `true` and you're installing certificates for third party CAs, remember to include MinIO's own certificate with key `public.crt`, if it also needs to be trusted.
+BuckIt can connect to other servers, including BuckIt nodes or other server types such as NATs and Redis. If these servers use certificates that were not registered with a known CA, add trust for these certificates to BuckIt Server by bundling these certificates into a Kubernetes secret and providing it to Helm via the `trustedCertsSecret` value. If `.Values.tls.enabled` is `true` and you're installing certificates for third party CAs, remember to include BuckIt's own certificate with key `public.crt`, if it also needs to be trusted.
 
-For instance, given that TLS is enabled and you need to add trust for MinIO's own CA and for the CA of a Keycloak server, a Kubernetes secret can be created from the certificate files using `kubectl`:
+For instance, given that TLS is enabled and you need to add trust for BuckIt's own CA and for the CA of a Keycloak server, a Kubernetes secret can be created from the certificate files using `kubectl`:
 
 ```
 kubectl -n minio create secret generic minio-trusted-certs --from-file=public.crt --from-file=keycloak.crt

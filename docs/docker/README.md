@@ -1,16 +1,16 @@
-# MinIO Docker Quickstart Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io) [![Docker Pulls](https://img.shields.io/docker/pulls/minio/minio.svg?maxAge=604800)](https://hub.docker.com/r/minio/minio/)
+# BuckIt Docker Quickstart Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io) [![Docker Pulls](https://img.shields.io/docker/pulls/minio/minio.svg?maxAge=604800)](https://hub.docker.com/r/minio/minio/)
 
-See our web documentation on [Deploying MinIO in Standalone Mode](Deploy Standalone MinIO in a Container) for a more structured tutorial on deploying MinIO in a container.
+See our web documentation on [Deploying BuckIt in Standalone Mode](Deploy Standalone BuckIt in a Container) for a more structured tutorial on deploying BuckIt in a container.
 
 ## Prerequisites
 
 Docker installed on your machine. Download the relevant installer from [here](https://www.docker.com/community-edition#/download).
 
-## Run Standalone MinIO on Docker
+## Run Standalone BuckIt on Docker
 
-*Note*: Standalone MinIO is intended for early development and evaluation. For production clusters, deploy a [Distributed](https://docs.min.io/community/minio-object-store/operations/deployments/baremetal-deploy-minio-as-a-container.html) MinIO deployment.
+*Note*: Standalone BuckIt is intended for early development and evaluation. For production clusters, deploy a [Distributed](https://docs.min.io/community/minio-object-store/operations/deployments/baremetal-deploy-minio-as-a-container.html) BuckIt deployment.
 
-MinIO needs a persistent volume to store configuration and application data. For testing purposes, you can launch MinIO by simply passing a directory (`/data` in the example below). This directory gets created in the container filesystem at the time of container start. But all the data is lost after container exits.
+BuckIt needs a persistent volume to store configuration and application data. For testing purposes, you can launch BuckIt by simply passing a directory (`/data` in the example below). This directory gets created in the container filesystem at the time of container start. But all the data is lost after container exits.
 
 ```sh
 docker run \
@@ -21,7 +21,7 @@ docker run \
   quay.io/minio/minio server /data --console-address ":9001"
 ```
 
-To create a MinIO container with persistent storage, you need to map local persistent directories from the host OS to virtual config. To do this, run the below commands
+To create a BuckIt container with persistent storage, you need to map local persistent directories from the host OS to virtual config. To do this, run the below commands
 
 ### GNU/Linux and macOS
 
@@ -38,7 +38,7 @@ docker run \
   quay.io/minio/minio server /data --console-address ":9001"
 ```
 
-The command creates a new local directory `~/minio/data` in your user home directory. It then starts the MinIO container with the `-v` argument to map the local path (`~/minio/data`) to the specified virtual container directory (`/data`). When MinIO writes data to `/data`, that data is actually written to the local path `~/minio/data` where it can persist between container restarts.
+The command creates a new local directory `~/minio/data` in your user home directory. It then starts the BuckIt container with the `-v` argument to map the local path (`~/minio/data`) to the specified virtual container directory (`/data`). When BuckIt writes data to `/data`, that data is actually written to the local path `~/minio/data` where it can persist between container restarts.
 
 ### Windows
 
@@ -53,17 +53,17 @@ docker run \
   quay.io/minio/minio server /data --console-address ":9001"
 ```
 
-## Run Distributed MinIO on Containers
+## Run Distributed BuckIt on Containers
 
 We recommend kubernetes based deployment for production level deployment <https://github.com/minio/operator>.
 
 See the [Kubernetes documentation](https://docs.min.io/community/minio-object-store/operations/deployments/kubernetes.html) for more information.
 
-## MinIO Docker Tips
+## BuckIt Docker Tips
 
-### MinIO Custom Access and Secret Keys
+### BuckIt Custom Access and Secret Keys
 
-To override MinIO's auto-generated keys, you may pass secret and access keys explicitly as environment variables. MinIO server also allows regular strings as access and secret keys.
+To override BuckIt's auto-generated keys, you may pass secret and access keys explicitly as environment variables. BuckIt server also allows regular strings as access and secret keys.
 
 #### GNU/Linux and macOS (custom access and secret keys)
 
@@ -91,7 +91,7 @@ docker run \
   quay.io/minio/minio server /data --console-address ":9001"
 ```
 
-### Run MinIO Docker as a regular user
+### Run BuckIt Docker as a regular user
 
 Docker provides standardized mechanisms to run docker containers as non-root users.
 
@@ -132,16 +132,16 @@ docker run \
   quay.io/minio/minio server /data --console-address ":9001"
 ```
 
-### MinIO Custom Access and Secret Keys using Docker secrets
+### BuckIt Custom Access and Secret Keys using Docker secrets
 
-To override MinIO's auto-generated keys, you may pass secret and access keys explicitly by creating access and secret keys as [Docker secrets](https://docs.docker.com/engine/swarm/secrets/). MinIO server also allows regular strings as access and secret keys.
+To override BuckIt's auto-generated keys, you may pass secret and access keys explicitly by creating access and secret keys as [Docker secrets](https://docs.docker.com/engine/swarm/secrets/). BuckIt server also allows regular strings as access and secret keys.
 
 ```
 echo "AKIAIOSFODNN7EXAMPLE" | docker secret create access_key -
 echo "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" | docker secret create secret_key -
 ```
 
-Create a MinIO service using `docker service` to read from Docker secrets.
+Create a BuckIt service using `docker service` to read from Docker secrets.
 
 ```
 docker service create --name="minio-service" --secret="access_key" --secret="secret_key" quay.io/minio/minio server /data
@@ -149,7 +149,7 @@ docker service create --name="minio-service" --secret="access_key" --secret="sec
 
 Read more about `docker service` [here](https://docs.docker.com/engine/swarm/how-swarm-mode-works/services/)
 
-#### MinIO Custom Access and Secret Key files
+#### BuckIt Custom Access and Secret Key files
 
 To use other secret names follow the instructions above and replace `access_key` and `secret_key` with your custom names (e.g. `my_secret_key`,`my_custom_key`). Run your service with
 
@@ -193,17 +193,17 @@ To stop a running container, you can use the [`docker stop`](https://docs.docker
 docker stop <container_id>
 ```
 
-### MinIO container logs
+### BuckIt container logs
 
-To access MinIO logs, you can use the [`docker logs`](https://docs.docker.com/engine/reference/commandline/logs/) command.
+To access BuckIt logs, you can use the [`docker logs`](https://docs.docker.com/engine/reference/commandline/logs/) command.
 
 ```sh
 docker logs <container_id>
 ```
 
-### Monitor MinIO Docker Container
+### Monitor BuckIt Docker Container
 
-To monitor the resources used by MinIO container, you can use the [`docker stats`](https://docs.docker.com/engine/reference/commandline/stats/) command.
+To monitor the resources used by BuckIt container, you can use the [`docker stats`](https://docs.docker.com/engine/reference/commandline/stats/) command.
 
 ```sh
 docker stats <container_id>
@@ -211,5 +211,5 @@ docker stats <container_id>
 
 ## Explore Further
 
-* [MinIO in a Container Installation Guide](https://docs.min.io/community/minio-object-store/operations/deployments/baremetal-deploy-minio-as-a-container.html)
-* [MinIO Erasure Code QuickStart Guide](https://docs.min.io/community/minio-object-store/operations/concepts/erasure-coding.html)
+* [BuckIt in a Container Installation Guide](https://docs.min.io/community/minio-object-store/operations/deployments/baremetal-deploy-minio-as-a-container.html)
+* [BuckIt Erasure Code QuickStart Guide](https://docs.min.io/community/minio-object-store/operations/concepts/erasure-coding.html)

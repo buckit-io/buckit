@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a bug in MinIO (community edition is source-only)
+about: Report a bug in BuckIt (community edition is source-only)
 title: ''
 labels: community, triage
 assignees: ''
@@ -9,9 +9,9 @@ assignees: ''
 
 ## IMPORTANT NOTES
 
-**Community Edition**: MinIO community edition is now source-only. Install via `go install github.com/minio/minio@latest`
+**Community Edition**: BuckIt community edition is now source-only. Install via `go install github.com/minio/minio@latest`
 
-**Feature Requests**: We are no longer accepting feature requests for the community edition. For feature requests and enterprise support, please subscribe to [MinIO Enterprise Support](https://min.io/pricing).
+**Feature Requests**: We are no longer accepting feature requests for the community edition. For feature requests and enterprise support, please subscribe to [BuckIt Enterprise Support](https://min.io/pricing).
 
 **Urgent Issues**: If this case is urgent or affects production, please subscribe to [SUBNET](https://min.io/pricing) for 24/7 enterprise support.
 
@@ -45,7 +45,7 @@ assignees: ''
 
 ## Regression
 <!-- Is this issue a regression? (Yes / No) -->
-<!-- If Yes, optionally please include minio version or commit id or PR# that caused this regression, if you have these details. -->
+<!-- If Yes, optionally please include buckit version or commit id or PR# that caused this regression, if you have these details. -->
 
 ## Your Environment
 <!--- Include as many relevant details about the environment you experienced the bug in -->

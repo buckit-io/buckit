@@ -1,10 +1,10 @@
 # Object Lambda
 
-MinIO's Object Lambda implementation allows for transforming your data to serve unique data format requirements for each application. For example, a dataset created by an ecommerce application might include personally identifiable information (PII). When the same data is processed for analytics, PII should be redacted. However, if the same dataset is used for a marketing campaign, you might need to enrich the data with additional details, such as information from the customer loyalty database.
+BuckIt's Object Lambda implementation allows for transforming your data to serve unique data format requirements for each application. For example, a dataset created by an ecommerce application might include personally identifiable information (PII). When the same data is processed for analytics, PII should be redacted. However, if the same dataset is used for a marketing campaign, you might need to enrich the data with additional details, such as information from the customer loyalty database.
 
-MinIO's Object Lambda, enables application developers to process data retrieved from MinIO before returning it to an application. You can register a Lambda Function target on MinIO, once successfully registered it can be used to transform the data for application GET requests on demand.
+BuckIt's Object Lambda, enables application developers to process data retrieved from BuckIt before returning it to an application. You can register a Lambda Function target on BuckIt, once successfully registered it can be used to transform the data for application GET requests on demand.
 
-This document focuses on showing a working example on how to use Object Lambda with MinIO, you must have [MinIO deployed in your environment](https://docs.min.io/community/minio-object-store/operations/installation.html) before you can start using external lambda functions. You also must install Python version 3.8 or later for the lambda handlers to work.
+This document focuses on showing a working example on how to use Object Lambda with BuckIt, you must have [BuckIt deployed in your environment](https://docs.min.io/community/minio-object-store/operations/installation.html) before you can start using external lambda functions. You also must install Python version 3.8 or later for the lambda handlers to work.
 
 ## Example Lambda handler
 
@@ -28,7 +28,7 @@ def get_webhook():
 		object_context = event["getObjectContext"]
 
 		# Get the presigned URL to fetch the requested
-		# original object from MinIO
+		# original object from BuckIt
 		s3_url = object_context["inputS3Url"]
 
 		# Extract the route and request token from the input context
@@ -45,7 +45,7 @@ def get_webhook():
 
 		# Write object back to S3 Object Lambda
 		# response sends the transformed data
-		# back to MinIO and then to the user
+		# back to BuckIt and then to the user
 		resp = make_response(transformed_object, 200)
 		resp.headers['x-amz-request-route'] = request_route
 		resp.headers['x-amz-request-token'] = request_token
@@ -58,15 +58,15 @@ if __name__ == '__main__':
 	app.run()
 ```
 
-When you're writing a Lambda function for use with MinIO, the function is based on event context that MinIO provides to the Lambda function. The event context provides information about the request being made. It contains the parameters with relevant context. The fields used to create the Lambda function are as follows:
+When you're writing a Lambda function for use with BuckIt, the function is based on event context that BuckIt provides to the Lambda function. The event context provides information about the request being made. It contains the parameters with relevant context. The fields used to create the Lambda function are as follows:
 
-The field of `getObjectContext` means the input and output details for connections to MinIO. It has the following fields:
+The field of `getObjectContext` means the input and output details for connections to BuckIt. It has the following fields:
 
-- `inputS3Url` – A presigned URL that the Lambda function can use to download the original object. By using a presigned URL, the Lambda function doesn't need to have MinIO credentials to retrieve the original object. This allows Lambda function to focus on transformation of the object instead of securing the credentials.
+- `inputS3Url` – A presigned URL that the Lambda function can use to download the original object. By using a presigned URL, the Lambda function doesn't need to have BuckIt credentials to retrieve the original object. This allows Lambda function to focus on transformation of the object instead of securing the credentials.
 
-- `outputRoute` – A routing token that is added to the response headers when the Lambda function returns the transformed object. This is used by MinIO to further verify the incoming response validity.
+- `outputRoute` – A routing token that is added to the response headers when the Lambda function returns the transformed object. This is used by BuckIt to further verify the incoming response validity.
 
-- `outputToken` – A token added to the response headers when the Lambda function returns the transformed object. This is used by MinIO to verify the incoming response validity.
+- `outputToken` – A token added to the response headers when the Lambda function returns the transformed object. This is used by BuckIt to verify the incoming response validity.
 
 Lets start the lambda handler.
 
@@ -79,15 +79,15 @@ WARNING: This is a development server. Do not use it in a production deployment.
 Press CTRL+C to quit
 ```
 
-## Start MinIO with Lambda target
+## Start BuckIt with Lambda target
 
-Register MinIO with a Lambda function, we are calling our target name as `function`, but you may call it any other friendly name of your choice.
+Register BuckIt with a Lambda function, we are calling our target name as `function`, but you may call it any other friendly name of your choice.
 ```
 MINIO_LAMBDA_WEBHOOK_ENABLE_function=on MINIO_LAMBDA_WEBHOOK_ENDPOINT_function=http://localhost:5000 minio server /data &
 ...
 ...
-MinIO Object Storage Server
-Copyright: 2015-2023 MinIO, Inc.
+BuckIt Object Storage Server
+Copyright: 2015-2023 BuckIt, Inc.
 License: GNU AGPLv3 <https://www.gnu.org/licenses/agpl-3.0.html>
 Version: DEVELOPMENT.2023-02-05T05-17-27Z (go1.19.4 linux/amd64)
 
@@ -123,7 +123,7 @@ mc mb myminio/functionbucket
 Create a file `testobject` with some test data that will be transformed
 ```
 cat > testobject << EOF
-MinIO is a High Performance Object Storage released under GNU Affero General Public License v3.0. It is API compatible with Amazon S3 cloud storage service. Use MinIO to build high performance infrastructure for machine learning, analytics and application data workloads.
+BuckIt is a High Performance Object Storage released under GNU Affero General Public License v3.0. It is API compatible with Amazon S3 cloud storage service. Use BuckIt to build high performance infrastructure for machine learning, analytics and application data workloads.
 EOF
 ```
 

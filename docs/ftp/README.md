@@ -1,6 +1,6 @@
-# MinIO FTP/SFTP Server
+# BuckIt FTP/SFTP Server
 
-MinIO natively supports FTP/SFTP protocol, this allows any ftp/sftp client to upload and download files.
+BuckIt natively supports FTP/SFTP protocol, this allows any ftp/sftp client to upload and download files.
 
 Currently supported `FTP/SFTP` operations are as follows:
 
@@ -15,7 +15,7 @@ Currently supported `FTP/SFTP` operations are as follows:
 | append              | no        |
 | rename              | no        |
 
-MinIO supports following FTP/SFTP based protocols to access and manage data.
+BuckIt supports following FTP/SFTP based protocols to access and manage data.
 
 - Secure File Transfer Protocol (SFTP) – Defined by the Internet Engineering Task Force (IETF) as an
   extended version of SSH 2.0, allowing file transfer over SSH and for use with Transport Layer
@@ -58,7 +58,7 @@ MinIO supports following FTP/SFTP based protocols to access and manage data.
 
 ## Usage
 
-Start MinIO in a distributed setup, with 'ftp/sftp' enabled.
+Start BuckIt in a distributed setup, with 'ftp/sftp' enabled.
 
 ```
 minio server http://server{1...4}/disk{1...4}
@@ -73,7 +73,7 @@ Following example shows connecting via ftp client using `minioadmin` credentials
 ```
 ftp localhost -P 8021
 Connected to localhost.
-220 Welcome to MinIO FTP Server
+220 Welcome to BuckIt FTP Server
 Name (localhost:user): minioadmin
 331 User name ok, password required
 Password:
@@ -163,7 +163,7 @@ Unlike SFTP server, FTP server is insecure by default. To operate under TLS mode
 --ftp="tls-private-key=path/to/private.key" --ftp="tls-public-cert=path/to/public.crt"
 ```
 
-> NOTE: if MinIO distributed setup is already configured to run under TLS, FTP will automatically use the relevant
+> NOTE: if BuckIt distributed setup is already configured to run under TLS, FTP will automatically use the relevant
 > certs from the server certificate chain, this is mainly to add simplicity of setup. However if you wish to terminate
 > TLS certificates via a different domain for your FTP servers you may choose the above command line options.
 

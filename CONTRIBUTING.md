@@ -1,14 +1,14 @@
-# MinIO Contribution Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io) [![Docker Pulls](https://img.shields.io/docker/pulls/minio/minio.svg?maxAge=604800)](https://hub.docker.com/r/minio/minio/)
+# BuckIt Contribution Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io) [![Docker Pulls](https://img.shields.io/docker/pulls/minio/minio.svg?maxAge=604800)](https://hub.docker.com/r/minio/minio/)
 
-``MinIO`` community welcomes your contribution. To make the process as seamless as possible, we recommend you read this contribution guide.
+``BuckIt`` community welcomes your contribution. To make the process as seamless as possible, we recommend you read this contribution guide.
 
 ## Development Workflow
 
-Start by forking the MinIO GitHub repository, make changes in a branch and then send a pull request. We encourage pull requests to discuss code changes. Here are the steps in details:
+Start by forking the BuckIt GitHub repository, make changes in a branch and then send a pull request. We encourage pull requests to discuss code changes. Here are the steps in details:
 
-### Setup your MinIO GitHub Repository
+### Setup your BuckIt GitHub Repository
 
-Fork [MinIO upstream](https://github.com/minio/minio/fork) source repository to your own personal repository. Copy the URL of your MinIO fork (you will need it for the `git clone` command below).
+Fork [BuckIt upstream](https://github.com/minio/minio/fork) source repository to your own personal repository. Copy the URL of your BuckIt fork (you will need it for the `git clone` command below).
 
 ```sh
 git clone https://github.com/minio/minio
@@ -35,7 +35,7 @@ Before making code changes, make sure you create a separate branch for these cha
 git checkout -b my-new-feature
 ```
 
-### Test MinIO server changes
+### Test BuckIt server changes
 
 After your code changes, make sure
 
@@ -66,9 +66,9 @@ Pull requests can be created via GitHub. Refer to [this document](https://help.g
 
 ## FAQs
 
-### How does ``MinIO`` manage dependencies?
+### How does ``BuckIt`` manage dependencies?
 
-``MinIO`` uses `go mod` to manage its dependencies.
+``BuckIt`` uses `go mod` to manage its dependencies.
 
 - Run `go get foo/bar` in the source folder to add the dependency to `go.mod` file.
 
@@ -77,6 +77,6 @@ To remove a dependency
 - Edit your code and remove the import reference.
 - Run `go mod tidy` in the source folder to remove dependency from `go.mod` file.
 
-### What are the coding guidelines for MinIO?
+### What are the coding guidelines for BuckIt?
 
-``MinIO`` is fully conformant with Golang style. Refer: [Effective Go](https://github.com/golang/go/wiki/CodeReviewComments) article from Golang project. If you observe offending code, please feel free to send a pull request or ping us on [Slack](https://slack.min.io).
+``BuckIt`` is fully conformant with Golang style. Refer: [Effective Go](https://github.com/golang/go/wiki/CodeReviewComments) article from Golang project. If you observe offending code, please feel free to send a pull request or ping us on [Slack](https://slack.min.io).

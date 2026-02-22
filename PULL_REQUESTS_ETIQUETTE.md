@@ -1,12 +1,12 @@
-# MinIO Pull Request Guidelines
+# BuckIt Pull Request Guidelines
 
-These guidelines ensure high-quality commits in MinIO’s GitHub repositories, maintaining 
+These guidelines ensure high-quality commits in BuckIt’s GitHub repositories, maintaining 
 a clear, valuable commit history for our open-source projects. They apply to all contributors, 
 fostering efficient reviews and robust code.
 
 ## Why Pull Requests?
 
-Pull Requests (PRs) drive quality in MinIO’s codebase by:
+Pull Requests (PRs) drive quality in BuckIt’s codebase by:
 - Enabling peer review without pair programming.
 - Documenting changes for future reference.
 - Ensuring commits tell a clear story of development.
@@ -15,12 +15,12 @@ Pull Requests (PRs) drive quality in MinIO’s codebase by:
 
 ## Crafting a Quality PR
 
-A strong MinIO PR:
+A strong BuckIt PR:
 - Delivers a complete, valuable change (feature, bug fix, or improvement).
 - Has a concise title (e.g., `[S3] Fix bucket policy parsing #1234`) and a summary with context, referencing issues (e.g., `#1234`).
 - Contains well-written, logical commits explaining *why* changes were made (e.g., “Add S3 bucket tagging support so that users can organize resources efficiently”).
 - Is small, focused, and easy to review—ideally one commit, unless multiple commits better narrate complex work.
-- Adheres to MinIO’s coding standards (e.g., Go style, error handling, testing).
+- Adheres to BuckIt’s coding standards (e.g., Go style, error handling, testing).
 
 PRs must flow smoothly through review to reach production. Large PRs should be split into smaller, manageable ones.
 
@@ -48,14 +48,14 @@ PRs must flow smoothly through review to reach production. Large PRs should be s
 
 ## Reviewing PRs
 
-Reviewers ensure MinIO’s commit history remains a clear, reliable record. Responsibilities include:
+Reviewers ensure BuckIt’s commit history remains a clear, reliable record. Responsibilities include:
 
 1. **Commit Quality**:
    - Verify each commit explains *why* the change was made (e.g., “So that…”).
    - Request rebasing if commits are unclear, redundant, or lack context (e.g., “Please squash typo fixes into the parent commit”).
 
 2. **Code Quality**:
-   - Check adherence to MinIO’s Go standards (e.g., error handling, documentation).
+   - Check adherence to BuckIt’s Go standards (e.g., error handling, documentation).
    - Ensure tests cover new code and pass CI.
    - Flag bugs or critical issues for immediate fixes; suggest non-blocking improvements as follow-up issues.
 
@@ -65,7 +65,7 @@ Reviewers ensure MinIO’s commit history remains a clear, reliable record. Resp
    - If unable to complete the review, tag another reviewer (e.g., `@username please take over`).
 
 4. **Shared Responsibility**:
-   - All MinIO contributors are reviewers. The first commenter on a PR owns the review unless they delegate.
+   - All BuckIt contributors are reviewers. The first commenter on a PR owns the review unless they delegate.
    - Multiple reviewers are encouraged for complex PRs.
 
 5. **No Self-Edits**:
@@ -86,8 +86,8 @@ Reviewers ensure MinIO’s commit history remains a clear, reliable record. Resp
 
 ## Resources
 
-- [MinIO Coding Standards](https://github.com/minio/minio/blob/master/CONTRIBUTING.md)
+- [BuckIt Coding Standards](https://github.com/minio/minio/blob/master/CONTRIBUTING.md)
 - [Effective Commit Messages](https://mislav.net/2014/02/hidden-documentation/)
 - [GitHub PR Tips](https://github.com/blog/1943-how-to-write-the-perfect-pull-request)
 
-By following these guidelines, we ensure MinIO’s codebase remains high-quality, maintainable, and a joy to contribute to. Happy coding!
+By following these guidelines, we ensure BuckIt’s codebase remains high-quality, maintainable, and a joy to contribute to. Happy coding!
