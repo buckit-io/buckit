@@ -2697,7 +2697,7 @@ func (c replicationConfig) Resync(ctx context.Context, oi ObjectInfo, dsc Replic
 		}
 		for _, t := range tgtArns {
 			opts.TargetArn = t
-			// Update replication decision for target based on existing object replciation rule.
+			// Update replication decision for target based on existing object replication rule.
 			dsc.Set(newReplicateTargetDecision(t, c.Replicate(opts), false))
 		}
 		return c.resync(oi, dsc, tgtStatuses)

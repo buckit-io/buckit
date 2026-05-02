@@ -4,6 +4,8 @@ set -E
 set -o pipefail
 set -x
 
+source "$(dirname "$0")/local-host.sh"
+
 if [ ! -x "$PWD/minio" ]; then
 	echo "minio executable binary not found in current directory"
 	exit 1
@@ -12,6 +14,7 @@ fi
 WORK_DIR="$(mktemp -d)"
 MINIO_CONFIG_DIR="$WORK_DIR/.minio"
 MINIO=("$PWD/minio" --config-dir "$MINIO_CONFIG_DIR" server)
+MINIO_HOST="$(minio_local_host)"
 
 function start_minio() {
 	start_port=$1
@@ -24,7 +27,7 @@ function start_minio() {
 
 	args=()
 	for i in $(seq 1 4); do
-		args+=("http://localhost:$((start_port + i))${WORK_DIR}/mnt/disk$i/ ")
+		args+=("http://${MINIO_HOST}:$((start_port + i))${WORK_DIR}/mnt/disk$i/ ")
 	done
 
 	for i in $(seq 1 4); do
@@ -33,7 +36,7 @@ function start_minio() {
 
 	# Wait until all nodes return 403
 	for i in $(seq 1 4); do
-		while [ "$(curl -m 1 -s -o /dev/null -w "%{http_code}" http://localhost:$((start_port + i)))" -ne "403" ]; do
+		while [ "$(curl -m 1 -s -o /dev/null -w "%{http_code}" http://${MINIO_HOST}:$((start_port + i)))" -ne "403" ]; do
 			echo -n "."
 			sleep 1
 		done

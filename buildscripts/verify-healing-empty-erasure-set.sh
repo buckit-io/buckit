@@ -4,6 +4,8 @@
 set -E
 set -o pipefail
 
+source "$(dirname "$0")/local-host.sh"
+
 if [ ! -x "$PWD/minio" ]; then
 	echo "minio executable binary not found in current directory"
 	exit 1
@@ -12,6 +14,7 @@ fi
 WORK_DIR="$PWD/.verify-$RANDOM"
 MINIO_CONFIG_DIR="$WORK_DIR/.minio"
 MINIO=("$PWD/minio" --config-dir "$MINIO_CONFIG_DIR" server)
+MINIO_HOST="$(minio_local_host)"
 
 function start_minio_3_node() {
 	export MINIO_ROOT_USER=minio
@@ -22,7 +25,7 @@ function start_minio_3_node() {
 	start_port=$1
 	args=""
 	for i in $(seq 1 3); do
-		args="$args http://127.0.0.1:$((start_port + i))${WORK_DIR}/$i/1/ http://127.0.0.1:$((start_port + i))${WORK_DIR}/$i/2/ http://127.0.0.1:$((start_port + i))${WORK_DIR}/$i/3/ http://127.0.0.1:$((start_port + i))${WORK_DIR}/$i/4/ http://127.0.0.1:$((start_port + i))${WORK_DIR}/$i/5/ http://127.0.0.1:$((start_port + i))${WORK_DIR}/$i/6/"
+		args="$args http://${MINIO_HOST}:$((start_port + i))${WORK_DIR}/$i/1/ http://${MINIO_HOST}:$((start_port + i))${WORK_DIR}/$i/2/ http://${MINIO_HOST}:$((start_port + i))${WORK_DIR}/$i/3/ http://${MINIO_HOST}:$((start_port + i))${WORK_DIR}/$i/4/ http://${MINIO_HOST}:$((start_port + i))${WORK_DIR}/$i/5/ http://${MINIO_HOST}:$((start_port + i))${WORK_DIR}/$i/6/"
 	done
 
 	"${MINIO[@]}" --address ":$((start_port + 1))" $args >"${WORK_DIR}/dist-minio-server1.log" 2>&1 &
@@ -37,7 +40,7 @@ function start_minio_3_node() {
 	pid3=$!
 	disown $pid3
 
-	export MC_HOST_myminio="http://minio:minio123@127.0.0.1:$((start_port + 1))"
+	export MC_HOST_myminio="http://minio:minio123@${MINIO_HOST}:$((start_port + 1))"
 
 	timeout 15m /tmp/mc ready myminio || fail
 

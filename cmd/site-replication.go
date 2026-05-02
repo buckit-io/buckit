@@ -2648,7 +2648,7 @@ func getPriorityHelper(replicationConfig replication.Config) int {
 	return maxPrio + 10
 }
 
-// returns a slice with site names participating in site replciation but unspecified while adding
+// returns a slice with site names participating in site replication but unspecified while adding
 // a new site.
 func getMissingSiteNames(oldDeps, newDeps set.StringSet, currSites []madmin.PeerInfo) []string {
 	diff := oldDeps.Difference(newDeps)

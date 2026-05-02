@@ -4,10 +4,13 @@ set -E
 set -o pipefail
 set -x
 
+source "$(dirname "$0")/local-host.sh"
+
 WORK_DIR="$PWD/.verify-$RANDOM"
 MINIO_CONFIG_DIR="$WORK_DIR/.minio"
 MINIO_OLD=("$PWD/minio.RELEASE.2020-10-28T08-16-50Z" --config-dir "$MINIO_CONFIG_DIR" server)
 MINIO=("$PWD/minio" --config-dir "$MINIO_CONFIG_DIR" server)
+MINIO_HOST="$(minio_local_host)"
 
 if [ ! -x "$PWD/minio" ]; then
 	echo "minio executable binary not found in current directory"
@@ -26,7 +29,7 @@ function verify_rewrite() {
 
 	export MINIO_ACCESS_KEY=minio
 	export MINIO_SECRET_KEY=minio123
-	export MC_HOST_minio="http://minio:minio123@127.0.0.1:${start_port}/"
+	export MC_HOST_minio="http://minio:minio123@${MINIO_HOST}:${start_port}/"
 	unset MINIO_KMS_AUTO_ENCRYPTION # do not auto-encrypt objects
 	export MINIO_CI_CD=1
 
@@ -94,7 +97,7 @@ function verify_rewrite() {
 		-versions \
 		-access-key minio \
 		-secret-key minio123 \
-		-endpoint "http://127.0.0.1:${start_port}/" 2>&1 | grep INTACT; then
+		-endpoint "http://${MINIO_HOST}:${start_port}/" 2>&1 | grep INTACT; then
 		echo "server1 log:"
 		cat "${WORK_DIR}/server1.log"
 		echo "FAILED"
@@ -111,7 +114,7 @@ function verify_rewrite() {
 		exit 1
 	fi
 
-	go run ./buildscripts/heal-manual.go "127.0.0.1:${start_port}" "minio" "minio123"
+	go run ./buildscripts/heal-manual.go "${MINIO_HOST}:${start_port}" "minio" "minio123"
 	sleep 1
 
 	if ! ./s3-check-md5 \
@@ -119,7 +122,7 @@ function verify_rewrite() {
 		-versions \
 		-access-key minio \
 		-secret-key minio123 \
-		-endpoint http://127.0.0.1:${start_port}/ 2>&1 | grep INTACT; then
+		-endpoint http://${MINIO_HOST}:${start_port}/ 2>&1 | grep INTACT; then
 		echo "server1 log:"
 		cat "${WORK_DIR}/server1.log"
 		echo "FAILED"
