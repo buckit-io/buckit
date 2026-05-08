@@ -19,7 +19,9 @@ cleanup() {
 	docker volume prune -f
 	docker system prune -f || true
 	docker volume prune -f || true
-	docker volume rm $(docker volume ls -q -f dangling=true) || true
+	for volume in $(docker volume ls -q -f dangling=true); do
+		docker volume rm "${volume}" || true
+	done
 }
 
 verify_checksum_after_heal() {
@@ -89,7 +91,7 @@ __init__() {
 	mc cp /etc/hosts minio/minio-test/to-read/hosts
 	mc anonymous set download minio/minio-test
 
-	verify_checksum_mc ./buckit minio/minio-test/to-read/minio
+	verify_checksum_mc ./buckit minio/minio-test/to-read/buckit
 
 	curl -s http://127.0.0.1:9000/minio-test/to-read/hosts | sha256sum
 
@@ -103,7 +105,7 @@ main() {
 
 	verify_checksum_after_heal minio/minio-test http://127.0.0.1:9000/minio-test/to-read/hosts
 
-	verify_checksum_mc ./buckit minio/minio-test/to-read/minio
+	verify_checksum_mc ./buckit minio/minio-test/to-read/buckit
 
 	verify_checksum_mc /etc/hosts minio/minio-test/to-read/hosts
 
