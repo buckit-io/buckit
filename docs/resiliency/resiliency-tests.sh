@@ -401,7 +401,7 @@ function main() {
 	cleanup_and_prune
 
 	# Run resiliency tests against MinIO
-	docker compose -f "${DOCKER_COMPOSE_FILE}" up -d
+	docker compose -f "${DOCKER_COMPOSE_FILE}" up -d --wait
 
 	# Initial setup
 	docs/resiliency/resiliency-initial-script.sh
