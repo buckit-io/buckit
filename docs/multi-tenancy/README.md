@@ -60,7 +60,7 @@ minio server --address :9003 http://192.168.10.1{1...4}/data/tenant3
 
 ![Example-3](https://buckit-io.github.io/docs/screenshots/Example-3.jpg?raw=true)
 
-**Note**: On distributed systems, root credentials are recommend to be defined by exporting the `MINIO_ROOT_USER` and  `MINIO_ROOT_PASSWORD` environment variables. If no value is set Buckit setup will assume `minioadmin/minioadmin` as default credentials. If a domain is required, it must be specified by defining and exporting the `MINIO_DOMAIN` environment variable.
+**Note**: On distributed systems, root credentials are recommend to be defined by exporting the `MINIO_ROOT_USER` and  `MINIO_ROOT_PASSWORD` environment variables. If no value is set Buckit setup will assume `buckitadmin/buckitadmin` as default credentials. If a domain is required, it must be specified by defining and exporting the `MINIO_DOMAIN` environment variable.
 
 ## Cloud Scale Deployment
 

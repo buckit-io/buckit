@@ -50,7 +50,7 @@ To start a distributed Buckit instance, you just need to pass drive locations as
 
 **NOTE:**
 
-- All the nodes running distributed Buckit should share a common root credentials, for the nodes to connect and trust each other. To achieve this, it is **recommended** to export root user and root password as environment variables, `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD`, on all the nodes before executing Buckit server command. If not exported, default `minioadmin/minioadmin` credentials shall be used.
+- All the nodes running distributed Buckit should share a common root credentials, for the nodes to connect and trust each other. To achieve this, it is **recommended** to export root user and root password as environment variables, `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD`, on all the nodes before executing Buckit server command. If not exported, default `buckitadmin/buckitadmin` credentials shall be used.
 - **Buckit creates erasure-coding sets of _2_ to _16_ drives per set.  The number of drives you provide in total must be a multiple of one of those numbers.**
 - **Buckit chooses the largest EC set size which divides into the total number of drives or total number of nodes given - making sure to keep the uniform distribution i.e each node participates equal number of drives per set**.
 - **Each object is written to a single EC set, and therefore is spread over no more than 16 drives.**

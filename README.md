@@ -59,7 +59,7 @@ env GOOS=linux GOARCH=arm64 go build -tags kqueue
 
 Start Buckit by running `buckit server PATH` where `PATH` is any empty folder on your local filesystem.
 
-The Buckit deployment starts using default root credentials `minioadmin:minioadmin`.
+The Buckit deployment starts using default root credentials `buckitadmin:buckitadmin`.
 You can test the deployment using the Buckit Console, an embedded web-based object browser built into Buckit Server.
 Point a web browser running on the host machine to <http://127.0.0.1:9000> and log in with the root credentials.
 You can use the Browser to create buckets, upload objects, and browse the contents of the Buckit server.
@@ -67,7 +67,7 @@ You can use the Browser to create buckets, upload objects, and browse the conten
 You can also connect using any S3-compatible tool, such as the Buckit Client `mc` commandline tool:
 
 ```sh
-mc alias set local http://localhost:9000 minioadmin minioadmin
+mc alias set local http://localhost:9000 buckitadmin buckitadmin
 mc admin info local
 ```
 
@@ -120,7 +120,7 @@ Point your web browser to <http://127.0.0.1:9000> to ensure your server has star
 The following commands set a local alias, validate the server information, create a bucket, copy data to that bucket, and list the contents of the bucket.
 
 ```sh
-mc alias set local http://localhost:9000 minioadmin minioadmin
+mc alias set local http://localhost:9000 buckitadmin buckitadmin
 mc admin info
 mc mb data
 mc cp ~/Downloads/mydata data/
