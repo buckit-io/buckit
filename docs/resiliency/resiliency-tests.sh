@@ -396,7 +396,7 @@ function main() {
 		wget -q https://dl.minio.io/client/mc/release/linux-amd64/mc && chmod +x ./mc
 	fi
 
-	export MC_HOST_myminio=http://minioadmin:minioadmin@localhost:9000
+	export MC_HOST_myminio=http://buckitadmin:buckitadmin@localhost:9000
 
 	cleanup_and_prune
 

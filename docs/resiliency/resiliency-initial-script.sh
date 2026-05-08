@@ -20,7 +20,7 @@ while true; do
 		echo retry: timeout while running: mc alias set
 		exit 1
 	fi
-	eval ./mc alias set "${ALIAS_NAME}" "${MINIO_SERVER_URL}" minioadmin minioadmin && break
+	eval ./mc alias set "${ALIAS_NAME}" "${MINIO_SERVER_URL}" buckitadmin buckitadmin && break
 	TIMEOUT=$((TIMEOUT - 1))
 	sleep 1
 done
