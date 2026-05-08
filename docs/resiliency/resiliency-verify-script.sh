@@ -16,8 +16,6 @@ if [ "${OBJ_COUNT_AFTER_STOP}" -ne 10 ]; then
 	exit 1
 fi
 
-./mc ready "${ALIAS_NAME}" --json
-
 OUT=$(./mc cp --quiet "${SRC_DIR}"/* "${ALIAS_NAME}"/"${BUCKET}"/new-data/)
 RET=${?}
 if [ ${RET} -ne 0 ]; then
