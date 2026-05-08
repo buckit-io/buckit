@@ -33,7 +33,7 @@ jobs:
       - name: setup-go-step
         uses: actions/setup-go@v5
         with:
-          go-version: 1.25.x
+          go-version: 1.25.10
 
       - name: github sha short
         id: vars
