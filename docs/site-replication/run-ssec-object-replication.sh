@@ -14,8 +14,8 @@ exit_1() {
 
 cleanup() {
 	echo -n "Cleaning up instances of MinIO ..."
-	pkill minio || sudo pkill minio
-	pkill -9 minio || sudo pkill -9 minio
+	pkill buckit || pkill minio || sudo pkill buckit || sudo pkill minio
+	pkill -9 buckit || pkill -9 minio || sudo pkill -9 buckit || sudo pkill -9 minio
 	rm -rf /tmp/minio{1,2}
 	echo "done"
 }

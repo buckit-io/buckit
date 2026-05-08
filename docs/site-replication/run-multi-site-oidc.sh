@@ -16,7 +16,7 @@ exit_1() {
 
 cleanup() {
 	echo "Cleaning up instances of MinIO"
-	pkill minio
+	pkill buckit || pkill minio
 	pkill -9 minio
 	rm -rf /tmp/minio{1,2,3}
 }

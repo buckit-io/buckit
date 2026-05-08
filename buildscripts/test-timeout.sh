@@ -6,15 +6,11 @@ fi
 
 WORK_DIR="$PWD/.verify-$RANDOM"
 MINIO_CONFIG_DIR="$WORK_DIR/.minio"
-MINIO=("$PWD/minio" --config-dir "$MINIO_CONFIG_DIR" server)
+MINIO=("$PWD/buckit" --config-dir "$MINIO_CONFIG_DIR" server)
+NETCAT="$(command -v netcat || command -v nc)"
 
-if [ ! -x "$PWD/minio" ]; then
-	echo "minio executable binary not found in current directory"
-	exit 1
-fi
-
-if [ ! -x "$PWD/minio" ]; then
-	echo "minio executable binary not found in current directory"
+if [ ! -x "$PWD/buckit" ]; then
+	echo "buckit executable binary not found in current directory"
 	exit 1
 fi
 
@@ -31,8 +27,8 @@ catch() {
 	fi
 
 	echo "Cleaning up instances of MinIO"
-	pkill minio || true
-	pkill -9 minio || true
+	pkill buckit || pkill minio || true
+	pkill -9 buckit || pkill -9 minio || true
 	purge "$WORK_DIR"
 	if [ $# -ne 0 ]; then
 		exit $#
@@ -65,7 +61,7 @@ function send_put_object_request() {
 	body_timeout=$2
 
 	start=$(date +%s)
-	timeout 5m bash -c "gen_put_request $hdr_timeout $body_timeout | netcat 127.0.0.1 $start_port | read" || return -1
+	timeout 5m bash -c "gen_put_request $hdr_timeout $body_timeout | \"$NETCAT\" 127.0.0.1 $start_port > /dev/null" || return -1
 	[ $(($(date +%s) - start)) -gt $((srv_hdr_timeout + srv_idle_timeout + 1)) ] && return -1
 	return 0
 }
@@ -110,7 +106,7 @@ function test_minio_with_timeout() {
 	set -e
 
 	"${PWD}/mc" mb minio/testbucket
-	"${PWD}/mc" anonymous set public minio/testbucket
+	"${PWD}/mc" anonymous set upload minio/testbucket
 
 	# slow header writing
 	send_put_object_request 20 0 && exit -1

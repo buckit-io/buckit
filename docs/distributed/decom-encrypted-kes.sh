@@ -4,7 +4,7 @@ if [ -n "$TEST_DEBUG" ]; then
 	set -x
 fi
 
-pkill minio
+pkill buckit || pkill minio
 pkill kes
 rm -rf /tmp/xl
 

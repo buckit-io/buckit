@@ -9,12 +9,12 @@ source "$(dirname "$0")/local-host.sh"
 WORK_DIR="$PWD/.verify-$RANDOM"
 MINIO_CONFIG_DIR="$WORK_DIR/.minio"
 MINIO_OLD=("$PWD/minio.RELEASE.2020-10-28T08-16-50Z" --config-dir "$MINIO_CONFIG_DIR" server)
-MINIO=("$PWD/minio" --config-dir "$MINIO_CONFIG_DIR" server)
+MINIO=("$PWD/buckit" --config-dir "$MINIO_CONFIG_DIR" server)
 MINIO_HOST="$(minio_local_host)"
 MINIO_OLD_RELEASE_URL="https://dl.minio.io/server/minio/release/linux-amd64/archive/minio.RELEASE.2020-10-28T08-16-50Z"
 
-if [ ! -x "$PWD/minio" ]; then
-	echo "minio executable binary not found in current directory"
+if [ ! -x "$PWD/buckit" ]; then
+	echo "buckit executable binary not found in current directory"
 	exit 1
 fi
 

@@ -20,7 +20,7 @@ catch() {
 
 	echo "Cleaning up instances of MinIO"
 	set +e
-	pkill minio
+	pkill buckit || pkill minio
 	pkill mc
 	rm -rf /tmp/xl/
 	if [ $# -ne 0 ]; then
@@ -54,9 +54,9 @@ export MINIO_KMS_SECRET_KEY="my-minio-key:OSMM+vkKUTCvQs9YL/CVMIMt43HFhkUpqJxTmG
 export MINIO_ROOT_USER="minioadmin"
 export MINIO_ROOT_PASSWORD="minioadmin"
 
-./minio server --address ":9001" /tmp/xl/1/{1...4}/ 2>&1 >/tmp/dc1.log &
+./buckit server --address ":9001" /tmp/xl/1/{1...4}/ 2>&1 >/tmp/dc1.log &
 pid1=$!
-./minio server --address ":9002" /tmp/xl/2/{1...4}/ 2>&1 >/tmp/dc2.log &
+./buckit server --address ":9002" /tmp/xl/2/{1...4}/ 2>&1 >/tmp/dc2.log &
 pid2=$!
 
 sleep 3

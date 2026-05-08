@@ -4,7 +4,7 @@ if [ -n "$TEST_DEBUG" ]; then
 	set -x
 fi
 
-pkill minio
+pkill buckit || pkill minio
 docker rm -f $(docker ps -aq)
 rm -rf /tmp/openid{1..4}
 
@@ -78,5 +78,5 @@ if [[ ${OBJ_NAME} != "hosts" ]]; then
 fi
 
 # Finally kill running processes
-pkill minio
+pkill buckit || pkill minio
 docker rm -f $(docker ps -aq)

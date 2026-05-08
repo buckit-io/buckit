@@ -82,7 +82,7 @@ create_iam_content_in_old_minio() {
 import_iam_content_in_new_minio() {
 	echo "Importing IAM content in new minio instance."
 	# Assume current minio binary exists.
-	MINIO_CI_CD=1 ./minio server /tmp/data/{1...4} &
+	MINIO_CI_CD=1 ./buckit server /tmp/data/{1...4} &
 	sleep 5
 
 	set -x

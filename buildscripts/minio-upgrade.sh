@@ -85,11 +85,11 @@ __init__() {
 	add_alias
 
 	mc mb minio/minio-test/
-	mc cp ./minio minio/minio-test/to-read/
+	mc cp ./buckit minio/minio-test/to-read/
 	mc cp /etc/hosts minio/minio-test/to-read/hosts
 	mc anonymous set download minio/minio-test
 
-	verify_checksum_mc ./minio minio/minio-test/to-read/minio
+	verify_checksum_mc ./buckit minio/minio-test/to-read/minio
 
 	curl -s http://127.0.0.1:9000/minio-test/to-read/hosts | sha256sum
 
@@ -103,7 +103,7 @@ main() {
 
 	verify_checksum_after_heal minio/minio-test http://127.0.0.1:9000/minio-test/to-read/hosts
 
-	verify_checksum_mc ./minio minio/minio-test/to-read/minio
+	verify_checksum_mc ./buckit minio/minio-test/to-read/minio
 
 	verify_checksum_mc /etc/hosts minio/minio-test/to-read/hosts
 

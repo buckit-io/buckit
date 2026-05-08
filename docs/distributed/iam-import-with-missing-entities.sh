@@ -4,7 +4,7 @@ if [ -n "$TEST_DEBUG" ]; then
 	set -x
 fi
 
-pkill minio
+pkill buckit || pkill minio
 docker rm -f $(docker ps -aq)
 rm -rf /tmp/ldap{1..4}
 rm -rf /tmp/ldap1{1..4}
@@ -64,7 +64,7 @@ if [ "${SVCACCT_COUNT_2}" -ne 2 ]; then
 fi
 
 # Kill MinIO and LDAP to start afresh with missing groups/DN
-pkill minio
+pkill buckit || pkill minio
 docker rm -f $(docker ps -aq)
 rm -rf /tmp/ldap{1..4}
 
@@ -111,5 +111,5 @@ if [ "${SVCACCT_COUNT_2}" -ne 0 ]; then
 fi
 
 # Finally kill running processes
-pkill minio
+pkill buckit || pkill minio
 docker rm -f $(docker ps -aq)

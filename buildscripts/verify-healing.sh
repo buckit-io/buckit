@@ -6,14 +6,14 @@ set -o pipefail
 
 source "$(dirname "$0")/local-host.sh"
 
-if [ ! -x "$PWD/minio" ]; then
-	echo "minio executable binary not found in current directory"
+if [ ! -x "$PWD/buckit" ]; then
+	echo "buckit executable binary not found in current directory"
 	exit 1
 fi
 
 WORK_DIR="$PWD/.verify-$RANDOM"
 MINIO_CONFIG_DIR="$WORK_DIR/.minio"
-MINIO=("$PWD/minio" --config-dir "$MINIO_CONFIG_DIR" server)
+MINIO=("$PWD/buckit" --config-dir "$MINIO_CONFIG_DIR" server)
 MINIO_HOST="$(minio_local_host)"
 GOPATH=/tmp/gopath
 
@@ -67,14 +67,14 @@ function start_minio_3_node() {
 		echo "minio server 3 is not running" && fail
 	fi
 
-	if ! pkill minio; then
+	if ! (pkill buckit || pkill minio); then
 		fail
 	fi
 
 	sleep 1
-	if pgrep minio; then
+	if pgrep buckit || pgrep minio; then
 		# forcibly killing, to proceed further properly.
-		if ! pkill -9 minio; then
+		if ! (pkill -9 buckit || pkill -9 minio); then
 			echo "no minio process running anymore, proceed."
 		fi
 	fi
@@ -108,7 +108,7 @@ function fail() {
 		echo "server$i log:"
 		cat "${WORK_DIR}/dist-minio-server$i.log"
 	done
-	pkill -9 minio
+	pkill -9 buckit || pkill -9 minio || true
 	echo "FAILED"
 	purge "$WORK_DIR"
 	exit 1
