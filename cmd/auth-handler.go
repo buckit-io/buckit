@@ -33,14 +33,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/minio/minio/internal/auth"
-	objectlock "github.com/minio/minio/internal/bucket/object/lock"
-	"github.com/minio/minio/internal/etag"
-	"github.com/minio/minio/internal/hash"
-	xhttp "github.com/minio/minio/internal/http"
-	xjwt "github.com/minio/minio/internal/jwt"
-	"github.com/minio/minio/internal/logger"
-	"github.com/minio/minio/internal/mcontext"
+	"github.com/buckit-io/buckit/internal/auth"
+	objectlock "github.com/buckit-io/buckit/internal/bucket/object/lock"
+	"github.com/buckit-io/buckit/internal/etag"
+	"github.com/buckit-io/buckit/internal/hash"
+	xhttp "github.com/buckit-io/buckit/internal/http"
+	xjwt "github.com/buckit-io/buckit/internal/jwt"
+	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/buckit/internal/mcontext"
 	"github.com/minio/pkg/v3/policy"
 )
 

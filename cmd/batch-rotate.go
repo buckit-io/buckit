@@ -31,9 +31,9 @@ import (
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/minio/minio-go/v7/pkg/tags"
-	"github.com/minio/minio/internal/crypto"
-	xhttp "github.com/minio/minio/internal/http"
-	"github.com/minio/minio/internal/kms"
+	"github.com/buckit-io/buckit/internal/crypto"
+	xhttp "github.com/buckit-io/buckit/internal/http"
+	"github.com/buckit-io/buckit/internal/kms"
 	"github.com/minio/pkg/v3/env"
 	"github.com/minio/pkg/v3/workers"
 )

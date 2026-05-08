@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/minio/madmin-go/v3"
-	"github.com/minio/minio/internal/config"
-	"github.com/minio/minio/internal/crypto"
+	"github.com/buckit-io/buckit/internal/config"
+	"github.com/buckit-io/buckit/internal/crypto"
 	"github.com/minio/pkg/v3/ldap"
 )
 

@@ -20,7 +20,7 @@ package cmd
 import (
 	"encoding/xml"
 
-	"github.com/minio/minio/internal/auth"
+	"github.com/buckit-io/buckit/internal/auth"
 )
 
 // AssumedRoleUser - The identifiers for the temporary security credentials that

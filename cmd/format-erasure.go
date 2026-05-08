@@ -27,11 +27,11 @@ import (
 	"sync"
 
 	"github.com/dustin/go-humanize"
-	"github.com/minio/minio/internal/color"
-	"github.com/minio/minio/internal/config"
-	"github.com/minio/minio/internal/config/storageclass"
-	xioutil "github.com/minio/minio/internal/ioutil"
-	"github.com/minio/minio/internal/logger"
+	"github.com/buckit-io/buckit/internal/color"
+	"github.com/buckit-io/buckit/internal/config"
+	"github.com/buckit-io/buckit/internal/config/storageclass"
+	xioutil "github.com/buckit-io/buckit/internal/ioutil"
+	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/minio/pkg/v3/sync/errgroup"
 )
 
@@ -177,7 +177,7 @@ func formatGetBackendErasureVersion(b []byte) (string, error) {
 		return "", fmt.Errorf(`format.Version expected: %s, got: %s`, formatMetaVersionV1, meta.Version)
 	}
 	if meta.Format != formatBackendErasure && meta.Format != formatBackendErasureSingle {
-		return "", fmt.Errorf(`found backend type %s, expected %s or %s - to migrate to a supported backend visit https://docs.min.io/community/minio-object-store/operations/deployments/baremetal-migrate-fs-gateway.html`, meta.Format, formatBackendErasure, formatBackendErasureSingle)
+		return "", fmt.Errorf(`found backend type %s, expected %s or %s - to migrate to a supported backend visit https://buckit-io.github.io/docs/community/minio-object-store/operations/deployments/baremetal-migrate-fs-gateway.html`, meta.Format, formatBackendErasure, formatBackendErasureSingle)
 	}
 	// Erasure backend found, proceed to detect version.
 	format := &formatErasureVersionDetect{}

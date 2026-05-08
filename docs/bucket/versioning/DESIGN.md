@@ -2,7 +2,7 @@
 
 ## Description of `xl.meta`
 
-`xl.meta` is a new self describing backend format used by BuckIt to support AWS S3 compatible versioning.
+`xl.meta` is a new self describing backend format used by Buckit to support AWS S3 compatible versioning.
 This file is the source of truth for each `version` at rest. `xl.meta` is a msgpack file serialized from a
 well defined data structure. To understand `xl.meta` here are the few things to start with
 
@@ -42,7 +42,7 @@ Therefore, the metadata is wrapped as a binary array for easy skipping.
 - LegacyObjectType (preserves existing deployments and older xl.json format)
 - DeleteMarker (a versionId to capture the DELETE sequences implemented primarily for AWS spec compatibility)
 
-A sample msgpack-JSON `xl.meta`, you can debug the content inside `xl.meta` using [xl-meta.go](https://github.com/minio/minio/tree/master/docs/debugging#decoding-metadata) program.
+A sample msgpack-JSON `xl.meta`, you can debug the content inside `xl.meta` using [xl-meta.go](https://buckit-io.github.io/docs/debugging#decoding-metadata) program.
 
 ```json
 {

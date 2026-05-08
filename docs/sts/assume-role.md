@@ -2,12 +2,12 @@
 
 ## Introduction
 
-Returns a set of temporary security credentials that you can use to access BuckIt resources. AssumeRole requires authorization credentials for an existing user on BuckIt. The advantages of this API are
+Returns a set of temporary security credentials that you can use to access Buckit resources. AssumeRole requires authorization credentials for an existing user on Buckit. The advantages of this API are
 
 - To be able to reliably use S3 multipart APIs feature of the SDKs without re-inventing the wheel of pre-signing the each URL in multipart API. This is very tedious to implement with all the scenarios of fault tolerance that's already implemented by the client SDK. The general client SDKs don't support multipart with presigned URLs.
 - To be able to easily get the temporary credentials to upload to a prefix. Make it possible for a client to upload a whole folder using the session. The server side applications need not create a presigned URL and serve to the client for each file. Since, the client would have the session it can do it by itself.
 
-The temporary security credentials returned by this API consists of an access key, a secret key, and a security token. Applications can use these temporary security credentials to sign calls to BuckIt API operations. The policy applied to these temporary credentials is inherited from the BuckIt user credentials. By default, the temporary security credentials created by AssumeRole last for one hour. However, use the optional DurationSeconds parameter to specify the duration of the credentials. This value varies from 900 seconds (15 minutes) up to the maximum session duration of 365 days.
+The temporary security credentials returned by this API consists of an access key, a secret key, and a security token. Applications can use these temporary security credentials to sign calls to Buckit API operations. The policy applied to these temporary credentials is inherited from the Buckit user credentials. By default, the temporary security credentials created by AssumeRole last for one hour. However, use the optional DurationSeconds parameter to specify the duration of the credentials. This value varies from 900 seconds (15 minutes) up to the maximum session duration of 365 days.
 
 ## API Request Parameters
 
@@ -89,7 +89,7 @@ export MINIO_ROOT_PASSWORD=minio123
 minio server ~/test
 ```
 
-Create new users following the multi-user guide [here](https://docs.min.io/community/minio-object-store/administration/identity-access-management.html)
+Create new users following the multi-user guide [here](https://buckit-io.github.io/docs/community/minio-object-store/administration/identity-access-management.html)
 
 ### Testing an example with awscli tool
 
@@ -102,7 +102,7 @@ aws_access_key_id = foobar
 aws_secret_access_key = foo12345
 ```
 
-> NOTE: In the following commands `--role-arn` and `--role-session-name` are not meaningful for BuckIt and can be set to any value satisfying the command line requirements.
+> NOTE: In the following commands `--role-arn` and `--role-session-name` are not meaningful for Buckit and can be set to any value satisfying the command line requirements.
 
 ```
 $ aws --profile foobar --endpoint-url http://localhost:9000 sts assume-role --policy '{"Version":"2012-10-17","Statement":[{"Sid":"Stmt1","Effect":"Allow","Action":"s3:*","Resource":"arn:aws:s3:::*"}]}' --role-arn arn:xxx:xxx:xxx:xxxx --role-session-name anything
@@ -134,5 +134,5 @@ SessionToken: eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3NLZXkiOiIyN1lEUllFT
 
 ## Explore Further
 
-- [BuckIt Admin Complete Guide](https://docs.min.io/community/minio-object-store/reference/minio-mc-admin.html)
-- [The BuckIt documentation website](https://docs.min.io/community/minio-object-store/index.html)
+- [Buckit Admin Complete Guide](https://buckit-io.github.io/docs/community/minio-object-store/reference/minio-mc-admin.html)
+- [The Buckit documentation website](https://buckit-io.github.io/docs/community/minio-object-store/index.html)

@@ -23,7 +23,7 @@ import (
 	"hash"
 	"io"
 
-	"github.com/minio/minio/internal/ioutil"
+	"github.com/buckit-io/buckit/internal/ioutil"
 )
 
 // Checker allows to verify the checksum of a reader.

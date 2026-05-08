@@ -19,7 +19,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.4.0.tgz
     version: 5.4.0
@@ -41,7 +41,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.3.0.tgz
     version: 5.3.0
@@ -63,7 +63,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.2.0.tgz
     version: 5.2.0
@@ -85,7 +85,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.1.0.tgz
     version: 5.1.0
@@ -107,7 +107,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.15.tgz
     version: 5.0.15
@@ -129,7 +129,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.14.tgz
     version: 5.0.14
@@ -151,7 +151,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.13.tgz
     version: 5.0.13
@@ -173,7 +173,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.12.tgz
     version: 5.0.12
@@ -195,7 +195,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.11.tgz
     version: 5.0.11
@@ -217,7 +217,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.10.tgz
     version: 5.0.10
@@ -239,7 +239,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.9.tgz
     version: 5.0.9
@@ -261,7 +261,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.8.tgz
     version: 5.0.8
@@ -283,7 +283,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.7.tgz
     version: 5.0.7
@@ -305,7 +305,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.6.tgz
     version: 5.0.6
@@ -327,7 +327,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.5.tgz
     version: 5.0.5
@@ -349,7 +349,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.4.tgz
     version: 5.0.4
@@ -371,7 +371,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.3.tgz
     version: 5.0.3
@@ -393,7 +393,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.2.tgz
     version: 5.0.2
@@ -415,7 +415,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.1.tgz
     version: 5.0.1
@@ -437,7 +437,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-5.0.0.tgz
     version: 5.0.0
@@ -459,7 +459,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.1.0.tgz
     version: 4.1.0
@@ -481,7 +481,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.15.tgz
     version: 4.0.15
@@ -503,7 +503,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.14.tgz
     version: 4.0.14
@@ -525,7 +525,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.13.tgz
     version: 4.0.13
@@ -547,7 +547,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.12.tgz
     version: 4.0.12
@@ -569,7 +569,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.11.tgz
     version: 4.0.11
@@ -591,7 +591,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.10.tgz
     version: 4.0.10
@@ -613,7 +613,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.9.tgz
     version: 4.0.9
@@ -635,7 +635,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.8.tgz
     version: 4.0.8
@@ -657,7 +657,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.7.tgz
     version: 4.0.7
@@ -679,7 +679,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.6.tgz
     version: 4.0.6
@@ -701,7 +701,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.5.tgz
     version: 4.0.5
@@ -723,7 +723,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.4.tgz
     version: 4.0.4
@@ -745,7 +745,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.3.tgz
     version: 4.0.3
@@ -767,7 +767,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.2.tgz
     version: 4.0.2
@@ -789,7 +789,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.1.tgz
     version: 4.0.1
@@ -811,7 +811,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-4.0.0.tgz
     version: 4.0.0
@@ -833,7 +833,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.6.6.tgz
     version: 3.6.6
@@ -855,7 +855,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.6.5.tgz
     version: 3.6.5
@@ -877,7 +877,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.6.4.tgz
     version: 3.6.4
@@ -899,7 +899,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.6.3.tgz
     version: 3.6.3
@@ -921,7 +921,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.6.2.tgz
     version: 3.6.2
@@ -943,7 +943,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.6.1.tgz
     version: 3.6.1
@@ -965,7 +965,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.6.0.tgz
     version: 3.6.0
@@ -987,7 +987,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.5.9.tgz
     version: 3.5.9
@@ -1009,7 +1009,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.5.8.tgz
     version: 3.5.8
@@ -1031,7 +1031,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.5.7.tgz
     version: 3.5.7
@@ -1053,7 +1053,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.5.6.tgz
     version: 3.5.6
@@ -1075,7 +1075,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.5.5.tgz
     version: 3.5.5
@@ -1097,7 +1097,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.5.4.tgz
     version: 3.5.4
@@ -1119,7 +1119,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.5.3.tgz
     version: 3.5.3
@@ -1141,7 +1141,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.5.2.tgz
     version: 3.5.2
@@ -1163,7 +1163,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.5.1.tgz
     version: 3.5.1
@@ -1185,7 +1185,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.5.0.tgz
     version: 3.5.0
@@ -1207,7 +1207,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.4.8.tgz
     version: 3.4.8
@@ -1229,7 +1229,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.4.7.tgz
     version: 3.4.7
@@ -1251,7 +1251,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.4.6.tgz
     version: 3.4.6
@@ -1273,7 +1273,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.4.5.tgz
     version: 3.4.5
@@ -1295,7 +1295,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.4.4.tgz
     version: 3.4.4
@@ -1317,7 +1317,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.4.3.tgz
     version: 3.4.3
@@ -1339,7 +1339,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.4.2.tgz
     version: 3.4.2
@@ -1361,7 +1361,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.4.1.tgz
     version: 3.4.1
@@ -1383,7 +1383,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.4.0.tgz
     version: 3.4.0
@@ -1405,7 +1405,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.3.4.tgz
     version: 3.3.4
@@ -1427,7 +1427,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.3.3.tgz
     version: 3.3.3
@@ -1449,7 +1449,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.3.2.tgz
     version: 3.3.2
@@ -1471,7 +1471,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.3.1.tgz
     version: 3.3.1
@@ -1493,7 +1493,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.3.0.tgz
     version: 3.3.0
@@ -1515,7 +1515,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.2.0.tgz
     version: 3.2.0
@@ -1537,7 +1537,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.1.9.tgz
     version: 3.1.9
@@ -1559,7 +1559,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.1.8.tgz
     version: 3.1.8
@@ -1581,7 +1581,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.1.7.tgz
     version: 3.1.7
@@ -1603,7 +1603,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.1.6.tgz
     version: 3.1.6
@@ -1625,7 +1625,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.1.5.tgz
     version: 3.1.5
@@ -1647,7 +1647,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.1.4.tgz
     version: 3.1.4
@@ -1669,7 +1669,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.1.3.tgz
     version: 3.1.3
@@ -1691,7 +1691,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.1.2.tgz
     version: 3.1.2
@@ -1713,7 +1713,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.1.1.tgz
     version: 3.1.1
@@ -1735,7 +1735,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.1.0.tgz
     version: 3.1.0
@@ -1757,7 +1757,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.0.2.tgz
     version: 3.0.2
@@ -1779,7 +1779,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.0.1.tgz
     version: 3.0.1
@@ -1801,7 +1801,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-3.0.0.tgz
     version: 3.0.0
@@ -1821,7 +1821,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-2.0.1.tgz
     version: 2.0.1
@@ -1841,7 +1841,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-2.0.0.tgz
     version: 2.0.0
@@ -1861,7 +1861,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-1.0.5.tgz
     version: 1.0.5
@@ -1881,7 +1881,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-1.0.4.tgz
     version: 1.0.4
@@ -1901,7 +1901,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-1.0.3.tgz
     version: 1.0.3
@@ -1921,7 +1921,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-1.0.2.tgz
     version: 1.0.2
@@ -1941,7 +1941,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-1.0.1.tgz
     version: 1.0.1
@@ -1961,7 +1961,7 @@ entries:
       name: MinIO, Inc
     name: minio
     sources:
-    - https://github.com/minio/minio
+    - https://github.com/buckit-io/buckit
     urls:
     - https://charts.min.io/helm-releases/minio-1.0.0.tgz
     version: 1.0.0

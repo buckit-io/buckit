@@ -25,8 +25,8 @@ import (
 
 	xnet "github.com/minio/pkg/v3/net"
 
-	"github.com/minio/minio/internal/color"
-	"github.com/minio/minio/internal/logger"
+	"github.com/buckit-io/buckit/internal/color"
+	"github.com/buckit-io/buckit/internal/logger"
 )
 
 // generates format string depending on the string length and padding.
@@ -144,7 +144,7 @@ func printServerCommonMsg(apiEndpoints []string) {
 
 // Prints startup message for Object API access, prints link to our SDK documentation.
 func printObjectAPIMsg() {
-	logger.Startup(color.Blue("\nDocs: ") + "https://docs.min.io")
+	logger.Startup(color.Blue("\nDocs: ") + "https://buckit-io.github.io/docs")
 }
 
 func printLambdaTargets() {
@@ -184,7 +184,7 @@ func printCLIAccessMsg(endPoint string, alias string) {
 	// Get saved credentials.
 	cred := globalActiveCred
 
-	const mcQuickStartGuide = "https://docs.min.io/community/minio-object-store/reference/minio-mc.html#quickstart"
+	const mcQuickStartGuide = "https://buckit-io.github.io/docs"
 
 	// Configure 'mc', following block prints platform specific information for minio client.
 	if color.IsTerminal() && (!globalServerCtxt.Anonymous && globalAPIConfig.permitRootAccess()) {

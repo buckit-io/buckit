@@ -36,7 +36,7 @@ import (
 	"github.com/klauspost/compress/s2"
 	"github.com/klauspost/compress/zstd"
 	gzip "github.com/klauspost/pgzip"
-	xioutil "github.com/minio/minio/internal/ioutil"
+	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/pierrec/lz4/v4"
 )
 

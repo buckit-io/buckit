@@ -11,6 +11,7 @@ MINIO_CONFIG_DIR="$WORK_DIR/.minio"
 MINIO_OLD=("$PWD/minio.RELEASE.2020-10-28T08-16-50Z" --config-dir "$MINIO_CONFIG_DIR" server)
 MINIO=("$PWD/minio" --config-dir "$MINIO_CONFIG_DIR" server)
 MINIO_HOST="$(minio_local_host)"
+MINIO_OLD_RELEASE_URL="https://dl.minio.io/server/minio/release/linux-amd64/archive/minio.RELEASE.2020-10-28T08-16-50Z"
 
 if [ ! -x "$PWD/minio" ]; then
 	echo "minio executable binary not found in current directory"
@@ -18,9 +19,33 @@ if [ ! -x "$PWD/minio" ]; then
 fi
 
 function download_old_release() {
-	if [ ! -f minio.RELEASE.2020-10-28T08-16-50Z ]; then
-		curl --silent -O https://dl.minio.io/server/minio/release/linux-amd64/archive/minio.RELEASE.2020-10-28T08-16-50Z
-		chmod a+x minio.RELEASE.2020-10-28T08-16-50Z
+	if [ -f minio.RELEASE.2020-10-28T08-16-50Z ]; then
+		header="$(od -An -t x1 -N4 minio.RELEASE.2020-10-28T08-16-50Z 2>/dev/null | tr -d '[:space:]')"
+		if [ "$header" = "7f454c46" ]; then
+			chmod a+x minio.RELEASE.2020-10-28T08-16-50Z
+			return 0
+		fi
+
+		rm -f minio.RELEASE.2020-10-28T08-16-50Z
+	fi
+
+	curl --fail --silent --show-error -L -o minio.RELEASE.2020-10-28T08-16-50Z "${MINIO_OLD_RELEASE_URL}"
+	chmod a+x minio.RELEASE.2020-10-28T08-16-50Z
+}
+
+function fail() {
+	echo "server1 log:"
+	if [ -f "${WORK_DIR}/server1.log" ]; then
+		cat "${WORK_DIR}/server1.log"
+	fi
+	echo "FAILED"
+	purge "$WORK_DIR"
+	exit 1
+}
+
+function wait_for_minio() {
+	if ! timeout 2m "${WORK_DIR}/mc" ready minio/; then
+		fail
 	fi
 }
 
@@ -49,14 +74,10 @@ function verify_rewrite() {
 	pid=$!
 	disown $pid
 
-	"${WORK_DIR}/mc" ready minio/
+	wait_for_minio
 
 	if ! ps -p ${pid} 1>&2 >/dev/null; then
-		echo "server1 log:"
-		cat "${WORK_DIR}/server1.log"
-		echo "FAILED"
-		purge "$WORK_DIR"
-		exit 1
+		fail
 	fi
 
 	"${WORK_DIR}/mc" mb minio/healing-rewrite-bucket --quiet --with-lock
@@ -82,14 +103,10 @@ function verify_rewrite() {
 	pid=$!
 	disown $pid
 
-	"${WORK_DIR}/mc" ready minio/
+	wait_for_minio
 
 	if ! ps -p ${pid} 1>&2 >/dev/null; then
-		echo "server1 log:"
-		cat "${WORK_DIR}/server1.log"
-		echo "FAILED"
-		purge "$WORK_DIR"
-		exit 1
+		fail
 	fi
 
 	if ! ./s3-check-md5 \
@@ -143,6 +160,7 @@ function verify_rewrite() {
 }
 
 function main() {
+	mkdir -p "$WORK_DIR" "$MINIO_CONFIG_DIR"
 	download_old_release
 
 	start_port=$(shuf -i 10000-65000 -n 1)

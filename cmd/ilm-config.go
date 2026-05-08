@@ -20,7 +20,7 @@ package cmd
 import (
 	"sync"
 
-	"github.com/minio/minio/internal/config/ilm"
+	"github.com/buckit-io/buckit/internal/config/ilm"
 )
 
 var globalILMConfig = ilmConfig{

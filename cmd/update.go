@@ -36,8 +36,8 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
-	xhttp "github.com/minio/minio/internal/http"
-	"github.com/minio/minio/internal/logger"
+	xhttp "github.com/buckit-io/buckit/internal/http"
+	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/minio/pkg/v3/env"
 	xnet "github.com/minio/pkg/v3/net"
 	"github.com/minio/selfupdate"
@@ -229,7 +229,7 @@ func IsPCFTile() bool {
 //	MinIO (<OS>; <ARCH>[; <MODE>][; dcos][; kubernetes][; docker][; source]) MinIO/<VERSION> MinIO/<RELEASE-TAG> MinIO/<COMMIT-ID> [MinIO/universe-<PACKAGE-NAME>] [MinIO/helm-<HELM-VERSION>]
 //
 // Any change here should be discussed by opening an issue at
-// https://github.com/minio/minio/issues.
+// https://github.com/buckit-io/buckit/issues.
 func getUserAgent(mode string) string {
 	userAgentParts := []string{}
 	// Helper function to concisely append a pair of strings to a
@@ -450,10 +450,10 @@ func getLatestReleaseTime(u *url.URL, timeout time.Duration, mode string) (sha25
 
 const (
 	// Kubernetes deployment doc link.
-	kubernetesDeploymentDoc = "https://docs.min.io/community/minio-object-store/operations/deployments/kubernetes.html"
+	kubernetesDeploymentDoc = "https://buckit-io.github.io/docs/community/minio-object-store/operations/deployments/kubernetes.html"
 
 	// Mesos deployment doc link.
-	mesosDeploymentDoc = "https://docs.min.io/community/minio-object-store/operations/deployments/kubernetes.html"
+	mesosDeploymentDoc = "https://buckit-io.github.io/docs/community/minio-object-store/operations/deployments/kubernetes.html"
 )
 
 func getDownloadURL(releaseTag string) (downloadURL string) {

@@ -26,7 +26,7 @@ import (
 	"strings"
 
 	"github.com/minio/madmin-go/v3"
-	"github.com/minio/minio/internal/logger"
+	"github.com/buckit-io/buckit/internal/logger"
 )
 
 // From Veeam-SOSAPI_1.0_Document_v1.02d.pdf

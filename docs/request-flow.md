@@ -28,10 +28,10 @@ This document leans on a handful of distributed-systems and S3 terms. If any of 
 
 - **Bucket** — an S3-level namespace, e.g. `s3://photos/cat.png` lives in bucket `photos`. Created and destroyed via API; not a filesystem directory.
 - **Object** — one stored item: a key (the path string `cat.png`), bytes (the body), and metadata (headers like `content-type`, custom `x-amz-meta-*`).
-- **Disk / drive** — one physical device or one mounted volume. To BuckIt, a disk is a directory the server can read/write into.
+- **Disk / drive** — one physical device or one mounted volume. To Buckit, a disk is a directory the server can read/write into.
 - **Set (Erasure Set)** — a fixed-size group of disks (typically 16) that act as a single redundancy unit. Reed–Solomon encoding (below) happens *within one set* — shards never cross sets.
 - **Pool** — a group of one or more Erasure sets added to the cluster as a single capacity expansion. To grow a cluster you add a new pool; existing pools stay at their original geometry.
-- **Cluster** — all pools together. One BuckIt deployment exposes one cluster behind an S3 endpoint.
+- **Cluster** — all pools together. One Buckit deployment exposes one cluster behind an S3 endpoint.
 
 So the hierarchy is **cluster → pools → sets → disks**, and an object lives on exactly one set within one pool.
 
@@ -39,7 +39,7 @@ So the hierarchy is **cluster → pools → sets → disks**, and an object live
 
 **Placement** means deciding where an object belongs in the storage hierarchy: which pool, which erasure set inside that pool, and therefore which disks will hold that object's shard files. It is the routing decision before reading or writing object bytes.
 
-BuckIt does not keep a central "object key directory" that says `photos/cat.png` lives on set 7. Instead, every node can independently calculate the same placement from the object name and the cluster layout it loaded at startup. Within a pool, BuckIt hashes the object key with a deterministic hash algorithm and maps the result to one erasure set. "Deterministic" means the same input key and the same cluster layout always produce the same set choice.
+Buckit does not keep a central "object key directory" that says `photos/cat.png` lives on set 7. Instead, every node can independently calculate the same placement from the object name and the cluster layout it loaded at startup. Within a pool, Buckit hashes the object key with a deterministic hash algorithm and maps the result to one erasure set. "Deterministic" means the same input key and the same cluster layout always produce the same set choice.
 
 That design removes a central metadata service from the hot path. A GET does not first ask a directory server where the object is. For each pool, the landing node calculates the erasure set where the object would belong using the hash algorithm, then try to read that object's metadata (`xl.meta` file) from every disk in that set. If more than one pool returns valid metadata, the landing node chooses the newest valid response, and that erasure set in that pool becomes the one used to read the object bytes.
 
@@ -79,7 +79,7 @@ In this 3-row example there are 6 shards total and 18 blocks total.
 ```
 
 - **Shard** — the shard is the file written on one disk for one object part. In the diagram, each column is one shard, and each shard is stored as that disk's `part.1` file. With 6 disks there are 6 `part.1` files for the same object part — one per disk. For multipart uploads, the next object part is stored as `part.2`, then `part.3`, and so on.
-- **Stripe** — one row in the diagram. During PUT, BuckIt reads the object body (from upload) one stripe (4 data blocks in the example) at a time: take all data blocks (4 in the example), calculate the parity blocks (2 in the example) for that group, then append the data and parity blocks to each of the shard files (4 `part.1`) on different disks (6).
+- **Stripe** — one row in the diagram. During PUT, Buckit reads the object body (from upload) one stripe (4 data blocks in the example) at a time: take all data blocks (4 in the example), calculate the parity blocks (2 in the example) for that group, then append the data and parity blocks to each of the shard files (4 `part.1`) on different disks (6).
 - **Block** — one fixed-size cell inside a stripe/shard (usually 1 MiB in size). Each block has its own bitrot hash (below) so corruption can be detected at block granularity.
 
 ### Quorum
@@ -106,15 +106,15 @@ Quick reference:
 
 A disk that returns *wrong bytes* without reporting an error — e.g. a flipped bit from a firmware bug, cosmic ray, faulty cable, or aging media. The OS and disk think nothing is wrong; only a checksum can detect it.
 
-BuckIt protects against bitrot by appending a small hash to each fixed-size block when writing the shard, and recomputing+verifying it on read. If the hash mismatches, that block is treated as failed and Reed–Solomon reconstructs it from parity. The hash function used is **HighwayHash** (fast on modern CPUs because it uses SIMD instructions).
+Buckit protects against bitrot by appending a small hash to each fixed-size block when writing the shard, and recomputing+verifying it on read. If the hash mismatches, that block is treated as failed and Reed–Solomon reconstructs it from parity. The hash function used is **HighwayHash** (fast on modern CPUs because it uses SIMD instructions).
 
 ### Distributed lock (`dsync` / `NSLock`)
 
-When multiple BuckIt nodes can each handle requests for the same object, an in-process lock isn't enough — node A could be writing while node B reads. **`dsync`** is BuckIt's distributed lock library; it runs a quorum-based protocol across the cluster nodes so that "I hold the write lock for `bucket/object`" is true cluster-wide, not just on one node. **`NSLock`** ("namespace lock") is the wrapper used in the storage layer that takes a `(bucket, object)` pair and gives you `RLock`/`Lock` methods backed by `dsync`.
+When multiple Buckit nodes can each handle requests for the same object, an in-process lock isn't enough — node A could be writing while node B reads. **`dsync`** is Buckit's distributed lock library; it runs a quorum-based protocol across the cluster nodes so that "I hold the write lock for `bucket/object`" is true cluster-wide, not just on one node. **`NSLock`** ("namespace lock") is the wrapper used in the storage layer that takes a `(bucket, object)` pair and gives you `RLock`/`Lock` methods backed by `dsync`.
 
 ### MessagePack ("msgpack")
 
-The on-disk format BuckIt uses for `xl.meta` and for many of its inter-node RPC payloads. It's a **language-neutral binary serialisation format** — like JSON but binary, with a 1-byte type tag in front of every value. Not a Go thing; libraries exist in essentially every language. Smaller than JSON, faster to parse, no separate schema file required (unlike Protobuf). See §4 for the full layout of `xl.meta`.
+The on-disk format Buckit uses for `xl.meta` and for many of its inter-node RPC payloads. It's a **language-neutral binary serialisation format** — like JSON but binary, with a 1-byte type tag in front of every value. Not a Go thing; libraries exist in essentially every language. Smaller than JSON, faster to parse, no separate schema file required (unlike Protobuf). See §4 for the full layout of `xl.meta`.
 
 ### Hash functions you'll see (and why each one)
 
@@ -134,21 +134,21 @@ These are *integrity* hashes (detect corruption) except SHA256-in-SigV4, which i
 - **Single-part PUT** — the normal `PUT /bucket/object` request where the client sends the whole object body in one request. On disk, that object part is stored as one shard file named `part.1` on each disk.
 - **Multipart upload** — uploading a large object as N numbered parts via separate `UploadPart` calls, then a final `CompleteMultipartUpload`. On disk, each uploaded part gets its own shard file name on every disk: `part.1`, `part.2`, `part.3`, and so on. Each part has its own ETag; the object's final ETag is `md5(concat-of-part-md5s) + "-N"`.
 - **Versioned bucket** — a bucket where overwriting or deleting an object preserves the prior version, identified by a UUID. A "DELETE" without a version ID adds a *delete marker* (see next entry) instead of removing data. Default GETs hide everything below a delete marker; explicit `?versionId=…` GETs still work.
-- **DeleteMarker** — a tombstone entry in a versioned bucket's version chain. When you `DELETE` an object on a versioned bucket without specifying a version, BuckIt **does not erase the bytes** — it prepends a small "this object was deleted" record to the version chain in `xl.meta`. The record has its own UUID and timestamp, but **no `DataDir`, no shards, no parts** — it is purely metadata. Effects: a default `GET` returns 404 (the marker is the newest version); `GET ?versionId=<original-id>` still succeeds and reads the original bytes; `ListObjectsV2` hides the object but `ListObjectVersions` shows both entries. To actually erase the bytes you must do a *permanent* delete with `DELETE ?versionId=<original-id>`. Used so deletes on versioned buckets are cheap (no shard rewrite, see §7), reversible (remove the marker → object reappears), and audit-friendly (every deletion is a recorded versioned event). On disk it looks like `xlMetaV2DeleteMarker{VersionID, ModTime, MetaSys}` — see §4.4 and the two-version sample in §4.9.
+- **DeleteMarker** — a tombstone entry in a versioned bucket's version chain. When you `DELETE` an object on a versioned bucket without specifying a version, Buckit **does not erase the bytes** — it prepends a small "this object was deleted" record to the version chain in `xl.meta`. The record has its own UUID and timestamp, but **no `DataDir`, no shards, no parts** — it is purely metadata. Effects: a default `GET` returns 404 (the marker is the newest version); `GET ?versionId=<original-id>` still succeeds and reads the original bytes; `ListObjectsV2` hides the object but `ListObjectVersions` shows both entries. To actually erase the bytes you must do a *permanent* delete with `DELETE ?versionId=<original-id>`. Used so deletes on versioned buckets are cheap (no shard rewrite, see §7), reversible (remove the marker → object reappears), and audit-friendly (every deletion is a recorded versioned event). On disk it looks like `xlMetaV2DeleteMarker{VersionID, ModTime, MetaSys}` — see §4.4 and the two-version sample in §4.9.
 - **Object lock / WORM** — Write-Once-Read-Many retention. An object under a lock cannot be deleted or overwritten until its retention end date — used for compliance (SEC 17a-4, GDPR retention, etc.).
 - **Lifecycle / ILM** — bucket-level rules that automatically transition (move to cheaper tier) or expire (delete) objects after a period.
 - **Replication** — copying writes to a peer S3 cluster asynchronously. The source records pending status in `xl.meta`; a background worker pushes to the target.
 
 ### Networking terms
 
-- **Multiplexed WebSocket** — many independent logical streams sharing one underlying TCP+WebSocket connection. Each frame is tagged with a stream ID so concurrent calls don't have to open N sockets. BuckIt's `internal/grid` is built this way.
-- **Head-of-line blocking** — when one slow message on a multiplexed connection delays every other message behind it (the head-of-line message is "blocking the line"). Streaming a 100 MB shard over the same WebSocket as a 50-byte metadata RPC would block the metadata call for seconds. That is exactly why BuckIt routes shard bytes over plain HTTP and only metadata over the grid WebSocket — see §8.
+- **Multiplexed WebSocket** — many independent logical streams sharing one underlying TCP+WebSocket connection. Each frame is tagged with a stream ID so concurrent calls don't have to open N sockets. Buckit's `internal/grid` is built this way.
+- **Head-of-line blocking** — when one slow message on a multiplexed connection delays every other message behind it (the head-of-line message is "blocking the line"). Streaming a 100 MB shard over the same WebSocket as a 50-byte metadata RPC would block the metadata call for seconds. That is exactly why Buckit routes shard bytes over plain HTTP and only metadata over the grid WebSocket — see §8.
 
 ---
 
 ## 1. Storage layer relationships
 
-In this document, a **layer** is a way to group related code by what it does. It is a mental model, not something that necessarily exists as a separate process, service, or runtime object. BuckIt is a complex system, so we organize its components into a hierarchy: the S3/API layer deals with HTTP and S3 rules, the object layer exposes object operations, the pool/set layers decide where an object belongs, and the disk layer performs local or remote disk I/O.
+In this document, a **layer** is a way to group related code by what it does. It is a mental model, not something that necessarily exists as a separate process, service, or runtime object. Buckit is a complex system, so we organize its components into a hierarchy: the S3/API layer deals with HTTP and S3 rules, the object layer exposes object operations, the pool/set layers decide where an object belongs, and the disk layer performs local or remote disk I/O.
 
 **Layer-by-layer responsibility**
 
@@ -194,7 +194,7 @@ flowchart TB
 
     subgraph physical["Physical storage"]
         fs["Mounted disk paths<br/>bucket/object/xl.meta + shard files"]
-        peer["Peer BuckIt node<br/>storage REST/grid server"]
+        peer["Peer Buckit node<br/>storage REST/grid server"]
     end
 
     client -->|HTTP S3 request| router
@@ -352,11 +352,11 @@ The external S3 API is registered in `cmd/api-router.go` and implemented as meth
 
 Authoritative source: `cmd/xl-storage-format-v2.go`, `cmd/xl-storage-meta-inline.go`.
 
-> **Note on MessagePack.** Throughout this section "msgpack" refers to **[MessagePack](https://msgpack.org)** — a *language-neutral* binary serialisation format ("JSON but binary"). It is not Go-specific; there are mature libraries in C, C++, Rust, Python, JS, Java, Ruby, etc. Each value starts with a 1-byte type tag (e.g. `0xc6` = `bin32`, `0xce` = `uint32`, `0x82` = a 2-entry map), so a reader decodes without needing a schema. BuckIt uses the [`tinylib/msgp`](https://github.com/tinylib/msgp) Go library, which generates `MarshalMsg`/`UnmarshalMsg` methods at build time — that is why files ending in `_gen.go` exist in the repo (see CLAUDE.md → *Code Generation*). Picking msgpack over JSON gives smaller files and faster parsing; picking it over Protobuf avoids a separate schema-compilation step. Practical consequence: scripts in Python, Rust, etc. can decode the MessagePack parts using off-the-shelf libraries, but they must first handle BuckIt's `xl.meta` file envelope described below.
+> **Note on MessagePack.** Throughout this section "msgpack" refers to **[MessagePack](https://msgpack.org)** — a *language-neutral* binary serialisation format ("JSON but binary"). It is not Go-specific; there are mature libraries in C, C++, Rust, Python, JS, Java, Ruby, etc. Each value starts with a 1-byte type tag (e.g. `0xc6` = `bin32`, `0xce` = `uint32`, `0x82` = a 2-entry map), so a reader decodes without needing a schema. Buckit uses the [`tinylib/msgp`](https://github.com/tinylib/msgp) Go library, which generates `MarshalMsg`/`UnmarshalMsg` methods at build time — that is why files ending in `_gen.go` exist in the repo (see CLAUDE.md → *Code Generation*). Picking msgpack over JSON gives smaller files and faster parsing; picking it over Protobuf avoids a separate schema-compilation step. Practical consequence: scripts in Python, Rust, etc. can decode the MessagePack parts using off-the-shelf libraries, but they must first handle Buckit's `xl.meta` file envelope described below.
 
 ### 4.1 On-disk byte layout
 
-`xl.meta` is **not just one MessagePack value from byte 0**. The file starts with BuckIt's own 8-byte header:
+`xl.meta` is **not just one MessagePack value from byte 0**. The file starts with Buckit's own 8-byte header:
 
 ```text
 58 4c 32 20  01 00 03 00
@@ -397,7 +397,7 @@ Key design choices:
 - **Trailer CRC** uses xxhash truncated to 32 bits and covers only the metadata, not the inline data trailer (inline data has its own per-block bitrot hashes).
 - **Append-only structure within a single write** — but the file itself is replaced wholesale by `RenameData`, never edited in place.
 
-**What "msgpack bin32 wrapper" means.** MessagePack — the binary serialisation format BuckIt uses for the metadata payload — has three type tags for raw binary blobs depending on length: `bin8` (≤255 B, tag `0xc4`), `bin16` (≤64 KiB, tag `0xc5`) and `bin32` (≤4 GiB, tag `0xc6`). Each tag is followed by the length, then the bytes. `xl.meta` always uses the `bin32` form for the whole metadata payload:
+**What "msgpack bin32 wrapper" means.** MessagePack — the binary serialisation format Buckit uses for the metadata payload — has three type tags for raw binary blobs depending on length: `bin8` (≤255 B, tag `0xc4`), `bin16` (≤64 KiB, tag `0xc5`) and `bin32` (≤4 GiB, tag `0xc6`). Each tag is followed by the length, then the bytes. `xl.meta` always uses the `bin32` form for the whole metadata payload:
 
 ```
 c6  00 00 02 b4   <… 692 bytes of metadata: headerVersion, metaVersion, versions[] …>
@@ -483,7 +483,7 @@ type xlMetaV2Version struct {
     ObjectV1         *xlMetaV1Object       // set when Type == LegacyV1
     ObjectV2         *xlMetaV2Object       // set when Type == Object   (the common case)
     DeleteMarker     *xlMetaV2DeleteMarker // set when Type == DeleteMarker
-    WrittenByVersion uint64                // BuckIt build that wrote this version (forensics)
+    WrittenByVersion uint64                // Buckit build that wrote this version (forensics)
 }
 ```
 
@@ -667,7 +667,7 @@ To catch a lying disk, you need an independent witness to what the bytes *should
 2. When reading the shard back, recompute the hash from what came off the disk.
 3. If the two hashes don't match, the disk lied — treat the shard as failed and let Reed–Solomon reconstruct it from parity, just as if the disk had gone offline.
 
-BuckIt does exactly this, with one extra refinement: instead of one hash per *whole shard*, it computes **one hash per fixed-size block** inside the shard (default block size = 1 MiB). That way, a single bad sector only invalidates the one block it lives in, not the entire shard — Reed–Solomon then has much less to reconstruct.
+Buckit does exactly this, with one extra refinement: instead of one hash per *whole shard*, it computes **one hash per fixed-size block** inside the shard (default block size = 1 MiB). That way, a single bad sector only invalidates the one block it lives in, not the entire shard — Reed–Solomon then has much less to reconstruct.
 
 The hash function is **HighwayHash**, chosen because it's very fast on modern CPUs (uses SIMD instructions), so verification keeps up with disk read throughput.
 
@@ -766,7 +766,7 @@ The layout is exactly what was sketched in §4.1 — magic, version, msgpack-wra
             "x-minio-internal-replication-timestamp": "..."
           }
         },
-        "WrittenByVersion": 17440000000000               // BuckIt build that wrote this entry
+        "WrittenByVersion": 17440000000000               // Buckit build that wrote this entry
       }
     },
 
@@ -891,7 +891,7 @@ The layout is exactly what was sketched in §4.1 — magic, version, msgpack-wra
 
 #### Reading this on a real disk
 
-If you have access to a BuckIt drive, you can decode any object's `xl.meta` yourself:
+If you have access to a Buckit drive, you can decode any object's `xl.meta` yourself:
 
 ```sh
 go run ./docs/debugging/xl-meta /path/to/disk/bucket/object/xl.meta
@@ -932,7 +932,7 @@ A GET locates the object's latest live version, asks every disk in its set to sh
 
 **On a *non-versioned* bucket**, an object has exactly one version, and `GET /bucket/object` reads that one. Simple.
 
-**On a *versioned* bucket**, the object's version chain may have many entries. A plain `GET` reads `versions[0]` (newest) — but if that entry is a DeleteMarker, the response is **404** and the bytes underneath are *not* served. To reach a specific historical version, the client passes `?versionId=<uuid>`; BuckIt walks the chain to find it.
+**On a *versioned* bucket**, the object's version chain may have many entries. A plain `GET` reads `versions[0]` (newest) — but if that entry is a DeleteMarker, the response is **404** and the bytes underneath are *not* served. To reach a specific historical version, the client passes `?versionId=<uuid>`; Buckit walks the chain to find it.
 
 What the client experiences:
 
@@ -1221,7 +1221,7 @@ DELETE behaves very differently depending on whether the bucket has versioning e
 
 **On a *non-versioned* bucket**, `DELETE /bucket/object` removes the object's metadata and (asynchronously) reclaims its bytes. Gone.
 
-**On a *versioned* bucket**, the same `DELETE` does **not** touch the object's bytes at all. Instead, BuckIt prepends a new entry to the object's version chain in `xl.meta`. That entry is a **DeleteMarker** — it has a fresh UUID, a timestamp, and the type field `Type=2`. It carries **no `DataDir`, no shards, no parts** — it is purely metadata (see `xlMetaV2DeleteMarker` in §4.4 and the two-version sample in §4.9).
+**On a *versioned* bucket**, the same `DELETE` does **not** touch the object's bytes at all. Instead, Buckit prepends a new entry to the object's version chain in `xl.meta`. That entry is a **DeleteMarker** — it has a fresh UUID, a timestamp, and the type field `Type=2`. It carries **no `DataDir`, no shards, no parts** — it is purely metadata (see `xlMetaV2DeleteMarker` in §4.4 and the two-version sample in §4.9).
 
 What changes for clients afterwards:
 
@@ -1400,7 +1400,7 @@ So in distributed mode the GET/PUT sequence diagrams above are essentially uncha
 
 ## 9. Cluster topology — pools, sets, disks, and peer nodes
 
-The topology comes from the server startup endpoints. BuckIt parses those endpoints, groups them into pools, divides each pool into erasure sets, and marks every disk endpoint as either local to this process or remote on a peer node.
+The topology comes from the server startup endpoints. Buckit parses those endpoints, groups them into pools, divides each pool into erasure sets, and marks every disk endpoint as either local to this process or remote on a peer node.
 
 For example, a distributed erasure deployment might be started with endpoint arguments like this:
 
@@ -1538,7 +1538,7 @@ This multi-pool lookup matters because pools can be added over time, and older o
 
 ## 10. Internal configuration files — what lives outside `xl.meta`
 
-`xl.meta` is only per-object metadata. BuckIt also stores server, IAM, bucket, disk-format, and operational metadata under the internal `.minio.sys` namespace.
+`xl.meta` is only per-object metadata. Buckit also stores server, IAM, bucket, disk-format, and operational metadata under the internal `.minio.sys` namespace.
 
 | Area | Stored where | What it contains |
 |---|---|---|
@@ -1560,7 +1560,7 @@ This multi-pool lookup matters because pools can be added over time, and older o
 | Healing / scanner / usage | `.minio.sys/buckets/...` and related internal paths | Data usage cache, background heal state, MRF lists, and metacache/listing state. |
 | Replication operational state | `.minio.sys/buckets/<bucket>/replication/...` | Resync state, MRF queues, and replication bookkeeping. |
 
-Conceptually, `.minio.sys` is BuckIt's internal metadata namespace. Some entries are normal internal objects written through the object layer, while a few bootstrapping files are direct per-disk files.
+Conceptually, `.minio.sys` is Buckit's internal metadata namespace. Some entries are normal internal objects written through the object layer, while a few bootstrapping files are direct per-disk files.
 
 ```text
 .minio.sys/
@@ -1592,7 +1592,7 @@ Bucket-level config is one branch of that internal namespace:
         └── object-lock.xml
 ```
 
-Most internal entries, such as bucket policy/versioning/lifecycle/notification config, are written like normal S3 objects and are protected by the cluster's normal erasure/quorum path. The difference is that they live under BuckIt's internal `.minio.sys` namespace instead of a user's bucket namespace.
+Most internal entries, such as bucket policy/versioning/lifecycle/notification config, are written like normal S3 objects and are protected by the cluster's normal erasure/quorum path. The difference is that they live under Buckit's internal `.minio.sys` namespace instead of a user's bucket namespace.
 
 `format.json` is the important exception. It is a direct per-disk format file stored at `<disk>/.minio.sys/format.json`, used before the object layer is fully available. In a 16-disk deployment there are 16 physical `format.json` files. They share the same deployment/set layout, but each one has a different `xl.this` value identifying the disk that owns that file.
 
@@ -1607,7 +1607,7 @@ Most internal entries, such as bucket policy/versioning/lifecycle/notification c
 | `id` | Deployment ID. Disks from different deployments must not be mixed. |
 | `xl.version` | Erasure backend format version. |
 | `xl.this` | UUID of this physical disk. This is the main per-disk difference between otherwise similar `format.json` files. |
-| `xl.sets` | Full matrix of disk UUIDs grouped by erasure set. This is how BuckIt verifies each disk's expected set/slot. |
+| `xl.sets` | Full matrix of disk UUIDs grouped by erasure set. This is how Buckit verifies each disk's expected set/slot. |
 | `xl.distributionAlgo` | Hash/distribution algorithm used to map object names to erasure sets. |
 
 Example `format.json` for one disk in a 4-disk erasure set:
@@ -1741,7 +1741,7 @@ The high-level split is:
 
 **Startup load sequence**
 
-At startup, BuckIt has to bootstrap from information that lives in different places. The order matters because some files are needed before the normal object layer can be trusted.
+At startup, Buckit has to bootstrap from information that lives in different places. The order matters because some files are needed before the normal object layer can be trusted.
 
 ```text
 server command line / environment
@@ -1775,7 +1775,7 @@ server command line / environment
 
 **Failure behavior quick reference**
 
-| Problem | What BuckIt does |
+| Problem | What Buckit does |
 |---|---|
 | A disk is missing `format.json` | Treats the disk as unformatted or replaced. Startup/heal can write the expected format only when the rest of the set has enough consistent format metadata. |
 | A disk has corrupt or inconsistent `format.json` | Rejects that disk for the deployment until it is repaired or healed; the disk must match the deployment ID, set layout, and expected disk UUID position. |
@@ -1801,7 +1801,7 @@ Bucket config is read often: request handlers need policy, versioning, lifecycle
 
 That creates the synchronization problem this subsection explains: if an admin request changes `photos/versioning.xml` on one node, every other node must stop using its old cached version and reload the updated bucket metadata.
 
-BuckIt handles that with an explicit in-cluster cache refresh: the node that accepts the change persists it, updates its own in-memory cache, then tells all other nodes in the same distributed cluster to reload the same bucket metadata from `.minio.sys`. This fan-out is per remote server host from the startup endpoint topology, not per disk, set, or pool.
+Buckit handles that with an explicit in-cluster cache refresh: the node that accepts the change persists it, updates its own in-memory cache, then tells all other nodes in the same distributed cluster to reload the same bucket metadata from `.minio.sys`. This fan-out is per remote server host from the startup endpoint topology, not per disk, set, or pool.
 
 ```mermaid
 sequenceDiagram
@@ -1847,7 +1847,7 @@ This is cluster-local cache synchronization. Cross-site bucket metadata replicat
 | `part.1` | Shard file for object part 1 on one disk. Each disk has its own `part.1` for the same object part. Multipart uploads also create `part.2`, `part.3`, etc. |
 | Shard | One per-disk shard file for one object part, such as `part.1` on disk 7. |
 | Stripe | One row of blocks processed together during erasure coding. PUT appends each stripe's data/parity blocks to the shard files. |
-| Block | One fixed-size cell inside a stripe. BuckIt stores a bitrot hash per block. |
+| Block | One fixed-size cell inside a stripe. Buckit stores a bitrot hash per block. |
 | `EC:N` | Storage-class shorthand for N parity shards. `EC:4` means 4 parity shards. |
 | `ErasureIndex` | The shard number for this disk in a version's erasure layout. It tells a disk which shard it stores. |
 | `VersionID` | UUID identifying a specific object version. Required to read or delete a non-latest version explicitly. |

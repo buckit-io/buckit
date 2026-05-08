@@ -25,7 +25,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/minio/minio/internal/ioutil"
+	"github.com/buckit-io/buckit/internal/ioutil"
 )
 
 // Tests functions like Size(), MD5*(), SHA256*()

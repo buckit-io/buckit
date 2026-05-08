@@ -2,15 +2,15 @@
 
 Bucket replication is designed to replicate selected objects in a bucket to a destination bucket.
 
-The contents of this page have been migrated to the new [BuckIt Documentation: Bucket Replication](https://docs.min.io/community/minio-object-store/administration/bucket-replication.html) page. The [Bucket Replication](https://docs.min.io/community/minio-object-store/administration/bucket-replication/bucket-replication-requirements.html) page references dedicated tutorials for configuring one-way "Active-Passive" and two-way "Active-Active" bucket replication.
+The contents of this page have been migrated to the new [Buckit Documentation: Bucket Replication](https://buckit-io.github.io/docs/community/minio-object-store/administration/bucket-replication.html) page. The [Bucket Replication](https://buckit-io.github.io/docs/community/minio-object-store/administration/bucket-replication/bucket-replication-requirements.html) page references dedicated tutorials for configuring one-way "Active-Passive" and two-way "Active-Active" bucket replication.
 
-To replicate objects in a bucket to a destination bucket on a target site either in the same cluster or a different cluster, start by enabling [versioning](https://docs.min.io/community/minio-object-store/administration/object-management/object-versioning.html) for both source and destination buckets. Finally, the target site and the destination bucket need to be configured on the source BuckIt server.
+To replicate objects in a bucket to a destination bucket on a target site either in the same cluster or a different cluster, start by enabling [versioning](https://buckit-io.github.io/docs/community/minio-object-store/administration/object-management/object-versioning.html) for both source and destination buckets. Finally, the target site and the destination bucket need to be configured on the source Buckit server.
 
 ## Highlights
 
 - Supports source and destination buckets to have the same name unlike AWS S3, addresses variety of use-cases such as *Splunk*, *Veeam* site to site DR.
 - Supports object locking/retention across source and destination buckets natively out of the box, unlike AWS S3.
-- Simpler implementation than [AWS S3 Bucket Replication Config](https://docs.aws.amazon.com/AmazonS3/latest/dev/replication-add-config.html) with requirements such as IAM Role, AccessControlTranslation, Metrics and SourceSelectionCriteria are not needed with BuckIt.
+- Simpler implementation than [AWS S3 Bucket Replication Config](https://docs.aws.amazon.com/AmazonS3/latest/dev/replication-add-config.html) with requirements such as IAM Role, AccessControlTranslation, Metrics and SourceSelectionCriteria are not needed with Buckit.
 - Active-Active replication
 - Multi destination replication
 
@@ -94,7 +94,7 @@ The access key provided for the replication *target* cluster should have these m
 }
 ```
 
-Please note that the permissions required by the admin user on the target cluster can be more fine grained to exclude permissions like "s3:ReplicateDelete", "s3:GetBucketObjectLockConfiguration" etc depending on whether delete replication rules are set up or if object locking is disabled on `destbucket`. The above policies assume that replication of objects, tags and delete marker replication are all enabled on object lock enabled buckets. A sample script to setup replication is provided [here](https://github.com/minio/minio/blob/master/docs/bucket/replication/setup_replication.sh)
+Please note that the permissions required by the admin user on the target cluster can be more fine grained to exclude permissions like "s3:ReplicateDelete", "s3:GetBucketObjectLockConfiguration" etc depending on whether delete replication rules are set up or if object locking is disabled on `destbucket`. The above policies assume that replication of objects, tags and delete marker replication are all enabled on object lock enabled buckets. A sample script to setup replication is provided [here](https://buckit-io.github.io/docs/bucket/replication/setup_replication.sh)
 
 To set up replication from a source bucket `srcbucket` on myminio cluster to a bucket `destbucket` on the target buckit cluster with endpoint https://replica-endpoint:9000, use:
 ```
@@ -153,9 +153,9 @@ The replication configuration generated has the following format and can be expo
 }
 ```
 
-The replication configuration follows [AWS S3 Spec](https://docs.aws.amazon.com/AmazonS3/latest/dev/replication-add-config.html). Any objects uploaded to the source bucket that meet replication criteria will now be automatically replicated by the BuckIt server to the remote destination bucket. Replication can be disabled at any time by disabling specific rules in the configuration or deleting the replication configuration entirely.
+The replication configuration follows [AWS S3 Spec](https://docs.aws.amazon.com/AmazonS3/latest/dev/replication-add-config.html). Any objects uploaded to the source bucket that meet replication criteria will now be automatically replicated by the Buckit server to the remote destination bucket. Replication can be disabled at any time by disabling specific rules in the configuration or deleting the replication configuration entirely.
 
-When object locking is used in conjunction with replication, both source and destination buckets needs to have [object locking](https://docs.min.io/community/minio-object-store/administration/object-management/object-retention.html) enabled. Similarly objects encrypted on the server side, will be replicated if destination also supports encryption.
+When object locking is used in conjunction with replication, both source and destination buckets needs to have [object locking](https://buckit-io.github.io/docs/community/minio-object-store/administration/object-management/object-retention.html) enabled. Similarly objects encrypted on the server side, will be replicated if destination also supports encryption.
 
 Replication status can be seen in the metadata on the source and destination objects. On the source side, the `X-Amz-Replication-Status` changes from `PENDING` to `COMPLETED` or `FAILED` after replication attempt either succeeded or failed respectively. On the destination side, a `X-Amz-Replication-Status` status of `REPLICA` indicates that the object was replicated successfully. Any replication failures are automatically re-attempted during a periodic disk scanner cycle.
 
@@ -167,7 +167,7 @@ To perform bi-directional replication, repeat the above process on the target si
 
 ## Replica Modification sync
 
-If bi-directional replication is set up between two clusters, any metadata update on the REPLICA object is by default reflected back in the source object when `ReplicaModifications` status in the `SourceSelectionCriteria` is `Enabled`. In BuckIt, this is enabled by default. If a metadata update is performed on the "REPLICA" object, its `X-Amz-Replication-Status` will change from `PENDING` to `COMPLETE` or `FAILED`, and the source object version will show `X-Amz-Replication-Status` of `REPLICA` once the replication operation is complete.
+If bi-directional replication is set up between two clusters, any metadata update on the REPLICA object is by default reflected back in the source object when `ReplicaModifications` status in the `SourceSelectionCriteria` is `Enabled`. In Buckit, this is enabled by default. If a metadata update is performed on the "REPLICA" object, its `X-Amz-Replication-Status` will change from `PENDING` to `COMPLETE` or `FAILED`, and the source object version will show `X-Amz-Replication-Status` of `REPLICA` once the replication operation is complete.
 
 The replication configuration in use on a bucket can be viewed using the `mc replicate export alias/bucket` command.
 
@@ -183,17 +183,17 @@ To re-enable replica metadata modification syncing,
 mc replicate edit alias/bucket --id xyz.id --replicate "delete,delete-marker,replica-metadata-sync"
 ```
 
-## BuckIt Extension
+## Buckit Extension
 
 ### Replicating Deletes
 
-Delete marker replication is allowed in [AWS V1 Configuration](https://aws.amazon.com/blogs/storage/managing-delete-marker-replication-in-amazon-s3/) but not in V2 configuration. The BuckIt implementation above is based on V2 configuration, however it has been extended to allow both DeleteMarker replication and replication of versioned deletes with the `DeleteMarkerReplication` and `DeleteReplication` fields in the replication configuration above. By default, this is set to `Disabled` unless the user specifies it while adding a replication rule.
+Delete marker replication is allowed in [AWS V1 Configuration](https://aws.amazon.com/blogs/storage/managing-delete-marker-replication-in-amazon-s3/) but not in V2 configuration. The Buckit implementation above is based on V2 configuration, however it has been extended to allow both DeleteMarker replication and replication of versioned deletes with the `DeleteMarkerReplication` and `DeleteReplication` fields in the replication configuration above. By default, this is set to `Disabled` unless the user specifies it while adding a replication rule.
 
-When an object is deleted from the source bucket, the corresponding replica version will be marked deleted if delete marker replication is enabled in the replication configuration. Replication of deletes that specify a version id (a.k.a hard deletes) can be enabled by setting the `DeleteReplication` status to enabled in the replication configuration. This is a BuckIt specific extension that can be enabled using the `mc replicate add` or `mc replicate edit` command with the --replicate "delete" flag.
+When an object is deleted from the source bucket, the corresponding replica version will be marked deleted if delete marker replication is enabled in the replication configuration. Replication of deletes that specify a version id (a.k.a hard deletes) can be enabled by setting the `DeleteReplication` status to enabled in the replication configuration. This is a Buckit specific extension that can be enabled using the `mc replicate add` or `mc replicate edit` command with the --replicate "delete" flag.
 
 Note that due to this extension behavior, AWS SDK's may not support the extension functionality pertaining to replicating versioned deletes.
 
-Note that just like with [AWS](https://docs.aws.amazon.com/AmazonS3/latest/userguide/delete-marker-replication.html), Delete marker replication is disallowed in BuckIt when the replication rule has tags.
+Note that just like with [AWS](https://docs.aws.amazon.com/AmazonS3/latest/userguide/delete-marker-replication.html), Delete marker replication is disallowed in Buckit when the replication rule has tags.
 
 To add a replication rule allowing both delete marker replication, versioned delete replication or both specify the --replicate flag with comma separated values as in the example below.
 
@@ -214,7 +214,7 @@ Status of delete marker replication can be viewed by doing a GET/HEAD on the obj
 
 The status of replication can be monitored by configuring event notifications on the source and target buckets using `mc event add`.On the source side, the `s3:PutObject`, `s3:Replication:OperationCompletedReplication` and `s3:Replication:OperationFailedReplication` events show the status of replication in the `X-Amz-Replication-Status` metadata.
 
-On the target bucket, `s3:PutObject` event shows `X-Amz-Replication-Status` status of `REPLICA` in the metadata. Additional metrics to monitor backlog state for the purpose of bandwidth management and resource allocation are exposed via Prometheus - see <https://github.com/minio/minio/blob/master/docs/metrics/prometheus/list.md> for more details.
+On the target bucket, `s3:PutObject` event shows `X-Amz-Replication-Status` status of `REPLICA` in the metadata. Additional metrics to monitor backlog state for the purpose of bandwidth management and resource allocation are exposed via Prometheus - see <https://buckit-io.github.io/docs/metrics/prometheus/list.md> for more details.
 
 ### Sync/Async Replication
 
@@ -266,16 +266,16 @@ In the above sample config, objects under prefixes matching any of the `Excluded
 
 ### SSE-C Encryption
 
-BuckIt does not support SSE-C encrypted objects on replicated buckets, any application uploading SSE-C encrypted objects will be rejected with an error on replicated buckets.
+Buckit does not support SSE-C encrypted objects on replicated buckets, any application uploading SSE-C encrypted objects will be rejected with an error on replicated buckets.
 
 #### Rationale
 
 - SSE-C requires application to remember the keys for all GET/PUT operations, any unfortunate loss of keys would automatically mean the objects cannot be accessed anymore.
 - SSE-C is hardly adopted by most widely used applications, applications prefer server to manage the keys via SSE-KMS or SSE-S3.
-- BuckIt recommends applications to use SSE-KMS, SSE-S3 for simpler, safer and robust encryption mechanism for replicated buckets.
+- Buckit recommends applications to use SSE-KMS, SSE-S3 for simpler, safer and robust encryption mechanism for replicated buckets.
 
 ## Explore Further
 
-- [BuckIt Bucket Replication Design](https://github.com/minio/minio/blob/master/docs/bucket/replication/DESIGN.md)
-- [BuckIt Bucket Versioning Implementation](https://docs.min.io/community/minio-object-store/administration/object-management/object-retention.html)
-- [BuckIt Client Quickstart Guide](https://docs.min.io/community/minio-object-store/reference/minio-mc.html#quickstart)
+- [Buckit Bucket Replication Design](https://buckit-io.github.io/docs/bucket/replication/DESIGN.md)
+- [Buckit Bucket Versioning Implementation](https://buckit-io.github.io/docs/community/minio-object-store/administration/object-management/object-retention.html)
+- [Buckit Client Quickstart Guide](https://buckit-io.github.io/docs/community/minio-object-store/reference/minio-mc.html#quickstart)

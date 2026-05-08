@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BuckIt is a high-performance, S3-compatible object storage server written in Go (module path: `github.com/minio/minio`). The built binary is named `minio`. Minimum Go version: 1.25.
+Buckit is a high-performance, S3-compatible object storage server written in Go (module path: `github.com/buckit-io/buckit`). The built binary is named `buckit`. Minimum Go version: 1.25.
 
 ## Common Commands
 
 ```sh
 # Build
-make build                          # build ./minio binary
-go build -tags kqueue -trimpath --ldflags "$(go run buildscripts/gen-ldflags.go)" -o minio
-
+make build                          # build ./buckit binary
+go build -tags kqueue -trimpath --ldflags "$(go run buildscripts/gen-ldflags.go)" -o buckit
+```
 # Install to $GOPATH/bin
 make install
 
@@ -44,7 +44,7 @@ make install-race
 
 ### Entry Point & Package Structure
 
-- `main.go` → `cmd.Main(os.Args)` (package `github.com/minio/minio/cmd`)
+- `main.go` → `cmd.Main(os.Args)` (package `github.com/buckit-io/buckit/cmd`)
 - `cmd/` — all server logic: HTTP handlers, routing, storage engines, background ops
 - `internal/` — reusable supporting packages (no circular dependencies with `cmd/`)
 

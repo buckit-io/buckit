@@ -28,10 +28,10 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/minio/minio/internal/event"
-	"github.com/minio/minio/internal/logger"
-	"github.com/minio/minio/internal/once"
-	"github.com/minio/minio/internal/store"
+	"github.com/buckit-io/buckit/internal/event"
+	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/buckit/internal/once"
+	"github.com/buckit-io/buckit/internal/store"
 	xnet "github.com/minio/pkg/v3/net"
 	"github.com/rabbitmq/amqp091-go"
 )

@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/minio/minio/internal/logger"
+	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/minio/pkg/v3/console"
 )
 

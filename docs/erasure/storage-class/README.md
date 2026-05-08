@@ -1,14 +1,14 @@
-# BuckIt Storage Class Quickstart Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
+# Buckit Storage Class Quickstart Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
 
-BuckIt server supports storage class in erasure coding mode. This allows configurable data and parity drives per object.
+Buckit server supports storage class in erasure coding mode. This allows configurable data and parity drives per object.
 
-This page is intended as a summary of BuckIt Erasure Coding. For a more complete explanation, see <https://docs.min.io/community/minio-object-store/operations/concepts/erasure-coding.html>.
+This page is intended as a summary of Buckit Erasure Coding. For a more complete explanation, see <https://buckit-io.github.io/docs/community/minio-object-store/operations/concepts/erasure-coding.html>.
 
 ## Overview
 
-BuckIt supports two storage classes, Reduced Redundancy class and Standard class. These classes can be defined using environment variables
-set before starting BuckIt server. After the data and parity drives for each storage class are defined using environment variables,
-you can set the storage class of an object via request metadata field `x-amz-storage-class`. BuckIt server then honors the storage class by
+Buckit supports two storage classes, Reduced Redundancy class and Standard class. These classes can be defined using environment variables
+set before starting Buckit server. After the data and parity drives for each storage class are defined using environment variables,
+you can set the storage class of an object via request metadata field `x-amz-storage-class`. Buckit server then honors the storage class by
 saving the object in specific number of data and parity drives.
 
 ## Storage usage
@@ -17,11 +17,11 @@ The selection of varying data and parity drives has a direct impact on the drive
 redundancy or better drive space utilization.
 
 To get an idea of how various combinations of data and parity drives affect the storage usage, let’s take an example of a 100 MiB file stored
-on 16 drive BuckIt deployment. If you use eight data and eight parity drives, the file space usage will be approximately twice, i.e. 100 MiB
+on 16 drive Buckit deployment. If you use eight data and eight parity drives, the file space usage will be approximately twice, i.e. 100 MiB
 file will take 200 MiB space. But, if you use ten data and six parity drives, same 100 MiB file takes around 160 MiB. If you use 14 data and
 two parity drives, 100 MiB file takes only approximately 114 MiB.
 
-Below is a list of data/parity drives and corresponding _approximate_ storage space usage on a 16 drive BuckIt deployment. The field _storage
+Below is a list of data/parity drives and corresponding _approximate_ storage space usage on a 16 drive Buckit deployment. The field _storage
 usage ratio_ is simply the drive space used by the file after erasure-encoding, divided by actual file size.
 
 | Total Drives (N) | Data Drives (D) | Parity Drives (P) | Storage Usage Ratio |
@@ -53,7 +53,7 @@ The default value for the `STANDARD` storage class depends on the number of volu
 | 6-7              |                 EC:3  |
 | 8 or more        |                 EC:4  |
 
-For more complete documentation on Erasure Set sizing, see the [BuckIt Documentation on Erasure Sets](https://docs.min.io/community/minio-object-store/operations/concepts/erasure-coding.html#erasure-sets).
+For more complete documentation on Erasure Set sizing, see the [Buckit Documentation on Erasure Sets](https://buckit-io.github.io/docs/community/minio-object-store/operations/concepts/erasure-coding.html#erasure-sets).
 
 ### Allowed values for REDUCED_REDUNDANCY storage class
 
@@ -80,16 +80,16 @@ export MINIO_STORAGE_CLASS_STANDARD=EC:3
 export MINIO_STORAGE_CLASS_RRS=EC:2
 ```
 
-Storage class can also be set via `mc admin config` get/set commands to update the configuration. Refer [storage class](https://github.com/minio/minio/tree/master/docs/config#storage-class) for
+Storage class can also be set via `mc admin config` get/set commands to update the configuration. Refer [storage class](https://buckit-io.github.io/docs/config#storage-class) for
 more details.
 
 #### Note
 
-- If `STANDARD` storage class is set via environment variables or `mc admin config` get/set commands, and `x-amz-storage-class` is not present in request metadata, BuckIt server will
+- If `STANDARD` storage class is set via environment variables or `mc admin config` get/set commands, and `x-amz-storage-class` is not present in request metadata, Buckit server will
 apply `STANDARD` storage class to the object. This means the data and parity drives will be used as set in `STANDARD` storage class.
 
-- If storage class is not defined before starting BuckIt server, and subsequent PutObject metadata field has `x-amz-storage-class` present
-with values `REDUCED_REDUNDANCY` or `STANDARD`, BuckIt server uses default parity values.
+- If storage class is not defined before starting Buckit server, and subsequent PutObject metadata field has `x-amz-storage-class` present
+with values `REDUCED_REDUNDANCY` or `STANDARD`, Buckit server uses default parity values.
 
 ### Set metadata
 

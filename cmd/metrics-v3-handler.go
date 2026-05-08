@@ -25,8 +25,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/minio/minio/internal/config"
-	"github.com/minio/minio/internal/mcontext"
+	"github.com/buckit-io/buckit/internal/config"
+	"github.com/buckit-io/buckit/internal/mcontext"
 	"github.com/minio/mux"
 	"github.com/minio/pkg/v3/env"
 	"github.com/prometheus/client_golang/prometheus"

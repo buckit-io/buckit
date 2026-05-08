@@ -32,25 +32,25 @@ func genLDFlags(version string) string {
 	releaseTag, date := releaseTag(version)
 	copyrightYear := strconv.Itoa(date.Year())
 	ldflagsStr := "-s -w"
-	ldflagsStr += " -X github.com/minio/minio/cmd.Version=" + version
-	ldflagsStr += " -X github.com/minio/minio/cmd.CopyrightYear=" + copyrightYear
-	ldflagsStr += " -X github.com/minio/minio/cmd.ReleaseTag=" + releaseTag
-	ldflagsStr += " -X github.com/minio/minio/cmd.CommitID=" + commitID()
-	ldflagsStr += " -X github.com/minio/minio/cmd.ShortCommitID=" + commitID()[:12]
-	ldflagsStr += " -X github.com/minio/minio/cmd.GOPATH=" + os.Getenv("GOPATH")
-	ldflagsStr += " -X github.com/minio/minio/cmd.GOROOT=" + os.Getenv("GOROOT")
+	ldflagsStr += " -X github.com/buckit-io/buckit/cmd.Version=" + version
+	ldflagsStr += " -X github.com/buckit-io/buckit/cmd.CopyrightYear=" + copyrightYear
+	ldflagsStr += " -X github.com/buckit-io/buckit/cmd.ReleaseTag=" + releaseTag
+	ldflagsStr += " -X github.com/buckit-io/buckit/cmd.CommitID=" + commitID()
+	ldflagsStr += " -X github.com/buckit-io/buckit/cmd.ShortCommitID=" + commitID()[:12]
+	ldflagsStr += " -X github.com/buckit-io/buckit/cmd.GOPATH=" + os.Getenv("GOPATH")
+	ldflagsStr += " -X github.com/buckit-io/buckit/cmd.GOROOT=" + os.Getenv("GOROOT")
 	return ldflagsStr
 }
 
 // genReleaseTag prints release tag to the console for easy git tagging.
 func releaseTag(version string) (string, time.Time) {
 	relPrefix := "DEVELOPMENT"
-	if prefix := os.Getenv("MINIO_RELEASE"); prefix != "" {
+	if prefix := os.Getenv("BUCKIT_RELEASE"); prefix != "" {
 		relPrefix = prefix
 	}
 
 	relSuffix := ""
-	if hotfix := os.Getenv("MINIO_HOTFIX"); hotfix != "" {
+	if hotfix := os.Getenv("BUCKIT_HOTFIX"); hotfix != "" {
 		relSuffix = hotfix
 	}
 

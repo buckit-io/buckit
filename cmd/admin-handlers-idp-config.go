@@ -28,9 +28,9 @@ import (
 
 	"github.com/minio/madmin-go/v3"
 	"github.com/minio/minio-go/v7/pkg/set"
-	"github.com/minio/minio/internal/config"
-	cfgldap "github.com/minio/minio/internal/config/identity/ldap"
-	"github.com/minio/minio/internal/config/identity/openid"
+	"github.com/buckit-io/buckit/internal/config"
+	cfgldap "github.com/buckit-io/buckit/internal/config/identity/ldap"
+	"github.com/buckit-io/buckit/internal/config/identity/openid"
 	"github.com/minio/mux"
 	"github.com/minio/pkg/v3/ldap"
 	"github.com/minio/pkg/v3/policy"

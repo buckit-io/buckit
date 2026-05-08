@@ -25,12 +25,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/minio/minio/internal/amztime"
-	"github.com/minio/minio/internal/bucket/lifecycle"
-	"github.com/minio/minio/internal/bucket/replication"
-	"github.com/minio/minio/internal/crypto"
-	"github.com/minio/minio/internal/hash/sha256"
-	xhttp "github.com/minio/minio/internal/http"
+	"github.com/buckit-io/buckit/internal/amztime"
+	"github.com/buckit-io/buckit/internal/bucket/lifecycle"
+	"github.com/buckit-io/buckit/internal/bucket/replication"
+	"github.com/buckit-io/buckit/internal/crypto"
+	"github.com/buckit-io/buckit/internal/hash/sha256"
+	xhttp "github.com/buckit-io/buckit/internal/http"
 	"github.com/minio/pkg/v3/sync/errgroup"
 )
 

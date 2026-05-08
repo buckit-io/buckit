@@ -1,6 +1,6 @@
 # Go Source Reading Primer
 
-This doc explains the Go features you will see most often while reading BuckIt/MinIO source code. It is written for reading and understanding the codebase, not for becoming fluent in every corner of Go.
+This doc explains the Go features you will see most often while reading Buckit/MinIO source code. It is written for reading and understanding the codebase, not for becoming fluent in every corner of Go.
 
 ## 1. Packages and Imports
 
@@ -10,7 +10,7 @@ Every Go file starts with a package name:
 package cmd
 ```
 
-Files in the same package can use each other's exported and unexported names. Most BuckIt server code lives in `cmd`, so a function in `cmd/object-handlers.go` can call helpers in `cmd/erasure-object.go` without importing them.
+Files in the same package can use each other's exported and unexported names. Most Buckit server code lives in `cmd`, so a function in `cmd/object-handlers.go` can call helpers in `cmd/erasure-object.go` without importing them.
 
 Imports bring in other packages:
 
@@ -19,7 +19,7 @@ import (
     "context"
     "net/http"
 
-    "github.com/minio/minio/internal/logger"
+    "github.com/buckit-io/buckit/internal/logger"
 )
 ```
 
@@ -289,7 +289,7 @@ return fmt.Errorf("load bucket metadata: %w", err)
 
 `%w` wraps the original error so callers can still inspect it with `errors.Is` or `errors.As`.
 
-Common BuckIt/MinIO style:
+Common Buckit/MinIO style:
 
 ```go
 if err != nil {
@@ -476,7 +476,7 @@ go func() {
 }()
 ```
 
-BuckIt/MinIO uses goroutines for:
+Buckit/MinIO uses goroutines for:
 
 - reading many disks in parallel;
 - sending RPCs to peer nodes;
@@ -732,7 +732,7 @@ When a production function is hard to understand, search for tests:
 rg "formatErasureV3Check" cmd/*_test.go
 ```
 
-## 28. Common BuckIt/MinIO Patterns
+## 28. Common Buckit/MinIO Patterns
 
 ### `(value, error)` Everywhere
 

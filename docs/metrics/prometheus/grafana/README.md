@@ -1,15 +1,15 @@
-# How to monitor BuckIt server with Grafana [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
+# How to monitor Buckit server with Grafana [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
 
 [Grafana](https://grafana.com/) allows you to query, visualize, alert on and understand your metrics no matter where they are stored. Create, explore, and share dashboards with your team and foster a data driven culture.
 
 ## Prerequisites
 
-- Prometheus and BuckIt configured as explained in [document here](https://github.com/minio/minio/blob/master/docs/metrics/prometheus/README.md).
+- Prometheus and Buckit configured as explained in [document here](https://buckit-io.github.io/docs/metrics/prometheus/README.md).
 - Grafana installed as explained [here](https://grafana.com/grafana/download).
 
-## BuckIt Grafana Dashboard
+## Buckit Grafana Dashboard
 
-Visualize BuckIt metrics with our official Grafana dashboard available on the [Grafana dashboard portal](https://grafana.com/grafana/dashboards/13502).
+Visualize Buckit metrics with our official Grafana dashboard available on the [Grafana dashboard portal](https://grafana.com/grafana/dashboards/13502).
 
 Refer to the dashboard [json file here](https://raw.githubusercontent.com/minio/minio/master/docs/metrics/prometheus/grafana/minio-dashboard.json).
 

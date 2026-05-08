@@ -24,7 +24,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/minio/minio/internal/s3select/jstream"
+	"github.com/buckit-io/buckit/internal/s3select/jstream"
 	"github.com/minio/simdjson-go"
 )
 

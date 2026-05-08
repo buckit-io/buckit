@@ -2,11 +2,11 @@
 
 ## Introduction
 
-BuckIt provides a custom STS API that allows authentication with client X.509 / TLS certificates.
+Buckit provides a custom STS API that allows authentication with client X.509 / TLS certificates.
 
 A major advantage of certificate-based authentication compared to other STS authentication methods, like OpenID Connect or LDAP/AD, is that client authentication works without any additional/external component that must be constantly available. Therefore, certificate-based authentication may provide better availability / lower operational complexity.
 
-The BuckIt TLS STS API can be configured via BuckIt's standard configuration API (i.e. using `mc admin config set/get`). Further, it can be configured via the following environment variables:
+The Buckit TLS STS API can be configured via Buckit's standard configuration API (i.e. using `mc admin config set/get`). Further, it can be configured via the following environment variables:
 
 ```
 mc admin config set myminio identity_tls --env
@@ -17,7 +17,7 @@ ARGS:
 MINIO_IDENTITY_TLS_SKIP_VERIFY  (on|off)    trust client certificates without verification. Defaults to "off" (verify)
 ```
 
-The BuckIt TLS STS API is disabled by default. However, it can be *enabled* by setting environment variable:
+The Buckit TLS STS API is disabled by default. However, it can be *enabled* by setting environment variable:
 
 ```
 export MINIO_IDENTITY_TLS_ENABLE=on
@@ -25,10 +25,10 @@ export MINIO_IDENTITY_TLS_ENABLE=on
 
 ## Example
 
-BuckIt exposes a custom S3 STS API endpoint as `Action=AssumeRoleWithCertificate`. A client has to send an HTTP `POST` request to `https://<host>:<port>?Action=AssumeRoleWithCertificate&Version=2011-06-15`. Since the authentication and authorization happens via X.509 certificates the client has to send the request over **TLS** and has to provide
+Buckit exposes a custom S3 STS API endpoint as `Action=AssumeRoleWithCertificate`. A client has to send an HTTP `POST` request to `https://<host>:<port>?Action=AssumeRoleWithCertificate&Version=2011-06-15`. Since the authentication and authorization happens via X.509 certificates the client has to send the request over **TLS** and has to provide
 a client certificate.
 
-The following curl example shows how to authenticate to a BuckIt server with client certificate and obtain STS access credentials.
+The following curl example shows how to authenticate to a Buckit server with client certificate and obtain STS access credentials.
 
 ```curl
 curl -X POST --key private.key --cert public.crt "https://minio:9000?Action=AssumeRoleWithCertificate&Version=2011-06-15&DurationSeconds=3600"
@@ -53,11 +53,11 @@ curl -X POST --key private.key --cert public.crt "https://minio:9000?Action=Assu
 
 ## Authentication Flow
 
-A client can request temp. S3 credentials via the STS API. It can authenticate via a client certificate and obtain a access/secret key pair as well as a session token. These credentials are associated to an S3 policy at the BuckIt server.
+A client can request temp. S3 credentials via the STS API. It can authenticate via a client certificate and obtain a access/secret key pair as well as a session token. These credentials are associated to an S3 policy at the Buckit server.
 
-In case of certificate-based authentication, BuckIt has to map the client-provided certificate to an S3 policy. BuckIt does this via the subject common name field of the X.509 certificate. So, BuckIt will associate a certificate with a subject `CN = foobar` to a S3 policy named `foobar`.
+In case of certificate-based authentication, Buckit has to map the client-provided certificate to an S3 policy. Buckit does this via the subject common name field of the X.509 certificate. So, Buckit will associate a certificate with a subject `CN = foobar` to a S3 policy named `foobar`.
 
-The following self-signed certificate is issued for `consoleAdmin`. So, BuckIt would associate it with the pre-defined `consoleAdmin` policy.
+The following self-signed certificate is issued for `consoleAdmin`. So, Buckit would associate it with the pre-defined `consoleAdmin` policy.
 
 ```
 Certificate:
@@ -94,18 +94,18 @@ Certificate:
 
 > Observe the `Subject: CN = consoleAdmin` field.
 
-Also, note that the certificate has to contain the `Extended Key Usage: TLS Web Client Authentication`. Otherwise, BuckIt would not accept the certificate as client certificate.
+Also, note that the certificate has to contain the `Extended Key Usage: TLS Web Client Authentication`. Otherwise, Buckit would not accept the certificate as client certificate.
 
 Now, the STS certificate-based authentication happens in 4 steps:
 
-- Client sends HTTP `POST` request over a TLS connection hitting the BuckIt TLS STS API.
-- BuckIt verifies that the client certificate is valid.
-- BuckIt tries to find a policy that matches the `CN` of the client certificate.
-- BuckIt returns temp. S3 credentials associated to the found policy.
+- Client sends HTTP `POST` request over a TLS connection hitting the Buckit TLS STS API.
+- Buckit verifies that the client certificate is valid.
+- Buckit tries to find a policy that matches the `CN` of the client certificate.
+- Buckit returns temp. S3 credentials associated to the found policy.
 
 The returned credentials expiry after a certain period of time that can be configured via `&DurationSeconds=3600`. By default, the STS credentials are valid for 1 hour. The minimum expiration allowed is 15 minutes.
 
-Further, the temp. S3 credentials will never out-live the client certificate. For example, if the `MINIO_IDENTITY_TLS_STS_EXPIRY` is 7 days but the certificate itself is only valid for the next 3 days, then BuckIt will return S3 credentials that are valid for 3 days only.
+Further, the temp. S3 credentials will never out-live the client certificate. For example, if the `MINIO_IDENTITY_TLS_STS_EXPIRY` is 7 days but the certificate itself is only valid for the next 3 days, then Buckit will return S3 credentials that are valid for 3 days only.
 
 ## Caveat
 
@@ -113,5 +113,5 @@ Further, the temp. S3 credentials will never out-live the client certificate. Fo
 
 ## Explore Further
 
-- [BuckIt Admin Complete Guide](https://docs.min.io/community/minio-object-store/reference/minio-mc-admin.html)
-- [The BuckIt documentation website](https://docs.min.io/community/minio-object-store/index.html)
+- [Buckit Admin Complete Guide](https://buckit-io.github.io/docs/community/minio-object-store/reference/minio-mc-admin.html)
+- [The Buckit documentation website](https://buckit-io.github.io/docs/community/minio-object-store/index.html)

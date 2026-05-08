@@ -1,46 +1,46 @@
-# **Disaggregated HDP Spark and Hive with BuckIt**
+# **Disaggregated HDP Spark and Hive with Buckit**
 
 ## **1. Cloud-native Architecture**
 
-![cloud-native](https://github.com/minio/minio/blob/master/docs/bigdata/images/image1.png?raw=true "cloud native architecture")
+![cloud-native](https://buckit-io.github.io/docs/bigdata/images/image1.png?raw=true "cloud native architecture")
 
 Kubernetes manages stateless Spark and Hive containers elastically on the compute nodes. Spark has native scheduler integration with Kubernetes. Hive, for legacy reasons, uses YARN scheduler on top of Kubernetes.
 
-All access to BuckIt object storage is via S3/SQL SELECT API. In addition to the compute nodes, BuckIt containers are also managed by Kubernetes as stateful containers with local storage (JBOD/JBOF) mapped as persistent local volumes. This architecture enables multi-tenant BuckIt, allowing isolation of data between customers.
+All access to Buckit object storage is via S3/SQL SELECT API. In addition to the compute nodes, Buckit containers are also managed by Kubernetes as stateful containers with local storage (JBOD/JBOF) mapped as persistent local volumes. This architecture enables multi-tenant Buckit, allowing isolation of data between customers.
 
-BuckIt also supports multi-cluster, multi-site federation similar to AWS regions and tiers. Using BuckIt Information Lifecycle Management (ILM), you can configure data to be tiered between NVMe based hot storage, and HDD based warm storage. All data is encrypted with per-object key. Access Control and Identity Management between the tenants are managed by BuckIt using OpenID Connect or Kerberos/LDAP/AD.
+Buckit also supports multi-cluster, multi-site federation similar to AWS regions and tiers. Using Buckit Information Lifecycle Management (ILM), you can configure data to be tiered between NVMe based hot storage, and HDD based warm storage. All data is encrypted with per-object key. Access Control and Identity Management between the tenants are managed by Buckit using OpenID Connect or Kerberos/LDAP/AD.
 
 ## **2. Prerequisites**
 
 - Install Hortonworks Distribution using this [guide.](https://docs.hortonworks.com/HDPDocuments/Ambari-2.7.1.0/bk_ambari-installation/content/ch_Installing_Ambari.html)
   - [Setup Ambari](https://docs.hortonworks.com/HDPDocuments/Ambari-2.7.1.0/bk_ambari-installation/content/set_up_the_ambari_server.html) which automatically sets up YARN
   - [Installing Spark](https://docs.hortonworks.com/HDPDocuments/HDP3/HDP-3.0.1/installing-spark/content/installing_spark.html)
-- Install BuckIt Distributed Server using one of the guides below.
-  - [Deployment based on Kubernetes](https://docs.min.io/community/minio-object-store/operations/deployments/kubernetes.html)
-  - [Deployment based on BuckIt Helm Chart](https://github.com/helm/charts/tree/master/stable/minio)
+- Install Buckit Distributed Server using one of the guides below.
+  - [Deployment based on Kubernetes](https://buckit-io.github.io/docs/community/minio-object-store/operations/deployments/kubernetes.html)
+  - [Deployment based on Buckit Helm Chart](https://github.com/helm/charts/tree/master/stable/minio)
 
-## **3. Configure Hadoop, Spark, Hive to use BuckIt**
+## **3. Configure Hadoop, Spark, Hive to use Buckit**
 
 After successful installation navigate to the Ambari UI `http://<ambari-server>:8080/` and login using the default credentials: [**_username: admin, password: admin_**]
 
-![ambari-login](https://github.com/minio/minio/blob/master/docs/bigdata/images/image3.png?raw=true "ambari login")
+![ambari-login](https://buckit-io.github.io/docs/bigdata/images/image3.png?raw=true "ambari login")
 
 ### **3.1 Configure Hadoop**
 
 Navigate to **Services** -> **HDFS** -> **CONFIGS** -> **ADVANCED** as shown below
 
-![hdfs-configs](https://github.com/minio/minio/blob/master/docs/bigdata/images/image2.png?raw=true "hdfs advanced configs")
+![hdfs-configs](https://buckit-io.github.io/docs/bigdata/images/image2.png?raw=true "hdfs advanced configs")
 
-Navigate to **Custom core-site** to configure BuckIt parameters for `_s3a_` connector
+Navigate to **Custom core-site** to configure Buckit parameters for `_s3a_` connector
 
-![s3a-config](https://github.com/minio/minio/blob/master/docs/bigdata/images/image5.png?raw=true "custom core-site")
+![s3a-config](https://buckit-io.github.io/docs/bigdata/images/image5.png?raw=true "custom core-site")
 
 ```
 sudo pip install yq
 alias kv-pairify='yq ".configuration[]" | jq ".[]" | jq -r ".name + \"=\" + .value"'
 ```
 
-Let's take for example a set of 12 compute nodes with an aggregate memory of _1.2TiB_, we need to do following settings for optimal results. Add the following optimal entries for _core-site.xml_ to configure _s3a_ with **BuckIt**. Most important options here are
+Let's take for example a set of 12 compute nodes with an aggregate memory of _1.2TiB_, we need to do following settings for optimal results. Add the following optimal entries for _core-site.xml_ to configure _s3a_ with **Buckit**. Most important options here are
 
 ```
 cat ${HADOOP_CONF_DIR}/core-site.xml | kv-pairify | grep "mapred"
@@ -56,7 +56,7 @@ mapreduce.task.io.sort.factor=999 # Threshold before writing to disk
 mapreduce.task.sort.spill.percent=0.9 # Minimum % before spilling to disk
 ```
 
-S3A is the connector to use S3 and other S3-compatible object stores such as BuckIt. MapReduce workloads typically interact with object stores in the same way they do with HDFS. These workloads rely on HDFS atomic rename functionality to complete writing data to the datastore. Object storage operations are atomic by nature and they do not require/implement rename API. The default S3A committer emulates renames through copy and delete APIs. This interaction pattern causes significant loss of performance because of the write amplification. _Netflix_, for example, developed two new staging committers - the Directory staging committer and the Partitioned staging committer - to take full advantage of native object storage operations. These committers do not require rename operation. The two staging committers were evaluated, along with another new addition called the Magic committer for benchmarking.
+S3A is the connector to use S3 and other S3-compatible object stores such as Buckit. MapReduce workloads typically interact with object stores in the same way they do with HDFS. These workloads rely on HDFS atomic rename functionality to complete writing data to the datastore. Object storage operations are atomic by nature and they do not require/implement rename API. The default S3A committer emulates renames through copy and delete APIs. This interaction pattern causes significant loss of performance because of the write amplification. _Netflix_, for example, developed two new staging committers - the Directory staging committer and the Partitioned staging committer - to take full advantage of native object storage operations. These committers do not require rename operation. The two staging committers were evaluated, along with another new addition called the Magic committer for benchmarking.
 
 It was found that the directory staging committer was the fastest among the three, S3A connector should be configured with the following parameters for optimal results:
 
@@ -80,7 +80,7 @@ fs.s3a.connection.timeout=200000
 fs.s3a.endpoint=http://minio:9000
 fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
 
-fs.s3a.committer.threads=2048 # Number of threads writing to BuckIt
+fs.s3a.committer.threads=2048 # Number of threads writing to Buckit
 fs.s3a.connection.maximum=8192 # Maximum number of concurrent conns
 fs.s3a.fast.upload.active.blocks=2048 # Number of parallel uploads
 fs.s3a.fast.upload.buffer=disk # Use disk as the buffer for uploads
@@ -100,19 +100,19 @@ The rest of the other optimization options are discussed in the links below
 
 Once the config changes are applied, proceed to restart **Hadoop** services.
 
-![hdfs-services](https://github.com/minio/minio/blob/master/docs/bigdata/images/image7.png?raw=true "hdfs restart services")
+![hdfs-services](https://buckit-io.github.io/docs/bigdata/images/image7.png?raw=true "hdfs restart services")
 
 ### **3.2 Configure Spark2**
 
 Navigate to **Services** -> **Spark2** -> **CONFIGS** as shown below
 
-![spark-config](https://github.com/minio/minio/blob/master/docs/bigdata/images/image6.png?raw=true "spark config")
+![spark-config](https://buckit-io.github.io/docs/bigdata/images/image6.png?raw=true "spark config")
 
-Navigate to “**Custom spark-defaults**” to configure BuckIt parameters for `_s3a_` connector
+Navigate to “**Custom spark-defaults**” to configure Buckit parameters for `_s3a_` connector
 
-![spark-config](https://github.com/minio/minio/blob/master/docs/bigdata/images/image9.png?raw=true "spark defaults")
+![spark-config](https://buckit-io.github.io/docs/bigdata/images/image9.png?raw=true "spark defaults")
 
-Add the following optimal entries for _spark-defaults.conf_ to configure Spark with **BuckIt**.
+Add the following optimal entries for _spark-defaults.conf_ to configure Spark with **Buckit**.
 
 ```
 spark.hadoop.fs.s3a.access.key minio
@@ -126,7 +126,7 @@ spark.hadoop.fs.s3a.committer.staging.abort.pending.uploads true
 spark.hadoop.fs.s3a.committer.staging.conflict-mode append
 spark.hadoop.fs.s3a.committer.staging.tmp.path /tmp/staging
 spark.hadoop.fs.s3a.committer.staging.unique-filenames true
-spark.hadoop.fs.s3a.committer.threads 2048 # number of threads writing to BuckIt
+spark.hadoop.fs.s3a.committer.threads 2048 # number of threads writing to Buckit
 spark.hadoop.fs.s3a.connection.establish.timeout 5000
 spark.hadoop.fs.s3a.connection.maximum 8192 # maximum number of concurrent conns
 spark.hadoop.fs.s3a.connection.ssl.enabled false
@@ -146,19 +146,19 @@ spark.hadoop.fs.s3a.threads.max 2048 # maximum number of threads for S3A
 
 Once the config changes are applied, proceed to restart **Spark** services.
 
-![spark-config](https://github.com/minio/minio/blob/master/docs/bigdata/images/image12.png?raw=true "spark restart services")
+![spark-config](https://buckit-io.github.io/docs/bigdata/images/image12.png?raw=true "spark restart services")
 
 ### **3.3 Configure Hive**
 
 Navigate to **Services** -> **Hive** -> **CONFIGS**-> **ADVANCED** as shown below
 
-![hive-config](https://github.com/minio/minio/blob/master/docs/bigdata/images/image10.png?raw=true "hive advanced config")
+![hive-config](https://buckit-io.github.io/docs/bigdata/images/image10.png?raw=true "hive advanced config")
 
-Navigate to “**Custom hive-site**” to configure BuckIt parameters for `_s3a_` connector
+Navigate to “**Custom hive-site**” to configure Buckit parameters for `_s3a_` connector
 
-![hive-config](https://github.com/minio/minio/blob/master/docs/bigdata/images/image11.png?raw=true "hive advanced config")
+![hive-config](https://buckit-io.github.io/docs/bigdata/images/image11.png?raw=true "hive advanced config")
 
-Add the following optimal entries for `hive-site.xml` to configure Hive with **BuckIt**.
+Add the following optimal entries for `hive-site.xml` to configure Hive with **Buckit**.
 
 ```
 hive.blobstore.use.blobstore.as.scratchdir=true
@@ -171,11 +171,11 @@ mapreduce.input.fileinputformat.list-status.num-threads=50
 
 For more information about these options please visit [https://www.cloudera.com/documentation/enterprise/5-11-x/topics/admin_hive_on_s3_tuning.html](https://www.cloudera.com/documentation/enterprise/5-11-x/topics/admin_hive_on_s3_tuning.html)
 
-![hive-config](https://github.com/minio/minio/blob/master/docs/bigdata/images/image13.png?raw=true "hive advanced custom config")
+![hive-config](https://buckit-io.github.io/docs/bigdata/images/image13.png?raw=true "hive advanced custom config")
 
 Once the config changes are applied, proceed to restart all Hive services.
 
-![hive-config](https://github.com/minio/minio/blob/master/docs/bigdata/images/image14.png?raw=true "restart hive services")
+![hive-config](https://buckit-io.github.io/docs/bigdata/images/image14.png?raw=true "restart hive services")
 
 ## **4. Run Sample Applications**
 
@@ -188,7 +188,7 @@ Test the Spark installation by running the following compute intensive example, 
 Follow these steps to run the Spark Pi example:
 
 - Login as user **‘spark’**.
-- When the job runs, the library can now use **BuckIt** during intermediate processing.
+- When the job runs, the library can now use **Buckit** during intermediate processing.
 - Navigate to a node with the Spark client and access the spark2-client directory:
 
 ```
@@ -224,7 +224,7 @@ WordCount is a simple program that counts how often a word occurs in a text file
 The following example submits WordCount code to the Scala shell. Select an input file for the Spark WordCount example. We can use any text file as input.
 
 - Login as user **‘spark’**.
-- When the job runs, the library can now use **BuckIt** during intermediate processing.
+- When the job runs, the library can now use **Buckit** during intermediate processing.
 - Navigate to a node with Spark client and access the spark2-client directory:
 
 ```
@@ -290,7 +290,7 @@ scala> counts.count()
 364
 ```
 
-To view the output from BuckIt exit the Scala shell. View WordCount job status:
+To view the output from Buckit exit the Scala shell. View WordCount job status:
 
 ```
 hadoop fs -ls s3a://testbucket/wordcount

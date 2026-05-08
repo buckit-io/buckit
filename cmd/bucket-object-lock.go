@@ -23,11 +23,11 @@ import (
 	"math"
 	"net/http"
 
-	"github.com/minio/minio/internal/auth"
-	objectlock "github.com/minio/minio/internal/bucket/object/lock"
-	"github.com/minio/minio/internal/bucket/replication"
-	xhttp "github.com/minio/minio/internal/http"
-	"github.com/minio/minio/internal/logger"
+	"github.com/buckit-io/buckit/internal/auth"
+	objectlock "github.com/buckit-io/buckit/internal/bucket/object/lock"
+	"github.com/buckit-io/buckit/internal/bucket/replication"
+	xhttp "github.com/buckit-io/buckit/internal/http"
+	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/minio/pkg/v3/policy"
 )
 

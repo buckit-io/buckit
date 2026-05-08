@@ -25,7 +25,7 @@ import (
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/minio/madmin-go/v3"
-	"github.com/minio/minio/internal/config/storageclass"
+	"github.com/buckit-io/buckit/internal/config/storageclass"
 	"github.com/minio/mux"
 	"github.com/minio/pkg/v3/policy"
 )

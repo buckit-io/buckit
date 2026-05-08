@@ -6,10 +6,10 @@ GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 
 VERSION ?= $(shell git describe --tags)
-REPO ?= quay.io/minio
-TAG ?= $(REPO)/minio:$(VERSION)
+REPO ?= quay.io/buckit
+TAG ?= $(REPO)/buckit:$(VERSION)
 
-GOLANGCI_DIR = .bin/golangci/$(GOLANGCI_VERSION)
+GOLANGCI_DIR = .bin/golangci/latest
 GOLANGCI = $(GOLANGCI_DIR)/golangci-lint
 
 all: build
@@ -23,9 +23,9 @@ help: ## print this help
 
 getdeps: ## fetch necessary dependencies
 	@mkdir -p ${GOPATH}/bin
-	@echo "Installing golangci-lint" && curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOLANGCI_DIR)
+	@echo "Installing latest golangci-lint" && curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(GOLANGCI_DIR)
 
-crosscompile: ## cross compile minio
+crosscompile: ## cross compile buckit
 	@(env bash $(PWD)/buildscripts/cross-compile.sh)
 
 verifiers: lint check-gen
@@ -46,12 +46,12 @@ lint-fix: getdeps ## runs golangci-lint suite of linters with automatic fixes
 	@$(GOLANGCI) run --build-tags kqueue --timeout=10m --config ./.golangci.yml --fix
 
 check: test
-test: verifiers build ## builds minio, runs linters, tests
+test: verifiers build ## builds buckit, runs linters, tests
 	@echo "Running unit tests"
 	@MINIO_API_REQUESTS_MAX=10000 CGO_ENABLED=0 go test -v -tags kqueue,dev ./...
 
 test-root-disable: install-race
-	@echo "Running minio root lockdown tests"
+	@echo "Running buckit root lockdown tests"
 	@env bash $(PWD)/buildscripts/disable-root.sh
 
 test-ilm: install-race
@@ -67,7 +67,7 @@ test-pbac: install-race
 	@env bash $(PWD)/docs/iam/policies/pbac-tests.sh
 
 test-decom: install-race
-	@echo "Running minio decom tests"
+	@echo "Running buckit decom tests"
 	@env bash $(PWD)/docs/distributed/decom.sh
 	@env bash $(PWD)/docs/distributed/decom-encrypted.sh
 	@env bash $(PWD)/docs/distributed/decom-encrypted-sse-s3.sh
@@ -75,17 +75,17 @@ test-decom: install-race
 	@env bash $(PWD)/docs/distributed/decom-encrypted-kes.sh
 
 test-versioning: install-race
-	@echo "Running minio versioning tests"
+	@echo "Running buckit versioning tests"
 	@env bash $(PWD)/docs/bucket/versioning/versioning-tests.sh
 
 test-configfile: install-race
 	@env bash $(PWD)/docs/distributed/distributed-from-config-file.sh
 
 test-upgrade: install-race
-	@echo "Running minio upgrade tests"
+	@echo "Running buckit upgrade tests"
 	@(env bash $(PWD)/buildscripts/minio-upgrade.sh)
 
-test-race: verifiers build ## builds minio, runs linters, tests (race)
+test-race: verifiers build ## builds buckit, runs linters, tests (race)
 	@echo "Running unit tests under -race"
 	@(env bash $(PWD)/buildscripts/race.sh)
 
@@ -134,7 +134,7 @@ test-site-replication-oidc: install-race ## verify automatic site replication
 	@(env bash $(PWD)/docs/site-replication/run-multi-site-oidc.sh)
 
 test-site-replication-minio: install-race ## verify automatic site replication
-	@echo "Running tests for automatic site replication of IAM (with MinIO IDP)"
+	@echo "Running tests for automatic site replication of IAM (with Buckit IDP)"
 	@(env bash $(PWD)/docs/site-replication/run-multi-site-minio-idp.sh)
 	@echo "Running tests for automatic site replication of SSE-C objects"
 	@(env bash $(PWD)/docs/site-replication/run-ssec-object-replication.sh)
@@ -151,11 +151,11 @@ test-timeout: install-race ## test multipart
 	@echo "Test server timeout"
 	@(env bash $(PWD)/buildscripts/test-timeout.sh)
 
-verify: install-race ## verify minio various setups
+verify: install-race ## verify buckit various setups
 	@echo "Verifying build with race"
 	@(env bash $(PWD)/buildscripts/verify-build.sh)
 
-verify-healing: install-race ## verify healing and replacing disks with minio binary
+verify-healing: install-race ## verify healing and replacing disks with buckit binary
 	@echo "Verify healing build with race"
 	@(env bash $(PWD)/buildscripts/verify-healing.sh)
 	@(env bash $(PWD)/buildscripts/verify-healing-empty-erasure-set.sh)
@@ -176,59 +176,59 @@ verify-healing-inconsistent-versions: install-race ## verify resolving inconsist
 build-debugging:
 	@(env bash $(PWD)/docs/debugging/build.sh)
 
-build: checks build-debugging ## builds minio to $(PWD)
-	@echo "Building minio binary to './minio'"
-	@CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -tags kqueue -trimpath --ldflags "$(LDFLAGS)" -o $(PWD)/minio 1>/dev/null
+build: checks build-debugging ## builds buckit to $(PWD)
+	@echo "Building buckit binary to './buckit'"
+	@CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -tags kqueue -trimpath --ldflags "$(LDFLAGS)" -o $(PWD)/buckit 1>/dev/null
 
 hotfix-vars:
-	$(eval LDFLAGS := $(shell MINIO_RELEASE="RELEASE" MINIO_HOTFIX="hotfix.$(shell git rev-parse --short HEAD)" go run buildscripts/gen-ldflags.go $(shell git describe --tags --abbrev=0 | \
+	$(eval LDFLAGS := $(shell BUCKIT_RELEASE="RELEASE" BUCKIT_HOTFIX="hotfix.$(shell git rev-parse --short HEAD)" go run buildscripts/gen-ldflags.go $(shell git describe --tags --abbrev=0 | \
     sed 's#RELEASE\.\([0-9]\+\)-\([0-9]\+\)-\([0-9]\+\)T\([0-9]\+\)-\([0-9]\+\)-\([0-9]\+\)Z#\1-\2-\3T\4:\5:\6Z#')))
 	$(eval VERSION := $(shell git describe --tags --abbrev=0).hotfix.$(shell git rev-parse --short HEAD))
 
-hotfix: hotfix-vars clean install ## builds minio binary with hotfix tags
+hotfix: hotfix-vars clean install ## builds buckit binary with hotfix tags
 	@wget -q -c https://github.com/minio/pkger/releases/download/v2.3.11/pkger_2.3.11_linux_amd64.deb
 	@wget -q -c https://raw.githubusercontent.com/minio/minio-service/v1.1.1/linux-systemd/distributed/minio.service
 	@sudo apt install ./pkger_2.3.11_linux_amd64.deb --yes
-	@mkdir -p minio-release/$(GOOS)-$(GOARCH)/archive
-	@cp -af ./minio minio-release/$(GOOS)-$(GOARCH)/minio
-	@cp -af ./minio minio-release/$(GOOS)-$(GOARCH)/minio.$(VERSION)
-	@minisign -qQSm minio-release/$(GOOS)-$(GOARCH)/minio.$(VERSION) -s "${CRED_DIR}/minisign.key" < "${CRED_DIR}/minisign-passphrase"
-	@sha256sum < minio-release/$(GOOS)-$(GOARCH)/minio.$(VERSION) | sed 's, -,minio.$(VERSION),g' > minio-release/$(GOOS)-$(GOARCH)/minio.$(VERSION).sha256sum
-	@cp -af minio-release/$(GOOS)-$(GOARCH)/minio.$(VERSION)* minio-release/$(GOOS)-$(GOARCH)/archive/
+	@mkdir -p buckit-release/$(GOOS)-$(GOARCH)/archive
+	@cp -af ./buckit buckit-release/$(GOOS)-$(GOARCH)/buckit
+	@cp -af ./buckit buckit-release/$(GOOS)-$(GOARCH)/buckit.$(VERSION)
+	@minisign -qQSm buckit-release/$(GOOS)-$(GOARCH)/buckit.$(VERSION) -s "${CRED_DIR}/minisign.key" < "${CRED_DIR}/minisign-passphrase"
+	@sha256sum < buckit-release/$(GOOS)-$(GOARCH)/buckit.$(VERSION) | sed 's, -,buckit.$(VERSION),g' > buckit-release/$(GOOS)-$(GOARCH)/buckit.$(VERSION).sha256sum
+	@cp -af buckit-release/$(GOOS)-$(GOARCH)/buckit.$(VERSION)* buckit-release/$(GOOS)-$(GOARCH)/archive/
 	@pkger -r $(VERSION) --ignore
 
 hotfix-push: hotfix
-	@scp -q -r minio-release/$(GOOS)-$(GOARCH)/* minio@dl-0.minio.io:~/releases/server/minio/hotfixes/linux-$(GOOS)/
-	@scp -q -r minio-release/$(GOOS)-$(GOARCH)/* minio@dl-0.minio.io:~/releases/server/minio/hotfixes/linux-$(GOOS)/archive
-	@scp -q -r minio-release/$(GOOS)-$(GOARCH)/* minio@dl-1.minio.io:~/releases/server/minio/hotfixes/linux-$(GOOS)/
-	@scp -q -r minio-release/$(GOOS)-$(GOARCH)/* minio@dl-1.minio.io:~/releases/server/minio/hotfixes/linux-$(GOOS)/archive
-	@echo "Published new hotfix binaries at https://dl.min.io/server/minio/hotfixes/linux-$(GOOS)/archive/minio.$(VERSION)"
+	@scp -q -r buckit-release/$(GOOS)-$(GOARCH)/* buckit@dl-0.buckit.io:~/releases/server/buckit/hotfixes/linux-$(GOOS)/
+	@scp -q -r buckit-release/$(GOOS)-$(GOARCH)/* buckit@dl-0.buckit.io:~/releases/server/buckit/hotfixes/linux-$(GOOS)/archive
+	@scp -q -r buckit-release/$(GOOS)-$(GOARCH)/* buckit@dl-1.buckit.io:~/releases/server/buckit/hotfixes/linux-$(GOOS)/
+	@scp -q -r buckit-release/$(GOOS)-$(GOARCH)/* buckit@dl-1.buckit.io:~/releases/server/buckit/hotfixes/linux-$(GOOS)/archive
+	@echo "Published new hotfix binaries at https://dl.buckit.io/server/buckit/hotfixes/linux-$(GOOS)/archive/buckit.$(VERSION)"
 
 docker-hotfix-push: docker-hotfix
 	@docker push -q $(TAG) && echo "Published new container $(TAG)"
 
-docker-hotfix: hotfix-push checks ## builds minio docker container with hotfix tags
-	@echo "Building minio docker image '$(TAG)'"
+docker-hotfix: hotfix-push checks ## builds buckit docker container with hotfix tags
+	@echo "Building buckit docker image '$(TAG)'"
 	@docker build -q --no-cache -t $(TAG) --build-arg RELEASE=$(VERSION) . -f Dockerfile.hotfix
 
-docker: build ## builds minio docker container
-	@echo "Building minio docker image '$(TAG)'"
+docker: build ## builds buckit docker container
+	@echo "Building buckit docker image '$(TAG)'"
 	@docker build -q --no-cache -t $(TAG) . -f Dockerfile
 
 test-resiliency: build
 	@echo "Running resiliency tests"
 	@(DOCKER_COMPOSE_FILE=$(PWD)/docs/resiliency/docker-compose.yaml env bash $(PWD)/docs/resiliency/resiliency-tests.sh)
 
-install-race: checks build-debugging ## builds minio to $(PWD)
-	@echo "Building minio binary with -race to './minio'"
-	@GORACE=history_size=7 CGO_ENABLED=1 go build -tags kqueue,dev -race -trimpath --ldflags "$(LDFLAGS)" -o $(PWD)/minio 1>/dev/null
-	@echo "Installing minio binary with -race to '$(GOPATH)/bin/minio'"
-	@mkdir -p $(GOPATH)/bin && cp -af $(PWD)/minio $(GOPATH)/bin/minio
+install-race: checks build-debugging ## builds buckit to $(PWD)
+	@echo "Building buckit binary with -race to './buckit'"
+	@GORACE=history_size=7 CGO_ENABLED=1 go build -tags kqueue,dev -race -trimpath --ldflags "$(LDFLAGS)" -o $(PWD)/buckit 1>/dev/null
+	@echo "Installing buckit binary with -race to '$(GOPATH)/bin/buckit'"
+	@mkdir -p $(GOPATH)/bin && cp -af $(PWD)/buckit $(GOPATH)/bin/buckit
 
-install: build ## builds minio and installs it to $GOPATH/bin.
-	@echo "Installing minio binary to '$(GOPATH)/bin/minio'"
-	@mkdir -p $(GOPATH)/bin && cp -af $(PWD)/minio $(GOPATH)/bin/minio
-	@echo "Installation successful. To learn more, try \"minio --help\"."
+install: build ## builds buckit and installs it to $GOPATH/bin.
+	@echo "Installing buckit binary to '$(GOPATH)/bin/buckit'"
+	@mkdir -p $(GOPATH)/bin && cp -af $(PWD)/buckit $(GOPATH)/bin/buckit
+	@echo "Installation successful. To learn more, try \"buckit --help\"."
 
 clean: ## cleanup all generated assets
 	@echo "Cleaning up all the generated files"
@@ -236,10 +236,10 @@ clean: ## cleanup all generated assets
 	@find . -name '*~' | xargs rm -fv
 	@find . -name '.#*#' | xargs rm -fv
 	@find . -name '#*#' | xargs rm -fv
-	@rm -rvf minio
+	@rm -rvf buckit
 	@rm -rvf build
 	@rm -rvf release
 	@rm -rvf .verify*
-	@rm -rvf minio-release
-	@rm -rvf minio.RELEASE*.hotfix.*
+	@rm -rvf buckit-release
+	@rm -rvf buckit.RELEASE*.hotfix.*
 	@rm -rvf pkger_*.deb

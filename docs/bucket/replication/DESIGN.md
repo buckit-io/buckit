@@ -1,6 +1,6 @@
 # Bucket Replication Design [![slack](https://slack.min.io/slack?type=svg)](https://slack.min.io) [![Docker Pulls](https://img.shields.io/docker/pulls/minio/minio.svg?maxAge=604800)](https://hub.docker.com/r/minio/minio/)
 
-This document explains the design approach of server side bucket replication. If you're looking to get started with replication, we suggest you go through the [Bucket replication guide](https://github.com/minio/minio/blob/master/docs/bucket/replication/README.md) first.
+This document explains the design approach of server side bucket replication. If you're looking to get started with replication, we suggest you go through the [Bucket replication guide](https://buckit-io.github.io/docs/bucket/replication/README.md) first.
 
 ## Overview
 
@@ -12,13 +12,13 @@ If an object meets replication rules as set in the replication configuration, `X
 
 All replication failures are picked up by the scanner which runs at a one minute frequency, each time scanning up to a sixteenth of the namespace. Object versions marked `PENDING` or `FAILED` are re-queued for replication.
 
-Replication speed depends on the cluster load, number of objects in the object store as well as storage speed. In addition, any bandwidth limits set via `mc admin bucket remote add` could also contribute to replication speed. The number of workers used for replication defaults to 100. Based on network bandwidth and system load, the number of workers used in replication can be configured using `mc admin config set alias api` to set the `replication_workers`. The prometheus metrics exposed by BuckIt can be used to plan resource allocation and bandwidth management to optimize replication speed.
+Replication speed depends on the cluster load, number of objects in the object store as well as storage speed. In addition, any bandwidth limits set via `mc admin bucket remote add` could also contribute to replication speed. The number of workers used for replication defaults to 100. Based on network bandwidth and system load, the number of workers used in replication can be configured using `mc admin config set alias api` to set the `replication_workers`. The prometheus metrics exposed by Buckit can be used to plan resource allocation and bandwidth management to optimize replication speed.
 
 If synchronous replication is configured above, replication is attempted right away prior to returning the PUT object response. In the event that the replication target is down, the `X-Amz-Replication-Status` is marked as `FAILED` and resynced with target when the scanner runs again.
 
 Any metadata changes on the source object version, such as metadata updates via PutObjectTagging, PutObjectRetention, PutObjectLegalHold and COPY api are replicated in a similar manner to target version, with the `X-Amz-Replication-Status` again cycling through the same states.
 
-The description above details one way replication from source to target w.r.t incoming object uploads and metadata changes to source object version. If active-active replication is configured, any incoming uploads and metadata changes to versions created on the target, will sync back to the source and be marked as `REPLICA` on the source. AWS, as well as BuckIt do not by default sync metadata changes on a object version marked `REPLICA` back to source. This requires a setting in the replication configuration called [replica modification sync](https://aws.amazon.com/about-aws/whats-new/2020/12/amazon-s3-replication-adds-support-two-way-replication/).
+The description above details one way replication from source to target w.r.t incoming object uploads and metadata changes to source object version. If active-active replication is configured, any incoming uploads and metadata changes to versions created on the target, will sync back to the source and be marked as `REPLICA` on the source. AWS, as well as Buckit do not by default sync metadata changes on a object version marked `REPLICA` back to source. This requires a setting in the replication configuration called [replica modification sync](https://aws.amazon.com/about-aws/whats-new/2020/12/amazon-s3-replication-adds-support-two-way-replication/).
 
 For active-active replication, automatic failover occurs on `GET/HEAD` operations if object or object version requested qualifies for replication and is missing on one site, but present on the other. This allows the applications to take full advantage of two-way replication even before the two sites get fully synced.
 
@@ -26,7 +26,7 @@ In the case of multi destination replication, the replication status shows `COMP
 
 ### Replication of DeleteMarker and versioned Delete
 
-BuckIt allows DeleteMarker replication and versioned delete replication by setting `--replicate delete,delete-marker` while setting up replication configuration using `mc replicate add`. The BuckIt implementation is based on V2 configuration, however it has been extended to allow both DeleteMarker replication and replication of versioned deletes with the `DeleteMarkerReplication` and `DeleteReplication` fields in the replication configuration. By default, this is set to `Disabled` unless the user specifies it while adding a replication rule.
+Buckit allows DeleteMarker replication and versioned delete replication by setting `--replicate delete,delete-marker` while setting up replication configuration using `mc replicate add`. The Buckit implementation is based on V2 configuration, however it has been extended to allow both DeleteMarker replication and replication of versioned deletes with the `DeleteMarkerReplication` and `DeleteReplication` fields in the replication configuration. By default, this is set to `Disabled` unless the user specifies it while adding a replication rule.
 
 Similar to object version replication, DeleteMarker replication also cycles through `PENDING` to `COMPLETED` or `FAILED` states for the `X-Amz-Replication-Status` on the source when a delete marker is set (i.e. performing `mc rm` on an object without specifying a version).After replication syncs the delete marker on the target, the DeleteMarker on the target shows `X-Amz-Replication-Status` of `REPLICA`. The status of DeleteMarker replication is returned by `X-Minio-Replication-DeleteMarker-Status` header on `HEAD/GET` calls for the delete marker version in question - i.e with `mc stat --version-id dm-version-id`
 
@@ -59,7 +59,7 @@ If 3 or more targets are participating in active-active replication, the replica
 
 ### Internal metadata for replication
 
-`xl.meta` that is in use for [versioning](https://github.com/minio/minio/blob/master/docs/bucket/versioning/DESIGN.md) has additional metadata for replication of objects,delete markers and versioned deletes.
+`xl.meta` that is in use for [versioning](https://buckit-io.github.io/docs/bucket/versioning/DESIGN.md) has additional metadata for replication of objects,delete markers and versioned deletes.
 
 ### Metadata for object replication - on source
 
@@ -156,5 +156,5 @@ If 3 or more targets are participating in active-active replication, the replica
 
 ## Explore Further
 
-- [BuckIt Bucket Versioning Implementation](https://docs.min.io/community/minio-object-store/administration/object-management/object-versioning.html)
-- [BuckIt Client Quickstart Guide](https://docs.min.io/community/minio-object-store/reference/minio-mc.html#quickstart)
+- [Buckit Bucket Versioning Implementation](https://buckit-io.github.io/docs/community/minio-object-store/administration/object-management/object-versioning.html)
+- [Buckit Client Quickstart Guide](https://buckit-io.github.io/docs/community/minio-object-store/reference/minio-mc.html#quickstart)

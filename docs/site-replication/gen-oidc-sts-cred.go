@@ -34,7 +34,7 @@ import (
 	"os"
 
 	cr "github.com/minio/minio-go/v7/pkg/credentials"
-	cmd "github.com/minio/minio/cmd"
+	cmd "github.com/buckit-io/buckit/cmd"
 )
 
 func main() {

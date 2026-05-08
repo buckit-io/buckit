@@ -1,4 +1,4 @@
-module github.com/minio/minio
+module github.com/buckit-io/buckit
 
 go 1.25.0
 
@@ -17,6 +17,7 @@ require (
 	github.com/IBM/sarama v1.45.1
 	github.com/alecthomas/participle v0.7.1
 	github.com/beevik/ntp v1.4.3
+	github.com/buckit-io/console v0.0.0-20260502012154-a500b6db00f3
 	github.com/buger/jsonparser v1.1.1
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cheggaaa/pb v1.0.29
@@ -49,7 +50,6 @@ require (
 	github.com/lithammer/shortuuid/v4 v4.2.0
 	github.com/miekg/dns v1.1.65
 	github.com/minio/cli v1.24.2
-	github.com/minio/console v1.7.7-0.20250905210349-2017f33b26e1
 	github.com/minio/csvparser v1.0.0
 	github.com/minio/dnscache v0.1.1
 	github.com/minio/dperf v0.6.3

@@ -24,8 +24,8 @@ import (
 
 	"github.com/minio/madmin-go/v3/logger/audit"
 
-	"github.com/minio/minio/internal/handlers"
-	xhttp "github.com/minio/minio/internal/http"
+	"github.com/buckit-io/buckit/internal/handlers"
+	xhttp "github.com/buckit-io/buckit/internal/http"
 )
 
 // Version - represents the current version of audit log structure.

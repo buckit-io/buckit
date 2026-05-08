@@ -32,13 +32,13 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/lithammer/shortuuid/v4"
 	"github.com/minio/madmin-go/v3"
-	"github.com/minio/minio/internal/bucket/lifecycle"
-	objectlock "github.com/minio/minio/internal/bucket/object/lock"
-	"github.com/minio/minio/internal/bucket/replication"
-	"github.com/minio/minio/internal/bucket/versioning"
-	"github.com/minio/minio/internal/hash"
-	xioutil "github.com/minio/minio/internal/ioutil"
-	"github.com/minio/minio/internal/logger"
+	"github.com/buckit-io/buckit/internal/bucket/lifecycle"
+	objectlock "github.com/buckit-io/buckit/internal/bucket/object/lock"
+	"github.com/buckit-io/buckit/internal/bucket/replication"
+	"github.com/buckit-io/buckit/internal/bucket/versioning"
+	"github.com/buckit-io/buckit/internal/hash"
+	xioutil "github.com/buckit-io/buckit/internal/ioutil"
+	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/minio/pkg/v3/env"
 	"github.com/minio/pkg/v3/workers"
 )
@@ -173,7 +173,7 @@ func (z *erasureServerPools) initRebalanceMeta(ctx context.Context, buckets []st
 	for _, disk := range si.Disks {
 		// Ignore invalid.
 		if disk.PoolIndex < 0 || len(diskStats) <= disk.PoolIndex {
-			// https://github.com/minio/minio/issues/16500
+			// https://github.com/buckit-io/buckit/issues/16500
 			continue
 		}
 		totalCap += disk.TotalSpace

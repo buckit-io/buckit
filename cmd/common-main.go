@@ -42,20 +42,20 @@ import (
 	"github.com/go-openapi/loads"
 	"github.com/inconshreveable/mousetrap"
 	dns2 "github.com/miekg/dns"
+	"github.com/buckit-io/console/api/operations"
+	consoleapi "github.com/buckit-io/console/api"
+	consoleoauth2 "github.com/buckit-io/console/pkg/auth/idp/oauth2"
+	consoleCerts "github.com/buckit-io/console/pkg/certs"
 	"github.com/minio/cli"
-	consoleapi "github.com/minio/console/api"
-	"github.com/minio/console/api/operations"
-	consoleoauth2 "github.com/minio/console/pkg/auth/idp/oauth2"
-	consoleCerts "github.com/minio/console/pkg/certs"
 	"github.com/minio/kms-go/kes"
 	"github.com/minio/madmin-go/v3"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/set"
-	"github.com/minio/minio/internal/auth"
-	"github.com/minio/minio/internal/color"
-	"github.com/minio/minio/internal/config"
-	"github.com/minio/minio/internal/kms"
-	"github.com/minio/minio/internal/logger"
+	"github.com/buckit-io/buckit/internal/auth"
+	"github.com/buckit-io/buckit/internal/color"
+	"github.com/buckit-io/buckit/internal/config"
+	"github.com/buckit-io/buckit/internal/kms"
+	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/minio/pkg/v3/certs"
 	"github.com/minio/pkg/v3/console"
 	"github.com/minio/pkg/v3/env"
@@ -82,7 +82,7 @@ func init() {
 		if mousetrap.StartedByExplorer() {
 			fmt.Printf("Don't double-click %s\n", os.Args[0])
 			fmt.Println("You need to open cmd.exe/PowerShell and run it from the command line")
-			fmt.Println("Refer to the docs here on how to run it as a Windows Service https://github.com/minio/minio-service/tree/master/windows")
+			fmt.Println("Refer to the docs here on how to run it as a Windows Service https://github.com/buckit-io/buckit-service/tree/master/windows")
 			fmt.Println("Press the Enter Key to Exit")
 			fmt.Scanln()
 			os.Exit(1)

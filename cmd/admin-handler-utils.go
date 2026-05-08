@@ -25,8 +25,8 @@ import (
 
 	"github.com/minio/kms-go/kes"
 	"github.com/minio/madmin-go/v3"
-	"github.com/minio/minio/internal/auth"
-	"github.com/minio/minio/internal/config"
+	"github.com/buckit-io/buckit/internal/auth"
+	"github.com/buckit-io/buckit/internal/config"
 	"github.com/minio/pkg/v3/policy"
 )
 

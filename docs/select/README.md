@@ -12,9 +12,9 @@ You can use the Select API to query objects with following features:
 
 Type inference and automatic conversion of values is performed based on the context when the value is un-typed (such as when reading CSV data). If present, the CAST function overrides automatic conversion.
 
-The [mc sql](https://docs.min.io/community/minio-object-store/reference/minio-mc/mc-sql.html) command can be used for executing queries using the command line.
+The [mc sql](https://buckit-io.github.io/docs/community/minio-object-store/reference/minio-mc/mc-sql.html) command can be used for executing queries using the command line.
 
-(*) Parquet is disabled on the BuckIt server by default. See below how to enable it.
+(*) Parquet is disabled on the Buckit server by default. See below how to enable it.
 
 ## Enabling Parquet Format
 
@@ -27,7 +27,7 @@ To enable Parquet set the environment variable `MINIO_API_SELECT_PARQUET=on`.
 
 ### 1. Prerequisites
 
-- Install BuckIt Server from [here](https://docs.min.io/community/minio-object-store/operations/deployments/baremetal-deploy-minio-on-redhat-linux.html#procedure).
+- Install Buckit Server from [here](https://buckit-io.github.io/docs/community/minio-object-store/operations/deployments/baremetal-deploy-minio-on-redhat-linux.html#procedure).
 - Familiarity with AWS S3 API.
 - Familiarity with Python and installing dependencies.
 
@@ -79,7 +79,7 @@ for event in r['Payload']:
 
 ## 4. Run the Program
 
-Upload a sample dataset to BuckIt using the following commands.
+Upload a sample dataset to Buckit using the following commands.
 
 ```sh
 curl "https://population.un.org/wpp/Download/Files/1_Indicators%20(Standard)/CSV_FILES/WPP2019_TotalPopulationBySex.csv" > TotalPopulation.csv
@@ -113,11 +113,11 @@ For a more detailed SELECT SQL reference, please see [here](https://docs.aws.ama
 
 ## 5. Explore Further
 
-- [Use `mc` with BuckIt Server](https://docs.min.io/community/minio-object-store/reference/minio-mc.html)
-- [Use `mc sql` with BuckIt Server](https://docs.min.io/community/minio-object-store/reference/minio-mc/mc-sql.html#command-mc.sql)
-- [Use `minio-go` SDK with BuckIt Server](https://docs.min.io/community/minio-object-store/developers/go/minio-go.html)
-- [Use `aws-cli` with BuckIt Server](https://docs.min.io/community/minio-object-store/integrations/aws-cli-with-buckit.html)
-- [The BuckIt documentation website](https://docs.min.io/community/minio-object-store/index.html)
+- [Use `mc` with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/reference/minio-mc.html)
+- [Use `mc sql` with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/reference/minio-mc/mc-sql.html#command-mc.sql)
+- [Use `minio-go` SDK with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/developers/go/minio-go.html)
+- [Use `aws-cli` with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/integrations/aws-cli-with-buckit.html)
+- [The Buckit documentation website](https://buckit-io.github.io/docs/community/minio-object-store/index.html)
 
 ## 6. Implementation Status
 

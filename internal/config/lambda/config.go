@@ -17,7 +17,7 @@
 
 package lambda
 
-import "github.com/minio/minio/internal/event/target"
+import "github.com/buckit-io/buckit/internal/event/target"
 
 // Config - lambda target configuration structure, holds
 // information about various lambda targets.

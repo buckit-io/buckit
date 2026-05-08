@@ -1,6 +1,6 @@
 # Object Lock and Immutability Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
 
-BuckIt server allows WORM for specific objects or by configuring a bucket with default object lock configuration that applies default retention mode and retention duration to all objects. This makes objects in the bucket immutable i.e. delete of the version are not allowed until an expiry specified in the bucket's object lock configuration or object retention.
+Buckit server allows WORM for specific objects or by configuring a bucket with default object lock configuration that applies default retention mode and retention duration to all objects. This makes objects in the bucket immutable i.e. delete of the version are not allowed until an expiry specified in the bucket's object lock configuration or object retention.
 
 Object locking requires locking to be enabled on a bucket at the time of bucket creation refer to `mc mb --with-lock`, object locking enables versioning on the bucket and cannot be disabled.
 
@@ -10,7 +10,7 @@ A default retention period and retention mode can be configured on a bucket to b
 
 ### 1. Prerequisites
 
-- Install BuckIt - [BuckIt Quickstart Guide](https://docs.min.io/community/minio-object-store/operations/deployments/baremetal-deploy-minio-on-redhat-linux.html)
+- Install Buckit - [Buckit Quickstart Guide](https://buckit-io.github.io/docs/community/minio-object-store/operations/deployments/baremetal-deploy-minio-on-redhat-linux.html)
 - Install `awscli` - [Installing AWS Command Line Interface](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html)
 
 ### 2. Set bucket WORM configuration
@@ -53,7 +53,7 @@ See <https://docs.aws.amazon.com/AmazonS3/latest/dev/object-lock-overview.html> 
 
 ## Explore Further
 
-- [Use `mc` with BuckIt Server](https://docs.min.io/community/minio-object-store/reference/minio-mc.html#quickstart)
-- [Use `aws-cli` with BuckIt Server](https://docs.min.io/community/minio-object-store/integrations/aws-cli-with-buckit.html)
-- [Use `minio-go` SDK with BuckIt Server](https://docs.min.io/community/minio-object-store/developers/go/minio-go.html)
-- [The BuckIt documentation website](https://docs.min.io/community/minio-object-store/index.html)
+- [Use `mc` with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/reference/minio-mc.html#quickstart)
+- [Use `aws-cli` with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/integrations/aws-cli-with-buckit.html)
+- [Use `minio-go` SDK with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/developers/go/minio-go.html)
+- [The Buckit documentation website](https://buckit-io.github.io/docs/community/minio-object-store/index.html)

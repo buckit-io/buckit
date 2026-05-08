@@ -44,28 +44,28 @@ rule_files:
 Here `rules.yml` is the file which should contain the alerting rules defined.
 
 ## Add rules for your deployment
-Below is a sample alerting rules configuration for BuckIt. Refer https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/ for more instructions on writing alerting rules for Prometheus.
+Below is a sample alerting rules configuration for Buckit. Refer https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/ for more instructions on writing alerting rules for Prometheus.
 
 ```yaml
 groups:
 - name: example
   rules:
-  - alert: BuckItClusterTolerance
+  - alert: BuckitClusterTolerance
     expr: minio_cluster_health_erasure_set_status < 1
     for: 5m
     labels:
       severity: critical
     annotations:
       summary: "Instance {{ $labels.server }} has lost quorum on pool {{ $labels.pool }} on set {{ $labels.set }}"
-      description: "BuckIt instance {{ $labels.server }} of job {{ $labels.job }} has lost quorum on pool {{ $labels.pool }} on set {{ $labels.set }} for more than 5 minutes."
+      description: "Buckit instance {{ $labels.server }} of job {{ $labels.job }} has lost quorum on pool {{ $labels.pool }} on set {{ $labels.set }} for more than 5 minutes."
 ```
 
 ## Verify the configuration and alerts
 To verify the above sample alert follow below steps
 
-1. Start a distributed BuckIt instance (4 nodes setup)
+1. Start a distributed Buckit instance (4 nodes setup)
 2. Start Prometheus server and AlertManager
-3. Bring down couple of BuckIt instances to bring down the Erasure Set tolerance to -1 and verify the same with `mc admin prometheus metrics ALIAS | grep minio_cluster_health_erasure_set_status`
+3. Bring down couple of Buckit instances to bring down the Erasure Set tolerance to -1 and verify the same with `mc admin prometheus metrics ALIAS | grep minio_cluster_health_erasure_set_status`
 4. Wait for 5 mins (as alert is configured to be firing after 5 mins), and verify that you see an entry in webhook for the alert as well as in Prometheus console as shown below
 
 ```json
@@ -76,7 +76,7 @@ To verify the above sample alert follow below steps
     {
       "status": "firing",
       "labels": {
-        "alertname": "BuckItClusterTolerance",
+        "alertname": "BuckitClusterTolerance",
         "instance": "localhost:9000",
         "job": "minio-job-node",
         "pool": "0",
@@ -85,7 +85,7 @@ To verify the above sample alert follow below steps
         "severity": "critical"
       },
       "annotations": {
-        "description": "BuckIt instance 127.0.0.1:9000 of job minio-job has tolerance <=0 for more than 5 minutes.",
+        "description": "Buckit instance 127.0.0.1:9000 of job minio-job has tolerance <=0 for more than 5 minutes.",
         "summary": "Instance 127.0.0.1:9000 unable to tolerate node failures"
       },
       "startsAt": "2023-11-18T06:20:09.456Z",
@@ -95,10 +95,10 @@ To verify the above sample alert follow below steps
     }
   ],
   "groupLabels": {
-    "alertname": "BuckItClusterTolerance"
+    "alertname": "BuckitClusterTolerance"
   },
   "commonLabels": {
-    "alertname": "BuckItClusterTolerance",
+    "alertname": "BuckitClusterTolerance",
     "instance": "localhost:9000",
     "job": "minio-job-node",
     "pool": "0",
@@ -107,12 +107,12 @@ To verify the above sample alert follow below steps
     "severity": "critical"
   },
   "commonAnnotations": {
-    "description": "BuckIt instance 127.0.0.1:9000 of job minio-job has lost quorum on pool 0 on set 0 for more than 5 minutes.",
+    "description": "Buckit instance 127.0.0.1:9000 of job minio-job has lost quorum on pool 0 on set 0 for more than 5 minutes.",
     "summary": "Instance 127.0.0.1:9000 has lost quorum on pool 0 on set 0"
   },
   "externalURL": "http://fedora-minio:9093",
   "version": "4",
-  "groupKey": "{}:{alertname=\"BuckItClusterTolerance\"}",
+  "groupKey": "{}:{alertname=\"BuckitClusterTolerance\"}",
   "truncatedAlerts": 0
 }
 ```

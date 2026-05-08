@@ -26,10 +26,10 @@ import (
 
 	"github.com/minio/madmin-go/v3"
 	"github.com/minio/madmin-go/v3/logger/log"
-	"github.com/minio/minio/internal/logger"
-	"github.com/minio/minio/internal/logger/target/console"
-	types "github.com/minio/minio/internal/logger/target/loggertypes"
-	"github.com/minio/minio/internal/pubsub"
+	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/buckit/internal/logger/target/console"
+	types "github.com/buckit-io/buckit/internal/logger/target/loggertypes"
+	"github.com/buckit-io/buckit/internal/pubsub"
 	xnet "github.com/minio/pkg/v3/net"
 )
 

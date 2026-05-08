@@ -21,8 +21,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/minio/minio/internal/dsync"
-	"github.com/minio/minio/internal/grid"
+	"github.com/buckit-io/buckit/internal/dsync"
+	"github.com/buckit-io/buckit/internal/grid"
 )
 
 // lockRESTClient is authenticable lock REST client

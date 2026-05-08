@@ -43,16 +43,16 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/minio/minio-go/v7/pkg/set"
-	"github.com/minio/minio/internal/auth"
-	"github.com/minio/minio/internal/bucket/bandwidth"
-	"github.com/minio/minio/internal/color"
-	"github.com/minio/minio/internal/config"
-	"github.com/minio/minio/internal/config/api"
-	"github.com/minio/minio/internal/handlers"
-	"github.com/minio/minio/internal/hash/sha256"
-	xhttp "github.com/minio/minio/internal/http"
-	xioutil "github.com/minio/minio/internal/ioutil"
-	"github.com/minio/minio/internal/logger"
+	"github.com/buckit-io/buckit/internal/auth"
+	"github.com/buckit-io/buckit/internal/bucket/bandwidth"
+	"github.com/buckit-io/buckit/internal/color"
+	"github.com/buckit-io/buckit/internal/config"
+	"github.com/buckit-io/buckit/internal/config/api"
+	"github.com/buckit-io/buckit/internal/handlers"
+	"github.com/buckit-io/buckit/internal/hash/sha256"
+	xhttp "github.com/buckit-io/buckit/internal/http"
+	xioutil "github.com/buckit-io/buckit/internal/ioutil"
+	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/minio/pkg/v3/certs"
 	"github.com/minio/pkg/v3/env"
 	"gopkg.in/yaml.v2"
@@ -220,20 +220,20 @@ FLAGS:
   {{range .VisibleFlags}}{{.}}
   {{end}}{{end}}
 EXAMPLES:
-  1. Start MinIO server on "/home/shared" directory.
+  1. Start Buckit server on "/home/shared" directory.
      {{.Prompt}} {{.HelpName}} /home/shared
 
   2. Start single node server with 64 local drives "/mnt/data1" to "/mnt/data64".
      {{.Prompt}} {{.HelpName}} /mnt/data{1...64}
 
-  3. Start distributed MinIO server on an 32 node setup with 32 drives each, run following command on all the nodes
+  3. Start distributed Buckit server on an 32 node setup with 32 drives each, run following command on all the nodes
      {{.Prompt}} {{.HelpName}} http://node{1...32}.example.com/mnt/export{1...32}
 
-  4. Start distributed MinIO server in an expanded setup, run the following command on all the nodes
+  4. Start distributed Buckit server in an expanded setup, run the following command on all the nodes
      {{.Prompt}} {{.HelpName}} http://node{1...16}.example.com/mnt/export{1...32} \
             http://node{17...64}.example.com/mnt/export{1...64}
 
-  5. Start distributed MinIO server, with FTP and SFTP servers on all interfaces via port 8021, 8022 respectively
+  5. Start distributed Buckit server, with FTP and SFTP servers on all interfaces via port 8021, 8022 respectively
      {{.Prompt}} {{.HelpName}} http://node{1...4}.example.com/mnt/export{1...4} \
            --ftp="address=:8021" --ftp="passive-port-range=30000-40000" \
            --sftp="address=:8022" --sftp="ssh-private-key=${HOME}/.ssh/id_rsa"
@@ -742,7 +742,7 @@ func initializeLogRotate(ctx *cli.Context) (io.WriteCloser, error) {
 	return output, nil
 }
 
-// serverMain handler called for 'minio server' command.
+// serverMain handler called for 'buckit server' command.
 func serverMain(ctx *cli.Context) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 

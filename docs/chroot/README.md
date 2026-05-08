@@ -1,4 +1,4 @@
-# Deploy BuckIt on Chrooted Environment [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io) [![Docker Pulls](https://img.shields.io/docker/pulls/minio/minio.svg?maxAge=604800)](https://hub.docker.com/r/minio/minio/)
+# Deploy Buckit on Chrooted Environment [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io) [![Docker Pulls](https://img.shields.io/docker/pulls/minio/minio.svg?maxAge=604800)](https://hub.docker.com/r/minio/minio/)
 
 Chroot allows user based namespace isolation on many standard Linux deployments.
 
@@ -7,15 +7,15 @@ Chroot allows user based namespace isolation on many standard Linux deployments.
 - Familiarity with [chroot](http://man7.org/linux/man-pages/man2/chroot.2.html)
 - Chroot installed on your machine.
 
-## 2. Install BuckIt in Chroot
+## 2. Install Buckit in Chroot
 
-> **Note:** BuckIt community edition is now distributed as source code only. Pre-compiled binaries are no longer provided for new releases.
+> **Note:** Buckit community edition is now distributed as source code only. Pre-compiled binaries are no longer provided for new releases.
 
-Build BuckIt from source and install it in the chroot directory:
+Build Buckit from source and install it in the chroot directory:
 
 ```sh
-# Build BuckIt from source
-go install github.com/minio/minio@latest
+# Build Buckit from source
+go install github.com/buckit-io/buckit@latest
 
 # Create the bin directory in your chroot
 mkdir -p /mnt/export/${USER}/bin
@@ -33,7 +33,7 @@ Bind your `proc` mount to the target chroot directory
 sudo mount --bind /proc /mnt/export/${USER}/proc
 ```
 
-## 3. Run Standalone BuckIt in Chroot
+## 3. Run Standalone Buckit in Chroot
 
 ### GNU/Linux
 
@@ -51,8 +51,8 @@ Instance is now accessible on the host at port 9000, proceed to access the Web b
 
 ## Explore Further
 
-- [BuckIt Erasure Code Overview](https://docs.min.io/community/minio-object-store/operations/concepts/erasure-coding.html)
-- [Use `mc` with BuckIt Server](https://docs.min.io/community/minio-object-store/reference/minio-mc.html)
-- [Use `aws-cli` with BuckIt Server](https://docs.min.io/community/minio-object-store/integrations/aws-cli-with-buckit.html)
-- [Use `minio-go` SDK with BuckIt Server](https://docs.min.io/community/minio-object-store/developers/go/minio-go.html)
-- [The BuckIt documentation website](https://docs.min.io/community/minio-object-store/index.html)
+- [Buckit Erasure Code Overview](https://buckit-io.github.io/docs/community/minio-object-store/operations/concepts/erasure-coding.html)
+- [Use `mc` with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/reference/minio-mc.html)
+- [Use `aws-cli` with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/integrations/aws-cli-with-buckit.html)
+- [Use `minio-go` SDK with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/developers/go/minio-go.html)
+- [The Buckit documentation website](https://buckit-io.github.io/docs/community/minio-object-store/index.html)

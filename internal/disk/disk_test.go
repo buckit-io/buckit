@@ -23,7 +23,7 @@ package disk_test
 import (
 	"testing"
 
-	"github.com/minio/minio/internal/disk"
+	"github.com/buckit-io/buckit/internal/disk"
 )
 
 func TestFree(t *testing.T) {

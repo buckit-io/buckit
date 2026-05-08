@@ -6,24 +6,24 @@ Buckets can be configured to have `Hard` quota - it disallows writes to the buck
 
 ## Prerequisites
 
-- Install BuckIt - [BuckIt Quickstart Guide](https://docs.min.io/community/minio-object-store/operations/deployments/baremetal-deploy-minio-on-redhat-linux.html#procedure).
-- [Use `mc` with BuckIt Server](https://docs.min.io/community/minio-object-store/reference/minio-mc.html#quickstart)
+- Install Buckit - [Buckit Quickstart Guide](https://buckit-io.github.io/docs/community/minio-object-store/operations/deployments/baremetal-deploy-minio-on-redhat-linux.html#procedure).
+- [Use `mc` with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/reference/minio-mc.html#quickstart)
 
 ## Set bucket quota configuration
 
-### Set a hard quota of 1GB for a bucket `mybucket` on BuckIt object storage
+### Set a hard quota of 1GB for a bucket `mybucket` on Buckit object storage
 
 ```sh
 mc admin bucket quota myminio/mybucket --hard 1gb
 ```
 
-### Verify the quota configured on `mybucket` on BuckIt
+### Verify the quota configured on `mybucket` on Buckit
 
 ```sh
 mc admin bucket quota myminio/mybucket
 ```
 
-### Clear bucket quota configuration for `mybucket` on BuckIt
+### Clear bucket quota configuration for `mybucket` on Buckit
 
 ```sh
 mc admin bucket quota myminio/mybucket --clear

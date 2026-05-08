@@ -18,7 +18,7 @@
 package crypto
 
 import (
-	"github.com/minio/minio/internal/config"
+	"github.com/buckit-io/buckit/internal/config"
 	"github.com/minio/pkg/v3/env"
 )
 

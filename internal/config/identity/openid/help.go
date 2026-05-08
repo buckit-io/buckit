@@ -17,7 +17,7 @@
 
 package openid
 
-import "github.com/minio/minio/internal/config"
+import "github.com/buckit-io/buckit/internal/config"
 
 // Help template for OpenID identity feature.
 var (

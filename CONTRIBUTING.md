@@ -1,27 +1,27 @@
-# BuckIt Contribution Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io) [![Docker Pulls](https://img.shields.io/docker/pulls/minio/minio.svg?maxAge=604800)](https://hub.docker.com/r/minio/minio/)
+# Buckit Contribution Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io) [![Docker Pulls](https://img.shields.io/docker/pulls/minio/minio.svg?maxAge=604800)](https://hub.docker.com/r/minio/minio/)
 
-``BuckIt`` community welcomes your contribution. To make the process as seamless as possible, we recommend you read this contribution guide.
+``Buckit`` community welcomes your contribution. To make the process as seamless as possible, we recommend you read this contribution guide.
 
 ## Development Workflow
 
-Start by forking the BuckIt GitHub repository, make changes in a branch and then send a pull request. We encourage pull requests to discuss code changes. Here are the steps in details:
+Start by forking the Buckit GitHub repository, make changes in a branch and then send a pull request. We encourage pull requests to discuss code changes. Here are the steps in details:
 
-### Setup your BuckIt GitHub Repository
+### Setup your Buckit GitHub Repository
 
-Fork [BuckIt upstream](https://github.com/minio/minio/fork) source repository to your own personal repository. Copy the URL of your BuckIt fork (you will need it for the `git clone` command below).
+Fork [Buckit upstream](https://github.com/buckit-io/buckit/fork) source repository to your own personal repository. Copy the URL of your Buckit fork (you will need it for the `git clone` command below).
 
 ```sh
-git clone https://github.com/minio/minio
-cd minio
-go install -v
-ls $(go env GOPATH)/bin/minio
+git clone https://github.com/buckit-io/buckit
+cd buckit
+make build
+ls ./buckit
 ```
 
 ### Set up git remote as ``upstream``
 
 ```sh
-$ cd minio
-$ git remote add upstream https://github.com/minio/minio
+$ cd buckit
+$ git remote add upstream https://github.com/buckit-io/buckit
 $ git fetch upstream
 $ git merge upstream/master
 ...
@@ -35,7 +35,7 @@ Before making code changes, make sure you create a separate branch for these cha
 git checkout -b my-new-feature
 ```
 
-### Test BuckIt server changes
+### Test Buckit server changes
 
 After your code changes, make sure
 
@@ -66,9 +66,9 @@ Pull requests can be created via GitHub. Refer to [this document](https://help.g
 
 ## FAQs
 
-### How does ``BuckIt`` manage dependencies?
+### How does ``Buckit`` manage dependencies?
 
-``BuckIt`` uses `go mod` to manage its dependencies.
+``Buckit`` uses `go mod` to manage its dependencies.
 
 - Run `go get foo/bar` in the source folder to add the dependency to `go.mod` file.
 
@@ -77,6 +77,6 @@ To remove a dependency
 - Edit your code and remove the import reference.
 - Run `go mod tidy` in the source folder to remove dependency from `go.mod` file.
 
-### What are the coding guidelines for BuckIt?
+### What are the coding guidelines for Buckit?
 
-``BuckIt`` is fully conformant with Golang style. Refer: [Effective Go](https://github.com/golang/go/wiki/CodeReviewComments) article from Golang project. If you observe offending code, please feel free to send a pull request or ping us on [Slack](https://slack.min.io).
+``Buckit`` is fully conformant with Golang style. Refer: [Effective Go](https://github.com/golang/go/wiki/CodeReviewComments) article from Golang project. If you observe offending code, please feel free to send a pull request or ping us on [Slack](https://slack.min.io).

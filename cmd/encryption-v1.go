@@ -36,13 +36,13 @@ import (
 	"strings"
 
 	"github.com/minio/kms-go/kes"
-	"github.com/minio/minio/internal/crypto"
-	"github.com/minio/minio/internal/etag"
-	"github.com/minio/minio/internal/hash"
-	"github.com/minio/minio/internal/hash/sha256"
-	xhttp "github.com/minio/minio/internal/http"
-	"github.com/minio/minio/internal/kms"
-	"github.com/minio/minio/internal/logger"
+	"github.com/buckit-io/buckit/internal/crypto"
+	"github.com/buckit-io/buckit/internal/etag"
+	"github.com/buckit-io/buckit/internal/hash"
+	"github.com/buckit-io/buckit/internal/hash/sha256"
+	xhttp "github.com/buckit-io/buckit/internal/http"
+	"github.com/buckit-io/buckit/internal/kms"
+	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/minio/sio"
 )
 

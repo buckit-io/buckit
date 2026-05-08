@@ -17,7 +17,7 @@
 
 package storageclass
 
-import "github.com/minio/minio/internal/config"
+import "github.com/buckit-io/buckit/internal/config"
 
 // Help template for storageclass feature.
 var (

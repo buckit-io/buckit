@@ -2,7 +2,7 @@
 
 ## Overview
 
-BuckIt implements an S3 extension to list, stat and download files inside a ZIP file stored in any bucket. A perfect use case scenario is when you have a lot of small files archived in multiple ZIP files. Uploading them is faster than uploading small files individually. Besides, your S3 applications will be able to access to the data with little performance overhead.
+Buckit implements an S3 extension to list, stat and download files inside a ZIP file stored in any bucket. A perfect use case scenario is when you have a lot of small files archived in multiple ZIP files. Uploading them is faster than uploading small files individually. Besides, your S3 applications will be able to access to the data with little performance overhead.
 
 The main limitation is that to update or delete content of a file inside a ZIP file the entire ZIP file must be replaced.
 
@@ -23,9 +23,9 @@ All properties except the file size are tied to the zip file. This means that mo
 
 ## Code Examples
 
-[Using minio-go library](https://github.com/minio/minio/blob/master/docs/extensions/s3zip/examples/minio-go/main.go)
-[Using AWS JS SDK v2](https://github.com/minio/minio/blob/master/docs/extensions/s3zip/examples/aws-js/main.js)
-[Using boto3](https://github.com/minio/minio/blob/master/docs/extensions/s3zip/examples/boto3/main.py)
+[Using minio-go library](https://buckit-io.github.io/docs/extensions/s3zip/examples/minio-go/main.go)
+[Using AWS JS SDK v2](https://buckit-io.github.io/docs/extensions/s3zip/examples/aws-js/main.js)
+[Using boto3](https://buckit-io.github.io/docs/extensions/s3zip/examples/boto3/main.py)
 
 ## Requirements and limits
 

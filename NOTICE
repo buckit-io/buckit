@@ -1,9 +1,9 @@
-MinIO Project, (C) 2015-2023 MinIO, Inc.
+Buckit Project, (C) 2026 Buckit Authors.
 
-This product includes software developed at MinIO, Inc.
-(https://min.io/).
+This product includes software developed at MinIO, Inc. (https://min.io/).
+Original Copyright (C) 2015-2024 MinIO, Inc.
 
-The MinIO project contains unmodified/modified subcomponents too with
-separate copyright notices and license terms. Your use of the source
-code for these subcomponents is subject to the terms and conditions
+The Buckit project contains unmodified/modified subcomponents with 
+separate copyright notices and license terms. Your use of the source 
+code for these subcomponents is subject to the terms and conditions 
 of GNU Affero General Public License 3.0.

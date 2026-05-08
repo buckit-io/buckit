@@ -18,15 +18,15 @@
 package cmd
 
 import (
-	"github.com/minio/minio/internal/auth"
-	"github.com/minio/minio/internal/config"
-	"github.com/minio/minio/internal/config/compress"
-	xldap "github.com/minio/minio/internal/config/identity/ldap"
-	"github.com/minio/minio/internal/config/identity/openid"
-	"github.com/minio/minio/internal/config/notify"
-	"github.com/minio/minio/internal/config/policy/opa"
-	"github.com/minio/minio/internal/config/storageclass"
-	"github.com/minio/minio/internal/logger"
+	"github.com/buckit-io/buckit/internal/auth"
+	"github.com/buckit-io/buckit/internal/config"
+	"github.com/buckit-io/buckit/internal/config/compress"
+	xldap "github.com/buckit-io/buckit/internal/config/identity/ldap"
+	"github.com/buckit-io/buckit/internal/config/identity/openid"
+	"github.com/buckit-io/buckit/internal/config/notify"
+	"github.com/buckit-io/buckit/internal/config/policy/opa"
+	"github.com/buckit-io/buckit/internal/config/storageclass"
+	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/minio/pkg/v3/quick"
 )
 

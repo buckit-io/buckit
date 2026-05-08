@@ -25,9 +25,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/minio/minio/internal/crypto"
-	"github.com/minio/minio/internal/grid"
-	xhttp "github.com/minio/minio/internal/http"
+	"github.com/buckit-io/buckit/internal/crypto"
+	"github.com/buckit-io/buckit/internal/grid"
+	xhttp "github.com/buckit-io/buckit/internal/http"
 )
 
 // Tests request guess function for net/rpc requests.

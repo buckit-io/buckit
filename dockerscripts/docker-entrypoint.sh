@@ -1,10 +1,10 @@
 #!/bin/sh
 #
 
-# If command starts with an option, prepend minio.
-if [ "${1}" != "minio" ]; then
+# If command starts with an option, prepend buckit.
+if [ "${1}" != "buckit" ]; then
 	if [ -n "${1}" ]; then
-		set -- minio "$@"
+		set -- buckit "$@"
 	fi
 fi
 

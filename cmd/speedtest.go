@@ -27,8 +27,8 @@ import (
 
 	"github.com/minio/dperf/pkg/dperf"
 	"github.com/minio/madmin-go/v3"
-	"github.com/minio/minio/internal/auth"
-	xioutil "github.com/minio/minio/internal/ioutil"
+	"github.com/buckit-io/buckit/internal/auth"
+	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 )
 
 const speedTest = "speedtest"

@@ -31,11 +31,11 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	jsoniter "github.com/json-iterator/go"
-	"github.com/minio/minio/internal/bpool"
-	"github.com/minio/minio/internal/bucket/lifecycle"
-	"github.com/minio/minio/internal/bucket/replication"
-	"github.com/minio/minio/internal/config/storageclass"
-	xhttp "github.com/minio/minio/internal/http"
+	"github.com/buckit-io/buckit/internal/bpool"
+	"github.com/buckit-io/buckit/internal/bucket/lifecycle"
+	"github.com/buckit-io/buckit/internal/bucket/replication"
+	"github.com/buckit-io/buckit/internal/config/storageclass"
+	xhttp "github.com/buckit-io/buckit/internal/http"
 	"github.com/tinylib/msgp/msgp"
 )
 
@@ -965,7 +965,7 @@ func (x *xlMetaV2) loadIndexed(buf xlMetaBuf, data xlMetaInlineData) error {
 		}
 		ver.meta = meta
 
-		// Fix inconsistent compression index due to https://github.com/minio/minio/pull/20575
+		// Fix inconsistent compression index due to https://github.com/buckit-io/buckit/pull/20575
 		// First search marshaled content for encoded values.
 		// We have bumped metaV to make this check cheaper.
 		if metaV < 3 && ver.header.Type == ObjectType && bytes.Contains(meta, []byte("\xa7PartIdx")) &&

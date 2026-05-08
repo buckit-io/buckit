@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a bug in BuckIt (community edition is source-only)
+about: Report a bug in Buckit (community edition is source-only)
 title: ''
 labels: community, triage
 assignees: ''
@@ -9,9 +9,9 @@ assignees: ''
 
 ## IMPORTANT NOTES
 
-**Community Edition**: BuckIt community edition is now source-only. Install via `go install github.com/minio/minio@latest`
+**Community Edition**: Buckit community edition is now source-only. Install via `go install github.com/buckit-io/buckit@latest`
 
-**Feature Requests**: We are no longer accepting feature requests for the community edition. For feature requests and enterprise support, please subscribe to [BuckIt Enterprise Support](https://min.io/pricing).
+**Feature Requests**: We are no longer accepting feature requests for the community edition. For feature requests and enterprise support, please subscribe to [Buckit Enterprise Support](https://min.io/pricing).
 
 **Urgent Issues**: If this case is urgent or affects production, please subscribe to [SUBNET](https://min.io/pricing) for 24/7 enterprise support.
 
@@ -32,7 +32,7 @@ assignees: ''
 ## Steps to Reproduce (for bugs)
 <!--- Provide a link to a live example, or an unambiguous set of steps to -->
 <!--- reproduce this bug. Include code to reproduce, if relevant -->
-<!--- and make sure you have followed https://github.com/minio/minio/tree/release/docs/debugging to capture relevant logs -->
+<!--- and make sure you have followed https://github.com/buckit-io/buckit/tree/release/docs/debugging to capture relevant logs -->
 
 1.
 2.

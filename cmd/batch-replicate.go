@@ -21,7 +21,7 @@ import (
 	"time"
 
 	miniogo "github.com/minio/minio-go/v7"
-	"github.com/minio/minio/internal/auth"
+	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/minio/pkg/v3/xtime"
 )
 

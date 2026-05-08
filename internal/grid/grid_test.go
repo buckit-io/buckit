@@ -31,7 +31,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/minio/minio/internal/logger/target/testlogger"
+	"github.com/buckit-io/buckit/internal/logger/target/testlogger"
 )
 
 func TestSingleRoundtrip(t *testing.T) {

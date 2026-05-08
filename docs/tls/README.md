@@ -1,19 +1,19 @@
-# How to secure access to BuckIt server with TLS [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
+# How to secure access to Buckit server with TLS [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
 
-This guide explains how to configure BuckIt Server with TLS certificates on Linux and Windows platforms.
+This guide explains how to configure Buckit Server with TLS certificates on Linux and Windows platforms.
 
-1. [Install BuckIt Server](#install-minio-server)
-2. [Use an Existing Key and Certificate with BuckIt](#use-an-existing-key-and-certificate-with-buckit)
-3. [Generate and use Self-signed Keys and Certificates with BuckIt](#generate-use-self-signed-keys-certificates)
+1. [Install Buckit Server](#install-minio-server)
+2. [Use an Existing Key and Certificate with Buckit](#use-an-existing-key-and-certificate-with-buckit)
+3. [Generate and use Self-signed Keys and Certificates with Buckit](#generate-use-self-signed-keys-certificates)
 4. [Install Certificates from Third-party CAs](#install-certificates-from-third-party-cas)
 
-## 1. Install BuckIt Server
+## 1. Install Buckit Server
 
-Install BuckIt Server using the instructions in the [BuckIt Quickstart Guide](https://docs.min.io/community/minio-object-store/operations/deployments/baremetal-deploy-minio-on-redhat-linux.html).
+Install Buckit Server using the instructions in the [Buckit Quickstart Guide](https://buckit-io.github.io/docs/community/minio-object-store/operations/deployments/baremetal-deploy-minio-on-redhat-linux.html).
 
-## 2. Use an Existing Key and Certificate with BuckIt
+## 2. Use an Existing Key and Certificate with Buckit
 
-This section describes how to use a private key and public certificate that have been obtained from a certificate authority (CA). If these files have not been obtained, skip to [3. Generate Self-signed Certificates](#generate-use-self-signed-keys-certificates) or generate them with [Let's Encrypt](https://letsencrypt.org) using these instructions: [Generate Let's Encrypt certificate using Certbot for BuckIt](https://docs.min.io/community/minio-object-store/integrations/generate-lets-encrypt-certificate-using-certbot-for-buckit.html). For more about TLS and certificates in BuckIt, see the [Network Encryption documentation](https://docs.min.io/community/minio-object-store/operations/network-encryption.html).
+This section describes how to use a private key and public certificate that have been obtained from a certificate authority (CA). If these files have not been obtained, skip to [3. Generate Self-signed Certificates](#generate-use-self-signed-keys-certificates) or generate them with [Let's Encrypt](https://letsencrypt.org) using these instructions: [Generate Let's Encrypt certificate using Certbot for Buckit](https://buckit-io.github.io/docs/community/minio-object-store/integrations/generate-lets-encrypt-certificate-using-certbot-for-buckit.html). For more about TLS and certificates in Buckit, see the [Network Encryption documentation](https://buckit-io.github.io/docs/community/minio-object-store/operations/network-encryption.html).
 
 Copy the existing private key and public certificate to the `certs` directory. The default certs directory is:
 
@@ -26,7 +26,7 @@ Copy the existing private key and public certificate to the `certs` directory. T
 * Inside the `certs` directory, the private key must by named `private.key` and the public key must be named `public.crt`.
 * A certificate signed by a CA contains information about the issued identity (e.g. name, expiry, public key) and any intermediate certificates. The root CA is not included.
 
-## 3. Generate and use Self-signed Keys and Certificates with BuckIt
+## 3. Generate and use Self-signed Keys and Certificates with Buckit
 
 This section describes how to generate a self-signed certificate using various tools:
 
@@ -37,8 +37,8 @@ This section describes how to generate a self-signed certificate using various t
 
 **Note:**
 
-* BuckIt only supports keys and certificates in PEM format on Linux and Windows.
-* BuckIt doesn't currently support PFX certificates.
+* Buckit only supports keys and certificates in PEM format on Linux and Windows.
+* Buckit doesn't currently support PFX certificates.
 
 ### 3.1 Use `certgen` to Generate a Certificate
 
@@ -115,7 +115,7 @@ openssl genrsa -aes256 -passout pass:PASSWORD -out private.key 2048
 export MINIO_CERT_PASSWD=<PASSWORD>
 ```
 
-The default OpenSSL format for private encrypted keys is PKCS-8, but BuckIt only supports PKCS-1. An RSA key that has been formatted with PKCS-8 can be converted to PKCS-1 using the following command:
+The default OpenSSL format for private encrypted keys is PKCS-8, but Buckit only supports PKCS-1. An RSA key that has been formatted with PKCS-8 can be converted to PKCS-1 using the following command:
 
 ```sh
 openssl rsa -in private-pkcs8-key.key -aes256 -passout pass:PASSWORD -out private.key
@@ -230,15 +230,15 @@ certtool.exe --generate-self-signed --load-privkey private.key --template cert.c
 
 ## 4. Install Certificates from Third-party CAs
 
-BuckIt can connect to other servers, including BuckIt nodes or other server types such as NATs and Redis. If these servers use certificates that were not registered with a known CA, add trust for these certificates to BuckIt Server by placing these certificates under one of the following BuckIt configuration paths:
+Buckit can connect to other servers, including Buckit nodes or other server types such as NATs and Redis. If these servers use certificates that were not registered with a known CA, add trust for these certificates to Buckit Server by placing these certificates under one of the following Buckit configuration paths:
 
 * **Linux:** `~/.minio/certs/CAs/`
 * **Windows**: `C:\Users\<Username>\.minio\certs\CAs`
 
 ## Explore Further
 
-* [TLS Configuration for BuckIt server on Kubernetes](https://github.com/minio/minio/tree/master/docs/tls/kubernetes)
-* [BuckIt Client Complete Guide](https://docs.min.io/community/minio-object-store/reference/minio-mc.html)
-* [BuckIt Network Encryption Overview](https://docs.min.io/community/minio-object-store/operations/network-encryption.html)
-* [Generate Let's Encrypt Certificate](https://docs.min.io/community/minio-object-store/integrations/generate-lets-encrypt-certificate-using-certbot-for-buckit.html)
-* [Setup nginx Proxy with BuckIt Server](https://docs.min.io/community/minio-object-store/integrations/setup-nginx-proxy-with-buckit.html)
+* [TLS Configuration for Buckit server on Kubernetes](https://buckit-io.github.io/docs/tls/kubernetes)
+* [Buckit Client Complete Guide](https://buckit-io.github.io/docs/community/minio-object-store/reference/minio-mc.html)
+* [Buckit Network Encryption Overview](https://buckit-io.github.io/docs/community/minio-object-store/operations/network-encryption.html)
+* [Generate Let's Encrypt Certificate](https://buckit-io.github.io/docs/community/minio-object-store/integrations/generate-lets-encrypt-certificate-using-certbot-for-buckit.html)
+* [Setup nginx Proxy with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/integrations/setup-nginx-proxy-with-buckit.html)

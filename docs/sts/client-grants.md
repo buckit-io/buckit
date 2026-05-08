@@ -4,7 +4,7 @@
 
 Returns a set of temporary security credentials for applications/clients who have been authenticated through client credential grants provided by identity provider. Example providers include KeyCloak, Okta etc.
 
-Calling AssumeRoleWithClientGrants does not require the use of BuckIt default credentials. Therefore, client application can be distributed that requests temporary security credentials without including BuckIt default credentials. Instead, the identity of the caller is validated by using a JWT access token from the identity provider. The temporary security credentials returned by this API consists of an access key, a secret key, and a security token. Applications can use these temporary security credentials to sign calls to BuckIt API operations.
+Calling AssumeRoleWithClientGrants does not require the use of Buckit default credentials. Therefore, client application can be distributed that requests temporary security credentials without including Buckit default credentials. Instead, the identity of the caller is validated by using a JWT access token from the identity provider. The temporary security credentials returned by this API consists of an access key, a secret key, and a security token. Applications can use these temporary security credentials to sign calls to Buckit API operations.
 
 By default, the temporary security credentials created by AssumeRoleWithClientGrants last for one hour. However, use the optional DurationSeconds parameter to specify the duration of the credentials. This value varies from 900 seconds (15 minutes) up to the maximum session duration of 365 days.
 
@@ -95,7 +95,7 @@ minio server /mnt/export
 ```
 
 Testing with an example
-> Obtaining client ID and secrets follow [Keycloak configuring documentation](https://github.com/minio/minio/blob/master/docs/sts/keycloak.md)
+> Obtaining client ID and secrets follow [Keycloak configuring documentation](https://buckit-io.github.io/docs/sts/keycloak.md)
 
 ```
 $ go run client-grants.go -cid PoEgXP6uVO45IsENRngDXj5Au5Ya -csec eKsw6z8CtOJVBtrOWvhRWL4TUCga
@@ -111,5 +111,5 @@ $ go run client-grants.go -cid PoEgXP6uVO45IsENRngDXj5Au5Ya -csec eKsw6z8CtOJVBt
 
 ## Explore Further
 
-- [BuckIt Admin Complete Guide](https://docs.min.io/community/minio-object-store/reference/minio-mc-admin.html)
-- [The BuckIt documentation website](https://docs.min.io/community/minio-object-store/index.html)
+- [Buckit Admin Complete Guide](https://buckit-io.github.io/docs/community/minio-object-store/reference/minio-mc-admin.html)
+- [The Buckit documentation website](https://buckit-io.github.io/docs/community/minio-object-store/index.html)

@@ -56,13 +56,13 @@ var (
 	MinioReleaseURL = MinioReleaseBaseURL + minioOSARCH + SlashSeparator
 
 	// MinioStoreName - MinIO store name.
-	MinioStoreName = "MinIO"
+	MinioStoreName = "Buckit"
 
 	// MinioUAName - MinIO user agent name.
-	MinioUAName = "MinIO"
+	MinioUAName = "Buckit"
 
 	// MinioBannerName - MinIO banner name for startup message.
-	MinioBannerName = "MinIO Object Storage Server"
+	MinioBannerName = "Buckit Object Storage Server"
 
 	// MinioLicense - MinIO server license.
 	MinioLicense = "GNU AGPLv3 - https://www.gnu.org/licenses/agpl-3.0.html"

@@ -1,8 +1,8 @@
 # Compression Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io)
 
-BuckIt server allows streaming compression to ensure efficient disk space usage.
+Buckit server allows streaming compression to ensure efficient disk space usage.
 Compression happens inflight, i.e objects are compressed before being written to disk(s).
-BuckIt uses [`klauspost/compress/s2`](https://github.com/klauspost/compress/tree/master/s2)
+Buckit uses [`klauspost/compress/s2`](https://github.com/klauspost/compress/tree/master/s2)
 streaming compression due to its stability and performance.
 
 This algorithm is specifically optimized for machine generated content.
@@ -19,11 +19,11 @@ will increase speed when the content can be compressed.
 
 ### 1. Prerequisites
 
-Install BuckIt - [BuckIt Quickstart Guide](https://docs.min.io/community/minio-object-store/operations/deployments/baremetal-deploy-minio-on-redhat-linux.html).
+Install Buckit - [Buckit Quickstart Guide](https://buckit-io.github.io/docs/community/minio-object-store/operations/deployments/baremetal-deploy-minio-on-redhat-linux.html).
 
-### 2. Run BuckIt with compression
+### 2. Run Buckit with compression
 
-Compression can be enabled by updating the `compress` config settings for BuckIt server config.
+Compression can be enabled by updating the `compress` config settings for Buckit server config.
 Config `compress` settings take extensions and mime-types to be compressed.
 
 ```bash
@@ -131,7 +131,7 @@ the data directory to view the size of the object.
 
 ## Explore Further
 
-- [Use `mc` with BuckIt Server](https://docs.min.io/community/minio-object-store/reference/minio-mc.html)
-- [Use `aws-cli` with BuckIt Server](https://docs.min.io/community/minio-object-store/integrations/aws-cli-with-buckit.html)
-- [Use `minio-go` SDK with BuckIt Server](https://docs.min.io/community/minio-object-store/developers/go/minio-go.html)
-- [The BuckIt documentation website](https://docs.min.io/community/minio-object-store/index.html)
+- [Use `mc` with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/reference/minio-mc.html)
+- [Use `aws-cli` with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/integrations/aws-cli-with-buckit.html)
+- [Use `minio-go` SDK with Buckit Server](https://buckit-io.github.io/docs/community/minio-object-store/developers/go/minio-go.html)
+- [The Buckit documentation website](https://buckit-io.github.io/docs/community/minio-object-store/index.html)
