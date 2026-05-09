@@ -44,19 +44,19 @@ if [ ! -f ./mc ]; then
 		chmod +x mc
 fi
 
-minio server --config-dir /tmp/minio-internal --address ":9001" http://localhost:9001/tmp/minio-internal-idp1/{1...4} http://localhost:9010/tmp/minio-internal-idp1/{5...8} >/tmp/minio1_1.log 2>&1 &
+./buckit server --config-dir /tmp/minio-internal --address ":9001" http://localhost:9001/tmp/minio-internal-idp1/{1...4} http://localhost:9010/tmp/minio-internal-idp1/{5...8} >/tmp/minio1_1.log 2>&1 &
 site1_pid1=$!
-minio server --config-dir /tmp/minio-internal --address ":9010" http://localhost:9001/tmp/minio-internal-idp1/{1...4} http://localhost:9010/tmp/minio-internal-idp1/{5...8} >/tmp/minio1_2.log 2>&1 &
+./buckit server --config-dir /tmp/minio-internal --address ":9010" http://localhost:9001/tmp/minio-internal-idp1/{1...4} http://localhost:9010/tmp/minio-internal-idp1/{5...8} >/tmp/minio1_2.log 2>&1 &
 site1_pid2=$!
 
-minio server --config-dir /tmp/minio-internal --address ":9002" http://localhost:9002/tmp/minio-internal-idp2/{1...4} http://localhost:9020/tmp/minio-internal-idp2/{5...8} >/tmp/minio2_1.log 2>&1 &
+./buckit server --config-dir /tmp/minio-internal --address ":9002" http://localhost:9002/tmp/minio-internal-idp2/{1...4} http://localhost:9020/tmp/minio-internal-idp2/{5...8} >/tmp/minio2_1.log 2>&1 &
 site2_pid1=$!
-minio server --config-dir /tmp/minio-internal --address ":9020" http://localhost:9002/tmp/minio-internal-idp2/{1...4} http://localhost:9020/tmp/minio-internal-idp2/{5...8} >/tmp/minio2_2.log 2>&1 &
+./buckit server --config-dir /tmp/minio-internal --address ":9020" http://localhost:9002/tmp/minio-internal-idp2/{1...4} http://localhost:9020/tmp/minio-internal-idp2/{5...8} >/tmp/minio2_2.log 2>&1 &
 site2_pid2=$!
 
-minio server --config-dir /tmp/minio-internal --address ":9003" http://localhost:9003/tmp/minio-internal-idp3/{1...4} http://localhost:9030/tmp/minio-internal-idp3/{5...8} >/tmp/minio3_1.log 2>&1 &
+./buckit server --config-dir /tmp/minio-internal --address ":9003" http://localhost:9003/tmp/minio-internal-idp3/{1...4} http://localhost:9030/tmp/minio-internal-idp3/{5...8} >/tmp/minio3_1.log 2>&1 &
 site3_pid1=$!
-minio server --config-dir /tmp/minio-internal --address ":9030" http://localhost:9003/tmp/minio-internal-idp3/{1...4} http://localhost:9030/tmp/minio-internal-idp3/{5...8} >/tmp/minio3_2.log 2>&1 &
+./buckit server --config-dir /tmp/minio-internal --address ":9030" http://localhost:9003/tmp/minio-internal-idp3/{1...4} http://localhost:9030/tmp/minio-internal-idp3/{5...8} >/tmp/minio3_2.log 2>&1 &
 site3_pid2=$!
 
 export MC_HOST_minio1=http://minio:minio123@localhost:9001
@@ -422,8 +422,8 @@ kill -9 ${site1_pid1} ${site1_pid2}
 ./mc rb minio2/bucket2
 
 # Restart minio1 instance
-minio server --config-dir /tmp/minio-internal --address ":9001" http://localhost:9001/tmp/minio-internal-idp1/{1...4} http://localhost:9010/tmp/minio-internal-idp1/{5...8} >/tmp/minio1_1.log 2>&1 &
-minio server --config-dir /tmp/minio-internal --address ":9010" http://localhost:9001/tmp/minio-internal-idp1/{1...4} http://localhost:9010/tmp/minio-internal-idp1/{5...8} >/tmp/minio1_2.log 2>&1 &
+./buckit server --config-dir /tmp/minio-internal --address ":9001" http://localhost:9001/tmp/minio-internal-idp1/{1...4} http://localhost:9010/tmp/minio-internal-idp1/{5...8} >/tmp/minio1_1.log 2>&1 &
+./buckit server --config-dir /tmp/minio-internal --address ":9010" http://localhost:9001/tmp/minio-internal-idp1/{1...4} http://localhost:9010/tmp/minio-internal-idp1/{5...8} >/tmp/minio1_2.log 2>&1 &
 sleep 200
 
 # Test whether most recent tag update on minio2 is replicated to minio1
