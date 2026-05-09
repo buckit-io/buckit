@@ -16,7 +16,7 @@ exit_1() {
 
 cleanup() {
 	echo -n "Cleaning up instances of MinIO ..."
-	pkill -9 minio || sudo pkill -9 minio
+	pkill -9 buckit || pkill -9 minio || sudo pkill -9 buckit || sudo pkill -9 minio
 	rm -rf /tmp/sitea
 	rm -rf /tmp/siteb
 	echo "done"
@@ -31,14 +31,14 @@ make install-race
 
 # Start MinIO instances
 echo -n "Starting MinIO instances ..."
-minio server --address 127.0.0.1:9001 --console-address ":10000" "http://127.0.0.1:9001/tmp/sitea/data/disterasure/xl{1...4}" \
+./buckit server --address 127.0.0.1:9001 --console-address ":10000" "http://127.0.0.1:9001/tmp/sitea/data/disterasure/xl{1...4}" \
 	"http://127.0.0.1:9002/tmp/sitea/data/disterasure/xl{5...8}" >/tmp/sitea_1.log 2>&1 &
-minio server --address 127.0.0.1:9002 "http://127.0.0.1:9001/tmp/sitea/data/disterasure/xl{1...4}" \
+./buckit server --address 127.0.0.1:9002 "http://127.0.0.1:9001/tmp/sitea/data/disterasure/xl{1...4}" \
 	"http://127.0.0.1:9002/tmp/sitea/data/disterasure/xl{5...8}" >/tmp/sitea_2.log 2>&1 &
 
-minio server --address 127.0.0.1:9003 --console-address ":10001" "http://127.0.0.1:9003/tmp/siteb/data/disterasure/xl{1...4}" \
+./buckit server --address 127.0.0.1:9003 --console-address ":10001" "http://127.0.0.1:9003/tmp/siteb/data/disterasure/xl{1...4}" \
 	"http://127.0.0.1:9004/tmp/siteb/data/disterasure/xl{5...8}" >/tmp/siteb_1.log 2>&1 &
-minio server --address 127.0.0.1:9004 "http://127.0.0.1:9003/tmp/siteb/data/disterasure/xl{1...4}" \
+./buckit server --address 127.0.0.1:9004 "http://127.0.0.1:9003/tmp/siteb/data/disterasure/xl{1...4}" \
 	"http://127.0.0.1:9004/tmp/siteb/data/disterasure/xl{5...8}" >/tmp/siteb_2.log 2>&1 &
 
 echo "done"

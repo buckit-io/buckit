@@ -22,7 +22,7 @@ catch() {
 
 	echo "Cleaning up instances of MinIO"
 	pkill buckit || pkill minio
-	pkill -9 minio
+	pkill -9 buckit || pkill -9 minio || true
 	rm -rf /tmp/multisitea
 	rm -rf /tmp/multisiteb
 	rm -rf /tmp/multisitec

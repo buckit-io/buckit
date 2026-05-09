@@ -5,7 +5,7 @@ set -e
 cleanup() {
 	echo "Cleaning up instances of MinIO"
 	pkill buckit || pkill minio || true
-	pkill -9 minio || true
+	pkill -9 buckit || pkill -9 minio || true
 	rm -rf /tmp/xl/ || true
 	rm -rf /tmp/minio.configfile.{1,2,3,4} || true
 }
