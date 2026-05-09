@@ -4,8 +4,8 @@ set -e
 
 cleanup() {
 	echo "Cleaning up instances of MinIO"
-	pkill minio || true
-	pkill -9 minio || true
+	pkill buckit || pkill minio || true
+	pkill -9 buckit || pkill -9 minio || true
 	rm -rf /tmp/xl/ || true
 	rm -rf /tmp/minio.configfile.{1,2,3,4} || true
 }
@@ -55,13 +55,13 @@ pools: # Specify the nodes and drives with pools
 EOF
 done
 
-minio server --config /tmp/minio.configfile.1 >/tmp/minio1_1.log 2>&1 &
+./buckit server --config /tmp/minio.configfile.1 >/tmp/minio1_1.log 2>&1 &
 site1_pid=$!
-minio server --config /tmp/minio.configfile.2 >/tmp/minio2_1.log 2>&1 &
+./buckit server --config /tmp/minio.configfile.2 >/tmp/minio2_1.log 2>&1 &
 site2_pid=$!
-minio server --config /tmp/minio.configfile.3 >/tmp/minio3_1.log 2>&1 &
+./buckit server --config /tmp/minio.configfile.3 >/tmp/minio3_1.log 2>&1 &
 site3_pid=$!
-minio server --config /tmp/minio.configfile.4 >/tmp/minio4_1.log 2>&1 &
+./buckit server --config /tmp/minio.configfile.4 >/tmp/minio4_1.log 2>&1 &
 site4_pid=$!
 
 export MC_HOST_minio1=http://minr0otUS2r:pBU94AGAY85e@localhost:9001

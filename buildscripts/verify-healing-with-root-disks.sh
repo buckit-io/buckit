@@ -6,14 +6,14 @@ set -x
 
 source "$(dirname "$0")/local-host.sh"
 
-if [ ! -x "$PWD/minio" ]; then
-	echo "minio executable binary not found in current directory"
+if [ ! -x "$PWD/buckit" ]; then
+	echo "buckit executable binary not found in current directory"
 	exit 1
 fi
 
 WORK_DIR="$(mktemp -d)"
 MINIO_CONFIG_DIR="$WORK_DIR/.minio"
-MINIO=("$PWD/minio" --config-dir "$MINIO_CONFIG_DIR" server)
+MINIO=("$PWD/buckit" --config-dir "$MINIO_CONFIG_DIR" server)
 MINIO_HOST="$(minio_local_host)"
 
 function start_minio() {
@@ -85,7 +85,7 @@ function main() {
 }
 
 function cleanup() {
-	pkill minio
+	pkill buckit || pkill minio
 	sudo umount ${WORK_DIR}/mnt/disk{1..3}/
 	sudo rm /dev/minio-loopdisk*
 	rm -rf "$WORK_DIR"

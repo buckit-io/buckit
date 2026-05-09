@@ -4,7 +4,7 @@ if [ -n "$TEST_DEBUG" ]; then
 	set -x
 fi
 
-pkill minio
+pkill buckit || pkill minio
 docker rm -f $(docker ps -aq)
 rm -rf /tmp/ldap{1..4}
 rm -rf /tmp/ldap1{1..4}
@@ -24,12 +24,12 @@ make docker-images
 make docker-run
 cd -
 
-export MC_HOST_myminio="http://minioadmin:minioadmin@localhost:22000"
-export MC_HOST_myminio1="http://minioadmin:minioadmin@localhost:24000"
+export MC_HOST_myminio="http://buckitadmin:buckitadmin@localhost:22000"
+export MC_HOST_myminio1="http://buckitadmin:buckitadmin@localhost:24000"
 
 # Start MinIO instance
 export CI=true
-(minio server --address :22000 --console-address :10000 http://localhost:22000/tmp/ldap{1...4} 2>&1 >/dev/null) &
+(./buckit server --address :22000 --console-address :10000 http://localhost:22000/tmp/ldap{1...4} 2>&1 >/dev/null) &
 sleep 30
 ./mc ready myminio
 
@@ -64,7 +64,7 @@ if [ "${SVCACCT_COUNT_2}" -ne 2 ]; then
 fi
 
 # Kill MinIO and LDAP to start afresh with missing groups/DN
-pkill minio
+pkill buckit || pkill minio
 docker rm -f $(docker ps -aq)
 rm -rf /tmp/ldap{1..4}
 
@@ -76,7 +76,7 @@ make docker-images
 make docker-run
 cd -
 
-(minio server --address ":24000" --console-address :10000 http://localhost:24000/tmp/ldap1{1...4} 2>&1 >/dev/null) &
+(./buckit server --address ":24000" --console-address :10000 http://localhost:24000/tmp/ldap1{1...4} 2>&1 >/dev/null) &
 sleep 30
 ./mc ready myminio1
 
@@ -111,5 +111,5 @@ if [ "${SVCACCT_COUNT_2}" -ne 0 ]; then
 fi
 
 # Finally kill running processes
-pkill minio
+pkill buckit || pkill minio
 docker rm -f $(docker ps -aq)

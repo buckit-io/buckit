@@ -14,13 +14,13 @@ SRC_DIR="/tmp/data"
 INLINED_DIR="/tmp/inlined"
 DEST_DIR="/tmp/dest"
 
-TIMEOUT=10
+TIMEOUT=30
 while true; do
 	if [[ ${TIMEOUT} -le 0 ]]; then
 		echo retry: timeout while running: mc alias set
 		exit 1
 	fi
-	eval ./mc alias set "${ALIAS_NAME}" "${MINIO_SERVER_URL}" minioadmin minioadmin && break
+	eval ./mc alias set "${ALIAS_NAME}" "${MINIO_SERVER_URL}" buckitadmin buckitadmin && break
 	TIMEOUT=$((TIMEOUT - 1))
 	sleep 1
 done

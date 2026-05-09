@@ -6,15 +6,15 @@ fi
 
 WORK_DIR="$PWD/.verify-$RANDOM"
 MINIO_CONFIG_DIR="$WORK_DIR/.minio"
-MINIO=("$PWD/minio" --config-dir "$MINIO_CONFIG_DIR" server)
+MINIO=("$PWD/buckit" --config-dir "$MINIO_CONFIG_DIR" server)
 
-if [ ! -x "$PWD/minio" ]; then
-	echo "minio executable binary not found in current directory"
+if [ ! -x "$PWD/buckit" ]; then
+	echo "buckit executable binary not found in current directory"
 	exit 1
 fi
 
-if [ ! -x "$PWD/minio" ]; then
-	echo "minio executable binary not found in current directory"
+if [ ! -x "$PWD/buckit" ]; then
+	echo "buckit executable binary not found in current directory"
 	exit 1
 fi
 
@@ -31,8 +31,8 @@ catch() {
 	fi
 
 	echo "Cleaning up instances of MinIO"
-	pkill minio || true
-	pkill -9 minio || true
+	pkill buckit || pkill minio || true
+	pkill -9 buckit || pkill -9 minio || true
 	purge "$WORK_DIR"
 	if [ $# -ne 0 ]; then
 		exit $#

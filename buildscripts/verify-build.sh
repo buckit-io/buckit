@@ -91,7 +91,7 @@ function run_test_fs() {
 	(cd "$WORK_DIR" && "$FUNCTIONAL_TESTS")
 	rv=$?
 
-	pkill minio
+	pkill buckit || pkill minio
 	sleep 3
 
 	if [ "$rv" -ne 0 ]; then
@@ -108,7 +108,7 @@ function run_test_erasure_sets() {
 	(cd "$WORK_DIR" && "$FUNCTIONAL_TESTS")
 	rv=$?
 
-	pkill minio
+	pkill buckit || pkill minio
 	sleep 3
 
 	if [ "$rv" -ne 0 ]; then
@@ -125,7 +125,7 @@ function run_test_pool_erasure_sets() {
 	(cd "$WORK_DIR" && "$FUNCTIONAL_TESTS")
 	rv=$?
 
-	pkill minio
+	pkill buckit || pkill minio
 	sleep 3
 
 	if [ "$rv" -ne 0 ]; then
@@ -150,7 +150,7 @@ function run_test_pool_erasure_sets_ipv6() {
 	(cd "$WORK_DIR" && "$FUNCTIONAL_TESTS")
 	rv=$?
 
-	pkill minio
+	pkill buckit || pkill minio
 	sleep 3
 
 	if [ "$rv" -ne 0 ]; then
@@ -173,7 +173,7 @@ function run_test_erasure() {
 	(cd "$WORK_DIR" && "$FUNCTIONAL_TESTS")
 	rv=$?
 
-	pkill minio
+	pkill buckit || pkill minio
 	sleep 3
 
 	if [ "$rv" -ne 0 ]; then
@@ -190,7 +190,7 @@ function run_test_dist_erasure() {
 	(cd "$WORK_DIR" && "$FUNCTIONAL_TESTS")
 	rv=$?
 
-	pkill minio
+	pkill buckit || pkill minio
 	sleep 3
 
 	if [ "$rv" -ne 0 ]; then

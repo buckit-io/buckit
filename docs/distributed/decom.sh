@@ -4,7 +4,7 @@ if [ -n "$TEST_DEBUG" ]; then
 	set -x
 fi
 
-pkill minio
+pkill buckit || pkill minio
 rm -rf /tmp/xl
 rm -rf /tmp/xltier
 
@@ -16,10 +16,10 @@ fi
 export CI=true
 export MINIO_SCANNER_SPEED=fastest
 
-(minio server http://localhost:9000/tmp/xl/{1...10}/disk{0...1} 2>&1 >/tmp/decom.log) &
+(./buckit server http://localhost:9000/tmp/xl/{1...10}/disk{0...1} 2>&1 >/tmp/decom.log) &
 pid=$!
 
-export MC_HOST_myminio="http://minioadmin:minioadmin@localhost:9000/"
+export MC_HOST_myminio="http://buckitadmin:buckitadmin@localhost:9000/"
 
 ./mc ready myminio
 
@@ -48,9 +48,9 @@ user_count=$(./mc admin user list myminio/ | wc -l)
 policy_count=$(./mc admin policy list myminio/ | wc -l)
 
 ## create a warm tier instance
-(minio server /tmp/xltier/{1...4}/disk{0...1} --address :9002 2>&1 >/dev/null) &
+(./buckit server /tmp/xltier/{1...4}/disk{0...1} --address :9002 2>&1 >/dev/null) &
 
-export MC_HOST_mytier="http://minioadmin:minioadmin@localhost:9002/"
+export MC_HOST_mytier="http://buckitadmin:buckitadmin@localhost:9002/"
 
 ./mc ready myminio
 
@@ -58,7 +58,7 @@ export MC_HOST_mytier="http://minioadmin:minioadmin@localhost:9002/"
 ./mc mb -l mytier/tiered
 
 ## create a tier and set up ilm policy to tier immediately
-./mc admin tier add minio myminio TIER1 --endpoint http://localhost:9002 --access-key minioadmin --secret-key minioadmin --bucket tiered --prefix prefix5/
+./mc admin tier add minio myminio TIER1 --endpoint http://localhost:9002 --access-key buckitadmin --secret-key buckitadmin --bucket tiered --prefix prefix5/
 ./mc ilm add myminio/bucket2 --transition-days 0 --transition-tier TIER1 --transition-days 0
 
 ## mirror some content to bucket2 and capture versions tiered
@@ -72,10 +72,10 @@ sleep 30
 
 kill $pid
 
-(minio server http://localhost:9000/tmp/xl/{1...10}/disk{0...1} http://localhost:9001/tmp/xl/{11...30}/disk{0...3} 2>&1 >/tmp/expanded_1.log) &
+(./buckit server http://localhost:9000/tmp/xl/{1...10}/disk{0...1} http://localhost:9001/tmp/xl/{11...30}/disk{0...3} 2>&1 >/tmp/expanded_1.log) &
 pid_1=$!
 
-(minio server --address ":9001" http://localhost:9000/tmp/xl/{1...10}/disk{0...1} http://localhost:9001/tmp/xl/{11...30}/disk{0...3} 2>&1 >/tmp/expanded_2.log) &
+(./buckit server --address ":9001" http://localhost:9000/tmp/xl/{1...10}/disk{0...1} http://localhost:9001/tmp/xl/{11...30}/disk{0...3} 2>&1 >/tmp/expanded_2.log) &
 pid_2=$!
 
 ./mc ready myminio
@@ -122,11 +122,11 @@ kill $pid_2
 
 sleep 5
 
-(minio server --address ":9001" http://localhost:9001/tmp/xl/{11...30}/disk{0...3} 2>&1 >/tmp/removed.log) &
+(./buckit server --address ":9001" http://localhost:9001/tmp/xl/{11...30}/disk{0...3} 2>&1 >/tmp/removed.log) &
 pid=$!
 
 sleep 5
-export MC_HOST_myminio="http://minioadmin:minioadmin@localhost:9001/"
+export MC_HOST_myminio="http://buckitadmin:buckitadmin@localhost:9001/"
 
 ./mc ready myminio
 
@@ -212,7 +212,7 @@ if [ "${expected_checksum}" != "${got_checksum}" ]; then
 	exit 1
 fi
 
-s3-check-md5 -versions -access-key minioadmin -secret-key minioadmin -endpoint http://127.0.0.1:9001/ -bucket bucket2
-s3-check-md5 -versions -access-key minioadmin -secret-key minioadmin -endpoint http://127.0.0.1:9001/ -bucket versioned
+s3-check-md5 -versions -access-key buckitadmin -secret-key buckitadmin -endpoint http://127.0.0.1:9001/ -bucket bucket2
+s3-check-md5 -versions -access-key buckitadmin -secret-key buckitadmin -endpoint http://127.0.0.1:9001/ -bucket versioned
 
 kill $pid

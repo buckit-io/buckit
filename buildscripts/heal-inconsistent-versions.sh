@@ -8,16 +8,16 @@ source "$(dirname "$0")/local-host.sh"
 
 WORK_DIR="$PWD/.verify-$RANDOM"
 MINIO_CONFIG_DIR="$WORK_DIR/.minio"
-MINIO=("$PWD/minio" --config-dir "$MINIO_CONFIG_DIR" server)
+MINIO=("$PWD/buckit" --config-dir "$MINIO_CONFIG_DIR" server)
 MINIO_HOST="$(minio_local_host)"
 
-if [ ! -x "$PWD/minio" ]; then
-	echo "minio executable binary not found in current directory"
+if [ ! -x "$PWD/buckit" ]; then
+	echo "buckit executable binary not found in current directory"
 	exit 1
 fi
 
-if [ ! -x "$PWD/minio" ]; then
-	echo "minio executable binary not found in current directory"
+if [ ! -x "$PWD/buckit" ]; then
+	echo "buckit executable binary not found in current directory"
 	exit 1
 fi
 
@@ -75,7 +75,7 @@ function start_minio_4drive() {
 		"${PWD}/mc" cat --vid "${vid}" minio/bucket/testobj | md5sum
 	done
 
-	pkill minio
+	pkill buckit || pkill minio
 	sleep 3
 }
 

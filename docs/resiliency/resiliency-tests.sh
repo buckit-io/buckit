@@ -346,7 +346,7 @@ function induce_bitrot_for_xlmeta() {
 	$(docker exec resiliency-minio$NODE-1 /bin/sh -c "cat $DIR/test-bucket/inlined-data/$FILE/xl.meta | tail --bytes 32 > /tail")
 
 	# Corrupt xl.meta by writing head followed by tail twice
-	$(docker exec resiliency-minio$NODE-1 /bin/sh -c "cat /head /tail tmp/tail > $DIR/test-bucket/inlined-data/$FILE/xl.meta")
+	$(docker exec resiliency-minio$NODE-1 /bin/sh -c "cat /head /tail /tail > $DIR/test-bucket/inlined-data/$FILE/xl.meta")
 }
 
 function test_resiliency_healing_inlined_metadata() {
@@ -396,12 +396,12 @@ function main() {
 		wget -q https://dl.minio.io/client/mc/release/linux-amd64/mc && chmod +x ./mc
 	fi
 
-	export MC_HOST_myminio=http://minioadmin:minioadmin@localhost:9000
+	export MC_HOST_myminio=http://buckitadmin:buckitadmin@localhost:9000
 
 	cleanup_and_prune
 
 	# Run resiliency tests against MinIO
-	docker compose -f "${DOCKER_COMPOSE_FILE}" up -d
+	docker compose -f "${DOCKER_COMPOSE_FILE}" up -d --wait
 
 	# Initial setup
 	docs/resiliency/resiliency-initial-script.sh

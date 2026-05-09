@@ -25,6 +25,7 @@ if [ ! -f ./mc ]; then
 fi
 
 export RELEASE=RELEASE.2023-08-29T23-07-35Z
+export REPO=quay.io/minio/minio
 
 docker-compose -f docker-compose-site1.yaml up -d
 docker-compose -f docker-compose-site2.yaml up -d
@@ -77,6 +78,7 @@ if [ $failed_count_site2 -ne 0 ]; then
 fi
 
 export RELEASE=${1}
+export REPO=quay.io/buckit/buckit
 
 docker-compose -f docker-compose-site1.yaml up -d
 docker-compose -f docker-compose-site2.yaml up -d

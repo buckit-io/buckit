@@ -4,7 +4,7 @@ if [ -n "$TEST_DEBUG" ]; then
 	set -x
 fi
 
-pkill minio
+pkill buckit || pkill minio
 pkill kes
 rm -rf /tmp/xl
 
@@ -32,9 +32,9 @@ export MINIO_KMS_KES_ENDPOINT=https://127.0.0.1:7373
 export MINIO_KMS_KES_API_KEY="${API_KEY}"
 export MINIO_KMS_KES_KEY_NAME=minio-default-key
 export MINIO_KMS_KES_CAPATH=public.crt
-export MC_HOST_myminio="http://minioadmin:minioadmin@localhost:9000/"
+export MC_HOST_myminio="http://buckitadmin:buckitadmin@localhost:9000/"
 
-(minio server http://localhost:9000/tmp/xl/{1...10}/disk{0...1} 2>&1 >/dev/null) &
+(./buckit server http://localhost:9000/tmp/xl/{1...10}/disk{0...1} 2>&1 >/dev/null) &
 pid=$!
 
 mc ready myminio

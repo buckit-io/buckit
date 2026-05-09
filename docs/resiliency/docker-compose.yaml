@@ -9,11 +9,12 @@ x-minio-common: &minio-common
     - "9001"
   environment:
     MINIO_CI_CD: 1
+    MC_HOST_local: http://buckitadmin:buckitadmin@localhost:9000
   healthcheck:
     test: ["CMD", "mc", "ready", "local"]
     interval: 5s
     timeout: 5s
-    retries: 5
+    retries: 12
 
 # starts 4 docker containers running minio server instances.
 # using nginx reverse proxy, load balancing, you can access
@@ -80,10 +81,14 @@ services:
       - "9000:9000"
       - "9001:9001"
     depends_on:
-      - minio1
-      - minio2
-      - minio3
-      - minio4
+      minio1:
+        condition: service_healthy
+      minio2:
+        condition: service_healthy
+      minio3:
+        condition: service_healthy
+      minio4:
+        condition: service_healthy
 
 ## By default this config uses default local driver,
 ## For custom volumes replace with volume driver configuration.

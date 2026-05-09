@@ -215,7 +215,7 @@ docker: build ## builds buckit docker container
 	@echo "Building buckit docker image '$(TAG)'"
 	@docker build -q --no-cache -t $(TAG) . -f Dockerfile
 
-test-resiliency: build
+test-resiliency:
 	@echo "Running resiliency tests"
 	@(DOCKER_COMPOSE_FILE=$(PWD)/docs/resiliency/docker-compose.yaml env bash $(PWD)/docs/resiliency/resiliency-tests.sh)
 

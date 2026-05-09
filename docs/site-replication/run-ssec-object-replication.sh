@@ -14,8 +14,8 @@ exit_1() {
 
 cleanup() {
 	echo -n "Cleaning up instances of MinIO ..."
-	pkill minio || sudo pkill minio
-	pkill -9 minio || sudo pkill -9 minio
+	pkill buckit || pkill minio || sudo pkill buckit || sudo pkill minio
+	pkill -9 buckit || pkill -9 minio || sudo pkill -9 buckit || sudo pkill -9 minio
 	rm -rf /tmp/minio{1,2}
 	echo "done"
 }
@@ -39,8 +39,8 @@ echo "done"
 
 # Start MinIO instances
 echo -n "Starting MinIO instances ..."
-minio server --certs-dir /tmp/certs --address ":9001" --console-address ":10000" /tmp/minio1/{1...4}/disk{1...4} /tmp/minio1/{5...8}/disk{1...4} >/tmp/minio1_1.log 2>&1 &
-minio server --certs-dir /tmp/certs --address ":9002" --console-address ":11000" /tmp/minio2/{1...4}/disk{1...4} /tmp/minio2/{5...8}/disk{1...4} >/tmp/minio2_1.log 2>&1 &
+./buckit server --certs-dir /tmp/certs --address ":9001" --console-address ":10000" /tmp/minio1/{1...4}/disk{1...4} /tmp/minio1/{5...8}/disk{1...4} >/tmp/minio1_1.log 2>&1 &
+./buckit server --certs-dir /tmp/certs --address ":9002" --console-address ":11000" /tmp/minio2/{1...4}/disk{1...4} /tmp/minio2/{5...8}/disk{1...4} >/tmp/minio2_1.log 2>&1 &
 echo "done"
 
 if [ ! -f ./mc ]; then

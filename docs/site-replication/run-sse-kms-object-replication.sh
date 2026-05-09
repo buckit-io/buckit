@@ -17,7 +17,7 @@ exit_1() {
 
 cleanup() {
 	echo -n "Cleaning up instances of MinIO ..."
-	pkill -9 minio || sudo pkill -9 minio
+	pkill -9 buckit || pkill -9 minio || sudo pkill -9 buckit || sudo pkill -9 minio
 	pkill -9 kes || sudo pkill -9 kes
 	rm -rf ${PWD}/keys
 	rm -rf /tmp/minio{1,2,3,4}
@@ -43,8 +43,8 @@ echo "done"
 
 # Start MinIO instances
 echo -n "Starting MinIO instances ..."
-CI=on MINIO_KMS_SECRET_KEY=minio-default-key:IyqsU3kMFloCNup4BsZtf/rmfHVcTgznO2F25CkEH1g= MINIO_ROOT_USER=minio MINIO_ROOT_PASSWORD=minio123 minio server --certs-dir /tmp/certs --address ":9001" --console-address ":10000" /tmp/minio1/{1...4}/disk{1...4} /tmp/minio1/{5...8}/disk{1...4} >/tmp/minio1_1.log 2>&1 &
-CI=on MINIO_KMS_SECRET_KEY=minio-default-key:IyqsU3kMFloCNup4BsZtf/rmfHVcTgznO2F25CkEH1g= MINIO_ROOT_USER=minio MINIO_ROOT_PASSWORD=minio123 minio server --certs-dir /tmp/certs --address ":9002" --console-address ":11000" /tmp/minio2/{1...4}/disk{1...4} /tmp/minio2/{5...8}/disk{1...4} >/tmp/minio2_1.log 2>&1 &
+CI=on MINIO_KMS_SECRET_KEY=minio-default-key:IyqsU3kMFloCNup4BsZtf/rmfHVcTgznO2F25CkEH1g= MINIO_ROOT_USER=minio MINIO_ROOT_PASSWORD=minio123 ./buckit server --certs-dir /tmp/certs --address ":9001" --console-address ":10000" /tmp/minio1/{1...4}/disk{1...4} /tmp/minio1/{5...8}/disk{1...4} >/tmp/minio1_1.log 2>&1 &
+CI=on MINIO_KMS_SECRET_KEY=minio-default-key:IyqsU3kMFloCNup4BsZtf/rmfHVcTgznO2F25CkEH1g= MINIO_ROOT_USER=minio MINIO_ROOT_PASSWORD=minio123 ./buckit server --certs-dir /tmp/certs --address ":9002" --console-address ":11000" /tmp/minio2/{1...4}/disk{1...4} /tmp/minio2/{5...8}/disk{1...4} >/tmp/minio2_1.log 2>&1 &
 echo "done"
 
 if [ ! -f ./mc ]; then
@@ -233,8 +233,8 @@ fi
 ./mc cat minio2/test-bucket/custpartsize --insecure >/dev/null || exit_1
 
 echo -n "Starting MinIO instances with different kms key ..."
-CI=on MINIO_KMS_SECRET_KEY=minio3-default-key:IyqsU3kMFloCNup4BsZtf/rmfHVcTgznO2F25CkEH1g= MINIO_ROOT_USER=minio MINIO_ROOT_PASSWORD=minio123 minio server --certs-dir /tmp/certs --address ":9003" --console-address ":10000" /tmp/minio3/disk{1...4} >/tmp/minio3_1.log 2>&1 &
-CI=on MINIO_KMS_SECRET_KEY=minio4-default-key:IyqsU3kMFloCNup4BsZtf/rmfHVcTgznO2F25CkEH1g= MINIO_ROOT_USER=minio MINIO_ROOT_PASSWORD=minio123 minio server --certs-dir /tmp/certs --address ":9004" --console-address ":11000" /tmp/minio4/disk{1...4} >/tmp/minio4_1.log 2>&1 &
+CI=on MINIO_KMS_SECRET_KEY=minio3-default-key:IyqsU3kMFloCNup4BsZtf/rmfHVcTgznO2F25CkEH1g= MINIO_ROOT_USER=minio MINIO_ROOT_PASSWORD=minio123 ./buckit server --certs-dir /tmp/certs --address ":9003" --console-address ":10000" /tmp/minio3/disk{1...4} >/tmp/minio3_1.log 2>&1 &
+CI=on MINIO_KMS_SECRET_KEY=minio4-default-key:IyqsU3kMFloCNup4BsZtf/rmfHVcTgznO2F25CkEH1g= MINIO_ROOT_USER=minio MINIO_ROOT_PASSWORD=minio123 ./buckit server --certs-dir /tmp/certs --address ":9004" --console-address ":11000" /tmp/minio4/disk{1...4} >/tmp/minio4_1.log 2>&1 &
 echo "done"
 
 export MC_HOST_minio3=https://minio:minio123@localhost:9003

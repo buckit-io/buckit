@@ -16,8 +16,8 @@ exit_1() {
 
 cleanup() {
 	echo "Cleaning up instances of MinIO"
-	pkill minio
-	pkill -9 minio
+	pkill buckit || pkill minio
+	pkill -9 buckit || pkill -9 minio || true
 	rm -rf /tmp/minio{1,2,3}
 }
 
@@ -42,14 +42,14 @@ export MINIO_IDENTITY_OPENID_CLAIM_NAME="groups"
 export MINIO_IDENTITY_OPENID_SCOPES="openid,groups"
 
 export MINIO_IDENTITY_OPENID_REDIRECT_URI="http://127.0.0.1:10000/oauth_callback"
-minio server --address ":9001" --console-address ":10000" /tmp/minio1/{1...4} >/tmp/minio1_1.log 2>&1 &
+./buckit server --address ":9001" --console-address ":10000" /tmp/minio1/{1...4} >/tmp/minio1_1.log 2>&1 &
 site1_pid=$!
 export MINIO_IDENTITY_OPENID_REDIRECT_URI="http://127.0.0.1:11000/oauth_callback"
-minio server --address ":9002" --console-address ":11000" /tmp/minio2/{1...4} >/tmp/minio2_1.log 2>&1 &
+./buckit server --address ":9002" --console-address ":11000" /tmp/minio2/{1...4} >/tmp/minio2_1.log 2>&1 &
 site2_pid=$!
 
 export MINIO_IDENTITY_OPENID_REDIRECT_URI="http://127.0.0.1:12000/oauth_callback"
-minio server --address ":9003" --console-address ":12000" /tmp/minio3/{1...4} >/tmp/minio3_1.log 2>&1 &
+./buckit server --address ":9003" --console-address ":12000" /tmp/minio3/{1...4} >/tmp/minio3_1.log 2>&1 &
 site3_pid=$!
 
 if [ ! -f ./mc ]; then
@@ -292,7 +292,7 @@ kill -9 ${site1_pid}
 ./mc rb minio2/bucket2
 
 # Restart minio1 instance
-minio server --address ":9001" --console-address ":10000" /tmp/minio1/{1...4} >/tmp/minio1_1.log 2>&1 &
+./buckit server --address ":9001" --console-address ":10000" /tmp/minio1/{1...4} >/tmp/minio1_1.log 2>&1 &
 sleep 200
 
 # Test whether most recent tag update on minio2 is replicated to minio1

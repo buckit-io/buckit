@@ -4,11 +4,11 @@ if [ -n "$TEST_DEBUG" ]; then
 	set -x
 fi
 
-pkill minio
+pkill buckit || pkill minio
 docker rm -f $(docker ps -aq)
 rm -rf /tmp/openid{1..4}
 
-export MC_HOST_myminio="http://minioadmin:minioadmin@localhost:22000"
+export MC_HOST_myminio="http://buckitadmin:buckitadmin@localhost:22000"
 # The service account used below is already present in iam configuration getting imported
 export MC_HOST_myminio1="http://dillon-service-2:dillon-service-2@localhost:22000"
 
@@ -30,7 +30,7 @@ mc -v
 	cd -
 )
 
-(minio server --address :22000 --console-address :10000 http://localhost:22000/tmp/openid{1...4} 2>&1 >/tmp/server.log) &
+(./buckit server --address :22000 --console-address :10000 http://localhost:22000/tmp/openid{1...4} 2>&1 >/tmp/server.log) &
 ./mc ready myminio
 ./mc mb myminio/test-bucket
 ./mc cp /etc/hosts myminio/test-bucket
@@ -78,5 +78,5 @@ if [[ ${OBJ_NAME} != "hosts" ]]; then
 fi
 
 # Finally kill running processes
-pkill minio
+pkill buckit || pkill minio
 docker rm -f $(docker ps -aq)

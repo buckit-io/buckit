@@ -4,7 +4,7 @@ if [ -n "$TEST_DEBUG" ]; then
 	set -x
 fi
 
-pkill minio
+pkill buckit || pkill minio
 rm -rf /tmp/xl
 
 if [ ! -f ./mc ]; then
@@ -16,10 +16,10 @@ export CI=true
 export MINIO_KMS_AUTO_ENCRYPTION=on
 export MINIO_KMS_SECRET_KEY=my-minio-key:OSMM+vkKUTCvQs9YL/CVMIMt43HFhkUpqJxTmGl6rYw=
 
-(minio server http://localhost:9000/tmp/xl/{1...10}/disk{0...1} 2>&1 >/dev/null) &
+(./buckit server http://localhost:9000/tmp/xl/{1...10}/disk{0...1} 2>&1 >/dev/null) &
 pid=$!
 
-export MC_HOST_myminio="http://minioadmin:minioadmin@localhost:9000/"
+export MC_HOST_myminio="http://buckitadmin:buckitadmin@localhost:9000/"
 
 ./mc ready myminio
 
@@ -49,10 +49,10 @@ policy_count=$(./mc admin policy list myminio/ | wc -l)
 
 kill $pid
 
-(minio server http://localhost:9000/tmp/xl/{1...10}/disk{0...1} http://localhost:9001/tmp/xl/{11...30}/disk{0...3} 2>&1 >/tmp/expanded_1.log) &
+(./buckit server http://localhost:9000/tmp/xl/{1...10}/disk{0...1} http://localhost:9001/tmp/xl/{11...30}/disk{0...3} 2>&1 >/tmp/expanded_1.log) &
 pid_1=$!
 
-(minio server --address ":9001" http://localhost:9000/tmp/xl/{1...10}/disk{0...1} http://localhost:9001/tmp/xl/{11...30}/disk{0...3} 2>&1 >/tmp/expanded_2.log) &
+(./buckit server --address ":9001" http://localhost:9000/tmp/xl/{1...10}/disk{0...1} http://localhost:9001/tmp/xl/{11...30}/disk{0...3} 2>&1 >/tmp/expanded_2.log) &
 pid_2=$!
 
 ./mc ready myminio
@@ -94,10 +94,10 @@ kill $pid_2
 
 sleep 5
 
-(minio server --address ":9001" http://localhost:9001/tmp/xl/{11...30}/disk{0...3} 2>&1 >/tmp/removed.log) &
+(./buckit server --address ":9001" http://localhost:9001/tmp/xl/{11...30}/disk{0...3} 2>&1 >/tmp/removed.log) &
 pid=$!
 
-export MC_HOST_myminio="http://minioadmin:minioadmin@localhost:9001/"
+export MC_HOST_myminio="http://buckitadmin:buckitadmin@localhost:9001/"
 
 ./mc ready myminio
 
@@ -144,6 +144,6 @@ if [ "${expected_checksum}" != "${got_checksum}" ]; then
 	exit 1
 fi
 
-./s3-check-md5 -versions -access-key minioadmin -secret-key minioadmin -endpoint http://127.0.0.1:9001/ -bucket versioned
+./s3-check-md5 -versions -access-key buckitadmin -secret-key buckitadmin -endpoint http://127.0.0.1:9001/ -bucket versioned
 
 kill $pid
