@@ -86,7 +86,7 @@ import_iam_content_in_new_minio() {
 	sleep 5
 
 	set -x
-	mc alias set new-minio http://localhost:9000 minioadmin minioadmin
+	mc alias set new-minio http://localhost:9000 buckitadmin buckitadmin
 	echo "BEFORE IMPORT mappings:"
 	mc ready new-minio
 	mc idp ldap policy entities new-minio
