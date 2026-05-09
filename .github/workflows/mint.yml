@@ -39,9 +39,9 @@ jobs:
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: build-minio
+      - name: build-buckit
         run: |
-          TAG="quay.io/minio/minio:${{ steps.vars.outputs.sha_short }}" make docker
+          TAG="quay.io/buckit/buckit:${{ steps.vars.outputs.sha_short }}" make docker
 
       - name: multipart uploads test
         run: |
@@ -79,7 +79,7 @@ jobs:
             docker volume rm ${volume} || true
           done
 
-          docker rmi -f quay.io/minio/minio:${{ steps.vars.outputs.sha_short }}
+          docker rmi -f quay.io/buckit/buckit:${{ steps.vars.outputs.sha_short }}
           docker system prune -f || true
           docker volume prune -f || true
           docker volume rm $(docker volume ls -q -f dangling=true) || true

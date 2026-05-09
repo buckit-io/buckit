@@ -2,11 +2,13 @@ version: '3.7'
 
 # Settings and configurations that are common for all containers
 x-minio-common: &minio-common
-  image: quay.io/minio/minio:${RELEASE}
+  image: ${REPO}:${RELEASE}
   command: server http://site1-minio{1...4}/data{1...2}
   environment:
     - MINIO_PROMETHEUS_AUTH_TYPE=public
     - CI=true
+    - MINIO_ROOT_USER=minioadmin
+    - MINIO_ROOT_PASSWORD=minioadmin
 
 # starts 4 docker containers running minio server instances.
 # using nginx reverse proxy, load balancing, you can access
