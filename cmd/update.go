@@ -589,9 +589,9 @@ func downloadBinary(u *url.URL, mode string) (binCompressed []byte, bin []byte, 
 }
 
 const (
-	// Update this with the Buckit minisign public key once generated.
-	// Generate with: minisign -G -p buckit.pub -s buckit.key
-	defaultMinisignPubkey = "REPLACE_WITH_BUCKIT_PUBKEY"
+	// Buckit minisign public key for release signature verification.
+	// Key ID: 62EB8D2A3DCDDA31
+	defaultMinisignPubkey = "RWQx2s09Ko3rYmr64TBI992Oppjy00FUMQAUM9Ezf9czdMFOhB7CmKKU"
 )
 
 func verifyBinary(u *url.URL, sha256Sum []byte, releaseInfo, mode string, reader io.Reader) (err error) {
