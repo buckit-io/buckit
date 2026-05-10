@@ -50,7 +50,7 @@ var (
 	minioOSARCH = runtime.GOOS + "-" + runtime.GOARCH
 
 	// MinioReleaseBaseURL - release url without os and arch.
-	MinioReleaseBaseURL = "https://dl.min.io/server/minio/release/"
+	MinioReleaseBaseURL = "https://buckit-io.github.io/buckit/server/buckit/release/"
 
 	// MinioReleaseURL - release URL.
 	MinioReleaseURL = MinioReleaseBaseURL + minioOSARCH + SlashSeparator

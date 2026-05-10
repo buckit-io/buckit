@@ -1,0 +1,176 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'RELEASE.*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.x
+
+      - name: Build binary
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          BUCKIT_RELEASE: RELEASE
+        run: |
+          LDFLAGS=$(go run buildscripts/gen-ldflags.go ${{ github.ref_name }})
+          go build -tags kqueue -trimpath --ldflags "${LDFLAGS}" -o buckit-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.${{ github.ref_name }}
+
+      - name: Generate checksum
+        run: |
+          sha256sum buckit-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.${{ github.ref_name }} > buckit-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.${{ github.ref_name }}.sha256sum
+
+      - name: Sign with minisign
+        env:
+          MINISIGN_PRIVATE_KEY: ${{ secrets.MINISIGN_PRIVATE_KEY }}
+          MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
+        run: |
+          go install aead.dev/minisign/cmd/minisign@v0.2.1
+          echo "$MINISIGN_PRIVATE_KEY" | base64 -d > /tmp/minisign.key
+          echo "$MINISIGN_PASSWORD" | minisign -Sm buckit-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.${{ github.ref_name }} -s /tmp/minisign.key
+          shred -u /tmp/minisign.key
+
+      - name: Build packages
+        if: matrix.goos == 'linux'
+        run: |
+          wget -q https://github.com/minio/pkger/releases/download/v2.3.11/pkger_2.3.11_linux_amd64.deb
+          sudo apt install -y ./pkger_2.3.11_linux_amd64.deb
+          wget -q -O minio.service https://raw.githubusercontent.com/minio/minio-service/v1.1.1/linux-systemd/distributed/minio.service
+          mkdir -p dist/linux-${{ matrix.goarch }}
+          cp buckit-${{ matrix.goos }}-${{ matrix.goarch }}.${{ github.ref_name }} dist/linux-${{ matrix.goarch }}/buckit.${{ github.ref_name }}
+          pkger -r ${{ github.ref_name }} --ignore
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            buckit-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.${{ github.ref_name }}
+            buckit-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.${{ github.ref_name }}.sha256sum
+            buckit-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.${{ github.ref_name }}.minisig
+            dist/linux-${{ matrix.goarch }}/*.deb
+            dist/linux-${{ matrix.goarch }}/*.rpm
+            dist/linux-${{ matrix.goarch }}/*.apk
+
+  docker:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Prepare binaries for Docker
+        run: |
+          cp artifacts/buckit-linux-amd64.${{ github.ref_name }} buckit-amd64.${{ github.ref_name }}
+          cp artifacts/buckit-linux-arm64.${{ github.ref_name }} buckit-arm64.${{ github.ref_name }}
+          chmod +x buckit-*.${{ github.ref_name }}
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Determine tags
+        id: tags
+        run: |
+          TAGS="ghcr.io/buckit-io/buckit:${{ github.ref_name }}"
+          TAGS="${TAGS},docker.io/buckitio/buckit:${{ github.ref_name }}"
+          if [[ "${{ github.ref_name }}" != *".rc"* ]]; then
+            TAGS="${TAGS},ghcr.io/buckit-io/buckit:latest"
+            TAGS="${TAGS},docker.io/buckitio/buckit:latest"
+          fi
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          build-args: |
+            RELEASE=${{ github.ref_name }}
+
+  publish:
+    needs: [build, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '.rc') }}
+          files: artifacts/**/*
+
+  update-gh-pages:
+    if: "!contains(github.ref_name, '.rc')"
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate sha256sum pointer files
+        run: |
+          tag="${{ github.ref_name }}"
+          for arch in amd64 arm64; do
+            dir="pages/server/buckit/release/linux-${arch}"
+            mkdir -p "${dir}"
+            sha=$(sha256sum "artifacts/buckit-linux-${arch}.${tag}" | awk '{print $1}')
+            echo "${sha} buckit.${tag}" > "${dir}/buckit.sha256sum"
+          done
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./pages
+          keep_files: true

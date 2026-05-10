@@ -52,10 +52,10 @@ const (
 
 var (
 	// Newer official download info URLs appear earlier below.
-	minioReleaseInfoURL = MinioReleaseURL + "minio.sha256sum"
+	minioReleaseInfoURL = MinioReleaseURL + "buckit.sha256sum"
 
 	// For windows our files have .exe additionally.
-	minioReleaseWindowsInfoURL = MinioReleaseURL + "minio.exe.sha256sum"
+	minioReleaseWindowsInfoURL = MinioReleaseURL + "buckit.exe.sha256sum"
 )
 
 // minioVersionToReleaseTime - parses a standard official release
@@ -374,7 +374,7 @@ func releaseInfoToReleaseTime(releaseInfo string) (releaseTime time.Time, err er
 		err = fmt.Errorf("Unknown release information `%s`", releaseInfo)
 		return releaseTime, err
 	}
-	if nfields[0] != "minio" {
+	if nfields[0] != "minio" && nfields[0] != "buckit" {
 		err = fmt.Errorf("Unknown release `%s`", releaseInfo)
 		return releaseTime, err
 	}
@@ -446,6 +446,39 @@ func getLatestReleaseTime(u *url.URL, timeout time.Duration, mode string) (sha25
 
 	sha256Sum, releaseTime, _, err = parseReleaseData(data)
 	return sha256Sum, releaseTime, err
+}
+
+// getBinaryURL returns the URL to download the release binary.
+// When the sha256sum was fetched from the default GitHub Pages URL,
+// the binary is served from GitHub Releases. Otherwise (user-provided URL),
+// the binary is assumed to be a sibling file in the same directory.
+func getBinaryURL(u *url.URL, releaseInfo string) *url.URL {
+	binURL := *u
+	if strings.Contains(u.Host, "github.io") {
+		// Derive from GitHub Releases.
+		// releaseInfo is like "buckit.RELEASE.2026-05-09T12-00-00Z"
+		// tag is "RELEASE.2026-05-09T12-00-00Z"
+		parts := strings.SplitN(releaseInfo, ".", 2)
+		tag := releaseInfo
+		if len(parts) == 2 {
+			tag = parts[1]
+		}
+		// Determine arch from the sha256sum URL path (e.g., .../linux-amd64/buckit.sha256sum)
+		arch := "amd64"
+		if strings.Contains(u.Path, "linux-arm64") {
+			arch = "arm64"
+		} else if strings.Contains(u.Path, "linux-ppc64le") {
+			arch = "ppc64le"
+		} else if strings.Contains(u.Path, "linux-s390x") {
+			arch = "s390x"
+		}
+		binURL.Host = "github.com"
+		binURL.Path = "/buckit-io/buckit/releases/download/" + tag + "/buckit-linux-" + arch + "." + tag
+	} else {
+		// User-provided URL: binary is a sibling in the same directory.
+		binURL.Path = path.Dir(u.Path) + slashSeparator + releaseInfo
+	}
+	return &binURL
 }
 
 const (
@@ -556,8 +589,9 @@ func downloadBinary(u *url.URL, mode string) (binCompressed []byte, bin []byte, 
 }
 
 const (
-	// Update this whenever the official minisign pubkey is rotated.
-	defaultMinisignPubkey = "RWTx5Zr1tiHQLwG9keckT0c45M3AGeHD6IvimQHpyRywVWGbP1aVSGav"
+	// Update this with the Buckit minisign public key once generated.
+	// Generate with: minisign -G -p buckit.pub -s buckit.key
+	defaultMinisignPubkey = "REPLACE_WITH_BUCKIT_PUBKEY"
 )
 
 func verifyBinary(u *url.URL, sha256Sum []byte, releaseInfo, mode string, reader io.Reader) (err error) {
@@ -583,7 +617,8 @@ func verifyBinary(u *url.URL, sha256Sum []byte, releaseInfo, mode string, reader
 	minisignPubkey := env.Get(envMinisignPubKey, defaultMinisignPubkey)
 	if minisignPubkey != "" {
 		v := selfupdate.NewVerifier()
-		u.Path = path.Dir(u.Path) + slashSeparator + releaseInfo + ".minisig"
+		// Derive .minisig URL as sibling of the binary URL
+		u.Path = u.Path + ".minisig"
 		if err = v.LoadFromURL(u.String(), minisignPubkey, transport); err != nil {
 			return AdminError{
 				Code:       AdminUpdateApplyFailure,
