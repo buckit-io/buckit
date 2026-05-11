@@ -173,7 +173,7 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	u.Path = path.Dir(u.Path) + SlashSeparator + releaseInfo
+	u = getBinaryURL(u, releaseInfo)
 	// Download Binary Once
 	binC, bin, err := downloadBinary(u, mode)
 	if err != nil {
@@ -380,7 +380,7 @@ func (a adminAPIHandlers) ServerUpdateHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	u.Path = path.Dir(u.Path) + SlashSeparator + releaseInfo
+	u = getBinaryURL(u, releaseInfo)
 
 	// Download Binary Once
 	binC, bin, err := downloadBinary(u, mode)

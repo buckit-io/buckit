@@ -320,6 +320,10 @@ func TestParseReleaseData(t *testing.T) {
 			"fbe246edbd382902db9a4035df7dce8cb441357d minio.RELEASE.2016-10-07T01-16-39Z.customer-hotfix\n", releaseTime, "fbe246edbd382902db9a4035df7dce8cb441357d",
 			"minio.RELEASE.2016-10-07T01-16-39Z.customer-hotfix", false,
 		},
+		{
+			"fbe246edbd382902db9a4035df7dce8cb441357d buckit.RELEASE.2016-10-07T01-16-39Z\n", releaseTime, "fbe246edbd382902db9a4035df7dce8cb441357d",
+			"buckit.RELEASE.2016-10-07T01-16-39Z", false,
+		},
 	}
 
 	for i, testCase := range testCases {
