@@ -20,6 +20,7 @@ package cmd
 import (
 	"bufio"
 	"crypto"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
 	"errors"
@@ -30,6 +31,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -57,6 +59,8 @@ var (
 	// For windows our files have .exe additionally.
 	minioReleaseWindowsInfoURL = MinioReleaseURL + "buckit.exe.sha256sum"
 )
+
+var releaseTagRegex = regexp.MustCompile(`RELEASE\.\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z(?:\.[A-Za-z0-9._-]+)?`)
 
 // minioVersionToReleaseTime - parses a standard official release
 // MinIO version string.
@@ -422,6 +426,46 @@ func parseReleaseData(data string) (sha256Sum []byte, releaseTime time.Time, rel
 	return sha256Sum, releaseTime, releaseInfo, err
 }
 
+func parseChecksumData(data string) (sha256Sum []byte, fileName string, err error) {
+	fields := strings.Fields(data)
+	if len(fields) < 1 {
+		return nil, "", fmt.Errorf("Unknown checksum data `%s`", data)
+	}
+
+	sha256Sum, err = hex.DecodeString(fields[0])
+	if err != nil {
+		return nil, "", err
+	}
+
+	if len(fields) > 1 {
+		fileName = fields[1]
+	}
+
+	return sha256Sum, fileName, nil
+}
+
+func extractReleaseTag(data []byte) (string, error) {
+	tag := releaseTagRegex.Find(data)
+	if len(tag) == 0 {
+		return "", fmt.Errorf("release tag not found in downloaded binary")
+	}
+	return string(tag), nil
+}
+
+func extractReleaseTime(data []byte) (releaseTime time.Time, releaseInfo string, err error) {
+	releaseTag, err := extractReleaseTag(data)
+	if err != nil {
+		return time.Time{}, "", err
+	}
+
+	releaseTime, err = releaseTagToReleaseTime(releaseTag)
+	if err != nil {
+		return time.Time{}, "", err
+	}
+
+	return releaseTime, "buckit." + releaseTag, nil
+}
+
 func getUpdateTransport(timeout time.Duration) http.RoundTripper {
 	var updateTransport http.RoundTripper = &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
@@ -449,32 +493,20 @@ func getLatestReleaseTime(u *url.URL, timeout time.Duration, mode string) (sha25
 }
 
 // getBinaryURL returns the URL to download the release binary.
-// When the sha256sum was fetched from the default GitHub Pages URL,
-// the binary is served from GitHub Releases. Otherwise (user-provided URL),
-// the binary is assumed to be a sibling file in the same directory.
+// For the default GitHub Pages URL, the binary is served as a stable sibling
+// file in the same directory as the checksum. User-provided URLs keep the
+// same sibling-directory behavior.
 func getBinaryURL(u *url.URL, releaseInfo string) *url.URL {
 	binURL := *u
 	if strings.Contains(u.Host, "github.io") {
-		// Derive from GitHub Releases.
-		// releaseInfo is like "buckit.RELEASE.2026-05-09T12-00-00Z"
-		// tag is "RELEASE.2026-05-09T12-00-00Z"
-		parts := strings.SplitN(releaseInfo, ".", 2)
-		tag := releaseInfo
-		if len(parts) == 2 {
-			tag = parts[1]
+		name := "buckit"
+		if strings.HasSuffix(u.Path, ".exe.sha256sum") || runtime.GOOS == "windows" {
+			name = "buckit.exe"
 		}
-		// Determine os and arch from the sha256sum URL path
-		// e.g., .../linux-amd64/buckit.sha256sum, .../windows-amd64/buckit.sha256sum
-		osArch := runtime.GOOS + "-" + runtime.GOARCH
-		ext := ""
-		if runtime.GOOS == "windows" {
-			ext = ".exe"
-		}
-		binURL.Host = "github.com"
-		binURL.Path = "/buckit-io/buckit/releases/download/" + tag + "/buckit-" + osArch + ext + "." + tag
+		binURL.Path = path.Join(path.Dir(u.Path), name)
 	} else {
 		// User-provided URL: binary is a sibling in the same directory.
-		binURL.Path = path.Dir(u.Path) + slashSeparator + releaseInfo
+		binURL.Path = path.Join(path.Dir(u.Path), releaseInfo)
 	}
 	return &binURL
 }
@@ -508,10 +540,10 @@ func getDownloadURL(releaseTag string) (downloadURL string) {
 
 	// For binary only installations, we return link to the latest binary.
 	if runtime.GOOS == "windows" {
-		return MinioReleaseURL + "minio.exe"
+		return MinioReleaseURL + "buckit.exe"
 	}
 
-	return MinioReleaseURL + "minio"
+	return MinioReleaseURL + "buckit"
 }
 
 func getUpdateReaderFromURL(u *url.URL, transport http.RoundTripper, mode string) (io.ReadCloser, error) {
@@ -545,6 +577,11 @@ func getUpdateReaderFromURL(u *url.URL, transport http.RoundTripper, mode string
 		}
 	}
 	return resp.Body, nil
+}
+
+func checksumBytes(b []byte) []byte {
+	sum := sha256.Sum256(b)
+	return sum[:]
 }
 
 var updateInProgress atomic.Uint32

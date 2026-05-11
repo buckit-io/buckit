@@ -128,56 +128,72 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	content, err := downloadReleaseURL(u, updateTimeout, mode)
-	if err != nil {
-		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
-		return
-	}
-
-	sha256Sum, lrTime, releaseInfo, err := parseReleaseData(content)
-	if err != nil {
-		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
-		return
-	}
-
 	updateStatus := madmin.ServerUpdateStatusV2{
 		DryRun:  dryRun,
 		Results: make([]madmin.ServerPeerUpdateStatus, 0, len(globalNotificationSys.allPeerClients)),
 	}
 	peerResults := make(map[string]madmin.ServerPeerUpdateStatus, len(globalNotificationSys.allPeerClients))
 	failedClients := make(map[int]bool, len(globalNotificationSys.allPeerClients))
-
-	if lrTime.Sub(currentReleaseTime) <= 0 {
-		updateStatus.Results = append(updateStatus.Results, madmin.ServerPeerUpdateStatus{
-			Host:           local,
-			Err:            fmt.Sprintf("server is running the latest version: %s", Version),
-			CurrentVersion: Version,
-		})
-
-		for _, client := range globalNotificationSys.peerClients {
-			updateStatus.Results = append(updateStatus.Results, madmin.ServerPeerUpdateStatus{
-				Host:           client.String(),
-				Err:            fmt.Sprintf("server is running the latest version: %s", Version),
-				CurrentVersion: Version,
-			})
-		}
-
-		// Marshal API response
-		jsonBytes, err := json.Marshal(updateStatus)
+	var (
+		sha256Sum      []byte
+		lrTime         time.Time
+		releaseInfo    string
+		updatedVersion string
+	)
+	if updateURL == "" {
+		content, err := downloadReleaseURL(u, updateTimeout, mode)
 		if err != nil {
 			writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 			return
 		}
 
-		writeSuccessResponseJSON(w, jsonBytes)
-		return
+		sha256Sum, _, err = parseChecksumData(content)
+		if err != nil {
+			writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
+			return
+		}
+		u = getBinaryURL(u, "")
+	} else {
+		releaseInfo = ""
+		updatedVersion = path.Base(u.Path)
 	}
-
-	u = getBinaryURL(u, releaseInfo)
 	// Download Binary Once
 	binC, bin, err := downloadBinary(u, mode)
 	if err != nil {
 		adminLogIf(ctx, fmt.Errorf("server update failed with %w", err))
+		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
+		return
+	}
+	if updateURL != "" {
+		sha256Sum = checksumBytes(bin)
+	}
+	if lrTime, releaseInfo, err = extractReleaseTime(bin); err == nil {
+		updatedVersion = strings.TrimPrefix(releaseInfo, "buckit.")
+		if lrTime.Sub(currentReleaseTime) <= 0 {
+			updateStatus.Results = append(updateStatus.Results, madmin.ServerPeerUpdateStatus{
+				Host:           local,
+				Err:            fmt.Sprintf("server is running the latest version: %s", Version),
+				CurrentVersion: Version,
+			})
+
+			for _, client := range globalNotificationSys.peerClients {
+				updateStatus.Results = append(updateStatus.Results, madmin.ServerPeerUpdateStatus{
+					Host:           client.String(),
+					Err:            fmt.Sprintf("server is running the latest version: %s", Version),
+					CurrentVersion: Version,
+				})
+			}
+
+			jsonBytes, err := json.Marshal(updateStatus)
+			if err != nil {
+				writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
+				return
+			}
+
+			writeSuccessResponseJSON(w, jsonBytes)
+			return
+		}
+	} else if updateURL == "" {
 		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 		return
 	}
@@ -196,7 +212,7 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 				peerResults[nerr.Host.String()] = madmin.ServerPeerUpdateStatus{
 					Host:           nerr.Host.String(),
 					CurrentVersion: Version,
-					UpdatedVersion: lrTime.Format(MinioReleaseTagTimeLayout),
+					UpdatedVersion: updatedVersion,
 				}
 			}
 		}
@@ -212,7 +228,7 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 		peerResults[local] = madmin.ServerPeerUpdateStatus{
 			Host:           local,
 			CurrentVersion: Version,
-			UpdatedVersion: lrTime.Format(MinioReleaseTagTimeLayout),
+			UpdatedVersion: updatedVersion,
 		}
 	}
 
@@ -240,7 +256,7 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 							Host:           nerr.Host.String(),
 							Err:            nerr.Err.Error(),
 							CurrentVersion: Version,
-							UpdatedVersion: lrTime.Format(MinioReleaseTagTimeLayout),
+							UpdatedVersion: updatedVersion,
 						}
 					}
 				}
@@ -351,41 +367,58 @@ func (a adminAPIHandlers) ServerUpdateHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	content, err := downloadReleaseURL(u, updateTimeout, mode)
-	if err != nil {
-		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
-		return
-	}
-
-	sha256Sum, lrTime, releaseInfo, err := parseReleaseData(content)
-	if err != nil {
-		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
-		return
-	}
-
-	if lrTime.Sub(currentReleaseTime) <= 0 {
-		updateStatus := madmin.ServerUpdateStatus{
-			CurrentVersion: Version,
-			UpdatedVersion: Version,
-		}
-
-		// Marshal API response
-		jsonBytes, err := json.Marshal(updateStatus)
+	var (
+		sha256Sum      []byte
+		lrTime         time.Time
+		releaseInfo    string
+		updatedVersion string
+	)
+	if updateURL == "" {
+		content, err := downloadReleaseURL(u, updateTimeout, mode)
 		if err != nil {
 			writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 			return
 		}
 
-		writeSuccessResponseJSON(w, jsonBytes)
-		return
+		sha256Sum, _, err = parseChecksumData(content)
+		if err != nil {
+			writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
+			return
+		}
+		u = getBinaryURL(u, "")
+	} else {
+		releaseInfo = ""
+		updatedVersion = path.Base(u.Path)
 	}
-
-	u = getBinaryURL(u, releaseInfo)
 
 	// Download Binary Once
 	binC, bin, err := downloadBinary(u, mode)
 	if err != nil {
 		adminLogIf(ctx, fmt.Errorf("server update failed with %w", err))
+		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
+		return
+	}
+	if updateURL != "" {
+		sha256Sum = checksumBytes(bin)
+	}
+	if lrTime, releaseInfo, err = extractReleaseTime(bin); err == nil {
+		updatedVersion = strings.TrimPrefix(releaseInfo, "buckit.")
+		if lrTime.Sub(currentReleaseTime) <= 0 {
+			updateStatus := madmin.ServerUpdateStatus{
+				CurrentVersion: Version,
+				UpdatedVersion: Version,
+			}
+
+			jsonBytes, err := json.Marshal(updateStatus)
+			if err != nil {
+				writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
+				return
+			}
+
+			writeSuccessResponseJSON(w, jsonBytes)
+			return
+		}
+	} else if updateURL == "" {
 		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 		return
 	}
@@ -435,7 +468,7 @@ func (a adminAPIHandlers) ServerUpdateHandler(w http.ResponseWriter, r *http.Req
 
 	updateStatus := madmin.ServerUpdateStatus{
 		CurrentVersion: Version,
-		UpdatedVersion: lrTime.Format(MinioReleaseTagTimeLayout),
+		UpdatedVersion: updatedVersion,
 	}
 
 	// Marshal API response

@@ -78,6 +78,13 @@ jobs:
             nfpm package -f packaging/nfpm.yaml -p "$pkg" -t dist/
           done
 
+      - name: Generate package checksums
+        if: matrix.goos == 'linux'
+        run: |
+          for pkg in dist/*.deb dist/*.rpm dist/*.apk; do
+            sha256sum "$pkg" > "${pkg}.sha256sum"
+          done
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -89,6 +96,9 @@ jobs:
             dist/*.deb
             dist/*.rpm
             dist/*.apk
+            dist/*.deb.sha256sum
+            dist/*.rpm.sha256sum
+            dist/*.apk.sha256sum
 
   docker:
     needs: build
@@ -171,25 +181,49 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Generate sha256sum pointer files
+      - name: Publish stable download files
         run: |
           tag="${{ github.ref_name }}"
           for arch in amd64 arm64; do
             dir="pages/server/buckit/release/linux-${arch}"
             mkdir -p "${dir}"
-            sha=$(sha256sum "artifacts/buckit-linux-${arch}.${tag}" | awk '{print $1}')
-            echo "${sha} buckit.${tag}" > "${dir}/buckit.sha256sum"
+            cp "artifacts/buckit-linux-${arch}.${tag}" "${dir}/buckit"
+            cp "artifacts/buckit-linux-${arch}.${tag}.minisig" "${dir}/buckit.minisig"
+            sha=$(sha256sum "${dir}/buckit" | awk '{print $1}')
+            echo "${sha}  buckit" > "${dir}/buckit.sha256sum"
           done
+          cp artifacts/buckit_*_amd64.deb pages/server/buckit/release/linux-amd64/buckit.deb
+          sha=$(sha256sum pages/server/buckit/release/linux-amd64/buckit.deb | awk '{print $1}')
+          echo "${sha}  buckit.deb" > pages/server/buckit/release/linux-amd64/buckit.deb.sha256sum
+          cp artifacts/buckit-*.x86_64.rpm pages/server/buckit/release/linux-amd64/buckit.rpm
+          sha=$(sha256sum pages/server/buckit/release/linux-amd64/buckit.rpm | awk '{print $1}')
+          echo "${sha}  buckit.rpm" > pages/server/buckit/release/linux-amd64/buckit.rpm.sha256sum
+          cp artifacts/buckit_*_x86_64.apk pages/server/buckit/release/linux-amd64/buckit.apk
+          sha=$(sha256sum pages/server/buckit/release/linux-amd64/buckit.apk | awk '{print $1}')
+          echo "${sha}  buckit.apk" > pages/server/buckit/release/linux-amd64/buckit.apk.sha256sum
+          cp artifacts/buckit_*_arm64.deb pages/server/buckit/release/linux-arm64/buckit.deb
+          sha=$(sha256sum pages/server/buckit/release/linux-arm64/buckit.deb | awk '{print $1}')
+          echo "${sha}  buckit.deb" > pages/server/buckit/release/linux-arm64/buckit.deb.sha256sum
+          cp artifacts/buckit-*.aarch64.rpm pages/server/buckit/release/linux-arm64/buckit.rpm
+          sha=$(sha256sum pages/server/buckit/release/linux-arm64/buckit.rpm | awk '{print $1}')
+          echo "${sha}  buckit.rpm" > pages/server/buckit/release/linux-arm64/buckit.rpm.sha256sum
+          cp artifacts/buckit_*_aarch64.apk pages/server/buckit/release/linux-arm64/buckit.apk
+          sha=$(sha256sum pages/server/buckit/release/linux-arm64/buckit.apk | awk '{print $1}')
+          echo "${sha}  buckit.apk" > pages/server/buckit/release/linux-arm64/buckit.apk.sha256sum
           # Windows
           dir="pages/server/buckit/release/windows-amd64"
           mkdir -p "${dir}"
-          sha=$(sha256sum "artifacts/buckit-windows-amd64.exe.${tag}" | awk '{print $1}')
-          echo "${sha} buckit.${tag}" > "${dir}/buckit.sha256sum"
+          cp "artifacts/buckit-windows-amd64.exe.${tag}" "${dir}/buckit.exe"
+          cp "artifacts/buckit-windows-amd64.exe.${tag}.minisig" "${dir}/buckit.exe.minisig"
+          sha=$(sha256sum "${dir}/buckit.exe" | awk '{print $1}')
+          echo "${sha}  buckit.exe" > "${dir}/buckit.sha256sum"
           # macOS
           dir="pages/server/buckit/release/darwin-arm64"
           mkdir -p "${dir}"
-          sha=$(sha256sum "artifacts/buckit-darwin-arm64.${tag}" | awk '{print $1}')
-          echo "${sha} buckit.${tag}" > "${dir}/buckit.sha256sum"
+          cp "artifacts/buckit-darwin-arm64.${tag}" "${dir}/buckit"
+          cp "artifacts/buckit-darwin-arm64.${tag}.minisig" "${dir}/buckit.minisig"
+          sha=$(sha256sum "${dir}/buckit" | awk '{print $1}')
+          echo "${sha}  buckit" > "${dir}/buckit.sha256sum"
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4

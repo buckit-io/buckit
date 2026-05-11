@@ -629,15 +629,17 @@ func (s *peerRESTServer) VerifyBinaryHandler(w http.ResponseWriter, r *http.Requ
 	}
 	releaseInfo := r.Form.Get(peerRESTReleaseInfo)
 
-	lrTime, err := releaseInfoToReleaseTime(releaseInfo)
-	if err != nil {
-		s.writeErrorResponse(w, err)
-		return
-	}
+	if releaseInfo != "" {
+		lrTime, err := releaseInfoToReleaseTime(releaseInfo)
+		if err != nil {
+			s.writeErrorResponse(w, err)
+			return
+		}
 
-	if lrTime.Sub(currentReleaseTime) <= 0 {
-		s.writeErrorResponse(w, fmt.Errorf("server is running the latest version: %s", Version))
-		return
+		if lrTime.Sub(currentReleaseTime) <= 0 {
+			s.writeErrorResponse(w, fmt.Errorf("server is running the latest version: %s", Version))
+			return
+		}
 	}
 
 	zr, err := zstd.NewReader(r.Body)

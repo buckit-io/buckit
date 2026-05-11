@@ -18,6 +18,8 @@
 package cmd
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -106,12 +108,12 @@ func TestDownloadURL(t *testing.T) {
 		}
 	} else {
 		if runtime.GOOS == "windows" {
-			if durl != MinioReleaseURL+"minio.exe" {
-				t.Errorf("Expected %s, got %s", MinioReleaseURL+"minio.exe", durl)
+			if durl != MinioReleaseURL+"buckit.exe" {
+				t.Errorf("Expected %s, got %s", MinioReleaseURL+"buckit.exe", durl)
 			}
 		} else {
-			if durl != MinioReleaseURL+"minio" {
-				t.Errorf("Expected %s, got %s", MinioReleaseURL+"minio", durl)
+			if durl != MinioReleaseURL+"buckit" {
+				t.Errorf("Expected %s, got %s", MinioReleaseURL+"buckit", durl)
 			}
 		}
 	}
@@ -126,6 +128,47 @@ func TestDownloadURL(t *testing.T) {
 	durl = getDownloadURL(minioVersion1)
 	if durl != mesosDeploymentDoc {
 		t.Errorf("Expected %s, got %s", mesosDeploymentDoc, durl)
+	}
+}
+
+func TestGetBinaryURL(t *testing.T) {
+	testCases := []struct {
+		name        string
+		rawURL      string
+		releaseInfo string
+		expected    string
+	}{
+		{
+			name:        "github-pages linux stable binary",
+			rawURL:      "https://buckit-io.github.io/buckit/server/buckit/release/linux-amd64/buckit.sha256sum",
+			releaseInfo: "buckit.RELEASE.2026-05-11T17-20-40Z",
+			expected:    "https://buckit-io.github.io/buckit/server/buckit/release/linux-amd64/buckit",
+		},
+		{
+			name:        "github-pages windows stable binary",
+			rawURL:      "https://buckit-io.github.io/buckit/server/buckit/release/windows-amd64/buckit.exe.sha256sum",
+			releaseInfo: "buckit.RELEASE.2026-05-11T17-20-40Z",
+			expected:    "https://buckit-io.github.io/buckit/server/buckit/release/windows-amd64/buckit.exe",
+		},
+		{
+			name:        "custom checksum URL keeps releaseInfo sibling behavior",
+			rawURL:      "https://mirror.example.com/releases/linux-amd64/buckit.sha256sum",
+			releaseInfo: "buckit.RELEASE.2026-05-11T17-20-40Z",
+			expected:    "https://mirror.example.com/releases/linux-amd64/buckit.RELEASE.2026-05-11T17-20-40Z",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			u, err := url.Parse(testCase.rawURL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := getBinaryURL(u, testCase.releaseInfo).String()
+			if got != testCase.expected {
+				t.Fatalf("expected %s, got %s", testCase.expected, got)
+			}
+		})
 	}
 }
 
@@ -346,5 +389,112 @@ func TestParseReleaseData(t *testing.T) {
 				t.Errorf("case %d: result: expected: %v, got: %v", i+1, testCase.expectedReleaseInfo, releaseInfo)
 			}
 		}
+	}
+}
+
+func TestParseChecksumData(t *testing.T) {
+	testCases := []struct {
+		data             string
+		expectedSha256   string
+		expectedFileName string
+		expectErr        bool
+	}{
+		{
+			data:             "fbe246edbd382902db9a4035df7dce8cb441357d  buckit\n",
+			expectedSha256:   "fbe246edbd382902db9a4035df7dce8cb441357d",
+			expectedFileName: "buckit",
+		},
+		{
+			data:           "invalid",
+			expectedSha256: "",
+			expectErr:      true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		sum, fileName, err := parseChecksumData(testCase.data)
+		if testCase.expectErr {
+			if err == nil {
+				t.Fatalf("expected error for %q", testCase.data)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("unexpected error for %q: %v", testCase.data, err)
+		}
+		if got := hex.EncodeToString(sum); got != testCase.expectedSha256 {
+			t.Fatalf("expected sha %s, got %s", testCase.expectedSha256, got)
+		}
+		if fileName != testCase.expectedFileName {
+			t.Fatalf("expected file name %s, got %s", testCase.expectedFileName, fileName)
+		}
+	}
+}
+
+func TestSelfUpdateHostedFlowIntegration(t *testing.T) {
+	bin := []byte("prefix RELEASE.2026-05-11T17-20-40Z suffix")
+	sum := sha256.Sum256(bin)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/buckit.sha256sum":
+			fmt.Fprintf(w, "%x  buckit\n", sum)
+		case "/buckit":
+			_, _ = w.Write(bin)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	checksumURL, err := url.Parse(ts.URL + "/buckit.sha256sum")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checksumContent, err := downloadReleaseURL(checksumURL, time.Second, "")
+	if err != nil {
+		t.Fatalf("downloadReleaseURL: %v", err)
+	}
+
+	shaSum, fileName, err := parseChecksumData(checksumContent)
+	if err != nil {
+		t.Fatalf("parseChecksumData: %v", err)
+	}
+	if fileName != "buckit" {
+		t.Fatalf("expected checksum file name buckit, got %s", fileName)
+	}
+
+	binURL, err := url.Parse(ts.URL + "/buckit")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, downloadedBin, err := downloadBinary(binURL, "")
+	if err != nil {
+		t.Fatalf("downloadBinary: %v", err)
+	}
+	if !bytes.Equal(downloadedBin, bin) {
+		t.Fatalf("downloaded binary mismatch")
+	}
+
+	if got := checksumBytes(downloadedBin); !bytes.Equal(got, shaSum) {
+		t.Fatalf("downloaded binary checksum mismatch")
+	}
+
+	releaseTime, releaseInfo, err := extractReleaseTime(downloadedBin)
+	if err != nil {
+		t.Fatalf("extractReleaseTime: %v", err)
+	}
+
+	expectedTime, err := releaseTagToReleaseTime("RELEASE.2026-05-11T17-20-40Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !releaseTime.Equal(expectedTime) {
+		t.Fatalf("expected release time %v, got %v", expectedTime, releaseTime)
+	}
+	if releaseInfo != "buckit.RELEASE.2026-05-11T17-20-40Z" {
+		t.Fatalf("expected release info %q, got %q", "buckit.RELEASE.2026-05-11T17-20-40Z", releaseInfo)
 	}
 }
