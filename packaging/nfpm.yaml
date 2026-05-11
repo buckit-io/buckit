@@ -1,0 +1,42 @@
+name: buckit
+arch: ${PKG_ARCH}
+platform: linux
+version: ${PKG_VERSION}
+section: net
+priority: optional
+maintainer: "Buckit Maintainers <noreply@buckit.io>"
+description: |
+  Buckit is a high-performance, S3-compatible object storage server.
+  It is API compatible with the Amazon S3 cloud storage service and
+  designed for large-scale data infrastructure workloads including
+  machine learning, analytics, and application storage.
+vendor: "Buckit"
+homepage: https://github.com/buckit-io/buckit
+license: AGPL-3.0
+
+contents:
+  - src: ./dist/buckit
+    dst: /usr/local/bin/buckit
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+
+  - src: ./packaging/buckit.service
+    dst: /lib/systemd/system/buckit.service
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+
+scripts:
+  postinstall: ./packaging/scripts/postinstall.sh
+  preremove:   ./packaging/scripts/preremove.sh
+  postremove:  ./packaging/scripts/postremove.sh
+
+rpm:
+  group: Applications/File
+
+deb:
+  fields:
+    XB-Vendor: "Buckit"

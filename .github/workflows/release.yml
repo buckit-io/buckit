@@ -63,13 +63,20 @@ jobs:
 
       - name: Build packages
         if: matrix.goos == 'linux'
+        env:
+          NFPM_VERSION: 2.46.3
+          PKG_ARCH: ${{ matrix.goarch }}
         run: |
-          wget -q https://github.com/minio/pkger/releases/download/v2.3.11/pkger_2.3.11_linux_amd64.deb
-          sudo apt install -y ./pkger_2.3.11_linux_amd64.deb
-          wget -q -O minio.service https://raw.githubusercontent.com/minio/minio-service/v1.1.1/linux-systemd/distributed/minio.service
-          mkdir -p buckit-release/linux-${{ matrix.goarch }}
-          cp buckit-${{ matrix.goos }}-${{ matrix.goarch }}.${{ github.ref_name }} buckit-release/linux-${{ matrix.goarch }}/buckit.${{ github.ref_name }}
-          pkger -a buckit -r ${{ github.ref_name }} --ignore
+          wget -q "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_amd64.deb"
+          sudo apt install -y "./nfpm_${NFPM_VERSION}_amd64.deb"
+          mkdir -p dist
+          cp "buckit-linux-${PKG_ARCH}.${{ github.ref_name }}" dist/buckit
+          # Convert RELEASE.2026-05-11T17-20-40Z[.rcN] -> 20260511172040.0.0
+          PKG_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^RELEASE\.//' | sed 's/\.rc[0-9]*$//' | tr -d '\-:TZ').0.0
+          export PKG_VERSION
+          for pkg in rpm deb apk; do
+            nfpm package -f packaging/nfpm.yaml -p "$pkg" -t dist/
+          done
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -79,9 +86,9 @@ jobs:
             buckit-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.${{ github.ref_name }}
             buckit-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.${{ github.ref_name }}.sha256sum
             buckit-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}.${{ github.ref_name }}.minisig
-            buckit-release/linux-${{ matrix.goarch }}/*.deb
-            buckit-release/linux-${{ matrix.goarch }}/*.rpm
-            buckit-release/linux-${{ matrix.goarch }}/*.apk
+            dist/*.deb
+            dist/*.rpm
+            dist/*.apk
 
   docker:
     needs: build
