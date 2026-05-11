@@ -69,7 +69,7 @@ jobs:
           wget -q -O minio.service https://raw.githubusercontent.com/minio/minio-service/v1.1.1/linux-systemd/distributed/minio.service
           mkdir -p buckit-release/linux-${{ matrix.goarch }}
           cp buckit-${{ matrix.goos }}-${{ matrix.goarch }}.${{ github.ref_name }} buckit-release/linux-${{ matrix.goarch }}/buckit.${{ github.ref_name }}
-          pkger -a buckit -r ${{ github.ref_name }} --ignore --no-json
+          pkger -a buckit -r ${{ github.ref_name }} --ignore
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
