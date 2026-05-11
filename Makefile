@@ -186,16 +186,19 @@ hotfix-vars:
 	$(eval VERSION := $(shell git describe --tags --abbrev=0).hotfix.$(shell git rev-parse --short HEAD))
 
 hotfix: hotfix-vars clean install ## builds buckit binary with hotfix tags
-	@wget -q -c https://github.com/minio/pkger/releases/download/v2.3.11/pkger_2.3.11_linux_amd64.deb
-	@wget -q -c https://raw.githubusercontent.com/minio/minio-service/v1.1.1/linux-systemd/distributed/minio.service
-	@sudo apt install ./pkger_2.3.11_linux_amd64.deb --yes
-	@mkdir -p buckit-release/$(GOOS)-$(GOARCH)/archive
+	@wget -q -c https://github.com/goreleaser/nfpm/releases/download/v2.46.3/nfpm_2.46.3_linux_amd64.deb
+	@sudo apt install ./nfpm_2.46.3_linux_amd64.deb --yes
+	@mkdir -p buckit-release/$(GOOS)-$(GOARCH)/archive dist
+	@cp -af ./buckit dist/buckit
 	@cp -af ./buckit buckit-release/$(GOOS)-$(GOARCH)/buckit
 	@cp -af ./buckit buckit-release/$(GOOS)-$(GOARCH)/buckit.$(VERSION)
 	@minisign -qQSm buckit-release/$(GOOS)-$(GOARCH)/buckit.$(VERSION) -s "${CRED_DIR}/minisign.key" < "${CRED_DIR}/minisign-passphrase"
 	@sha256sum < buckit-release/$(GOOS)-$(GOARCH)/buckit.$(VERSION) | sed 's, -,buckit.$(VERSION),g' > buckit-release/$(GOOS)-$(GOARCH)/buckit.$(VERSION).sha256sum
 	@cp -af buckit-release/$(GOOS)-$(GOARCH)/buckit.$(VERSION)* buckit-release/$(GOOS)-$(GOARCH)/archive/
-	@pkger -r $(VERSION) --ignore
+	@PKG_VERSION=$$(echo "$(VERSION)" | sed 's/^RELEASE\.//' | sed -E 's/\.(rc[0-9]+|hotfix\.[a-f0-9]+)$$//' | tr -d ':TZ-').0.0; \
+		PKG_ARCH=$(GOARCH); export PKG_VERSION PKG_ARCH; \
+		for pkg in rpm deb apk; do nfpm package -f packaging/nfpm.yaml -p $$pkg -t dist/; done
+	@cp -af dist/*.rpm dist/*.deb dist/*.apk buckit-release/$(GOOS)-$(GOARCH)/ 2>/dev/null || true
 
 hotfix-push: hotfix
 	@scp -q -r buckit-release/$(GOOS)-$(GOARCH)/* buckit@dl-0.buckit.io:~/releases/server/buckit/hotfixes/linux-$(GOOS)/
@@ -242,4 +245,5 @@ clean: ## cleanup all generated assets
 	@rm -rvf .verify*
 	@rm -rvf buckit-release
 	@rm -rvf buckit.RELEASE*.hotfix.*
-	@rm -rvf pkger_*.deb
+	@rm -rvf nfpm_*.deb
+	@rm -rvf dist

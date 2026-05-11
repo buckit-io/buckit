@@ -18,7 +18,7 @@ design.
 | Tag trigger `RELEASE.*` | yes | yes | ✅ |
 | Build matrix amd64/arm64 | yes | yes | ✅ |
 | Minisign sign (v0.2.1) | yes | yes | ✅ |
-| pkger (v2.3.11) `.deb`/`.rpm`/`.apk` | yes | yes | ✅ |
+| nfpm (v2.46.3) `.deb`/`.rpm`/`.apk` | yes | yes | ✅ |
 | Docker multi-arch from root `Dockerfile` | yes | yes | ✅ |
 | Push to `ghcr.io/buckit-io/buckit` | yes | yes | ✅ |
 | Push to `docker.io/buckitio/buckit` | yes | **missing** (no Docker Hub login, no Docker Hub tags) | ❌ |
