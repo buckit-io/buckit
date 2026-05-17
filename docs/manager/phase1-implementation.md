@@ -66,11 +66,30 @@ Bbolt buckets:
 - `tasks` — task metadata (id → `Task`).
 - `task_index` — secondary index `(state, started_at) → taskID`.
 - `audit` — append-only audit events keyed by ULID.
-- `credentials` — SSH + admin credentials, AES-GCM encrypted with key from `BM_DATA_KEY` env or `/etc/bm/data.key`.
+- `credentials` — SSH + admin credentials, AES-GCM encrypted with the data key (see below).
 - `meta` — schema version, manager UUID, root admin hash.
 
+**Data key bootstrap.** The AES-GCM key for the `credentials` bucket
+resolves in this order on startup:
+
+1. `BM_DATA_KEY` env (base64-encoded 32 bytes) — for operators who
+   want the key out of the data dir entirely (mount from a secret
+   manager, KMS, etc.).
+2. `~/.config/bm/data.key` (`%APPDATA%\bm\data.key` on Windows) —
+   a 32-byte file, mode `0600`.
+3. Neither exists → generate a fresh 32-byte key from `crypto/rand`,
+   write it to path #2 with mode `0600`, and log one line on startup
+   noting the path so the operator knows to back it up alongside
+   `bm.db`.
+
+`bm` refuses to start if the file exists but has the wrong size or
+world/group-readable permissions — fail loudly rather than silently
+downgrading. Personal-tool framing: zero-friction default via
+auto-gen, escape hatch via env for operators who care about
+backup-leakage scenarios.
+
 Task **logs** never go into bbolt. They stream to
-`/var/lib/bm/tasks/<task-id>.log` (rotated by size, capped per-cluster).
+`~/.config/bm/tasks/<task-id>.log` (rotated by size, capped per-cluster).
 The task record stores a path + offset + size. SSE streams tail the
 file directly.
 
@@ -353,6 +372,79 @@ milestones](#implementation-milestones) above for full scope):
   History, Manager Settings). Per-page docs for the wizards
   (`/clusters/new`, `/clusters/migrate`) and for Tasks Center +
   Task Detail are stubbed in the doc and need to be filled in
+- **TODO — Add new pool wizard.** The `Actions ▾ → Add new pool…`
+  menu item is wired up on `/clusters/:id` (`ClusterDetail.tsx`
+  `CLUSTER_ACTIONS`) but currently only records a History row. A
+  proper wizard is still to be built. Sketch: reuses the New Cluster
+  wizard's Add Nodes → Discovery → Topology → Preflight steps, then
+  a Cutover step that rolling-restarts every node with an expanded
+  `MINIO_VOLUMES` envfile. Constraints worth calling out in the doc
+  once it's drafted: the new pool's per-set drive layout must match
+  existing pools (uniform set size), parity is fixed cluster-wide
+  and not re-selectable, and the rolling restart is mandatory because
+  `MINIO_VOLUMES` is env-only (see `request-flow.md` § 10.1). Backend
+  side belongs in a post-Phase-1 milestone — not part of M1–M9 today.
+- **TODO — M5 preflight: detect stale `.minio.sys/format.json`.**
+  When a deploy reuses a drive from a prior Buckit/MinIO deployment
+  (different deployment ID), the server refuses to start with a
+  cryptic error. Preflight should SSH into each host and `test -f
+  <mount>/.minio.sys/format.json` for every chosen mountpoint, then
+  parse the file's `id` (deployment ID). If any drive's deployment ID
+  is set and doesn't match an empty / about-to-be-created cluster,
+  surface a warning row: *"`<mount>` on `<host>` already belongs to a
+  different deployment. The server will refuse to start. Wipe with
+  `rm -rf <mount>/.minio.sys` (destroys data) or pick a different
+  drive."* High-frequency support issue in practice — operators who
+  retry after a failed deploy hit this. Belongs in M5 alongside the
+  existing preflight checks; not a separate milestone.
+- **TODO — Auto-save bm alias on successful deploy / import.** The
+  New Cluster Done step and the Import flow's success path both
+  promise that a `bm` alias has been saved to the operator's
+  `~/.bm/config.json` (the prototype's UI copy says so). This is
+  `bm`'s own alias file — separate from `mc`'s `~/.mc/config.json` —
+  consumed by future `bm alias`/`bm admin …` CLI subcommands. Backend
+  behavior `bm` should implement when M6 lands:
+  - Resolve config dir: `BM_CONFIG_DIR` env, else `~/.bm/`
+    (`%USERPROFILE%\.bm\` on Windows). Create the dir mode `0700` if
+    missing. (Distinct from the bbolt data dir at `~/.config/bm/`;
+    the alias file is operator-facing, the bbolt is manager-internal.)
+  - Read existing `config.json` or initialize the skeleton if absent.
+    Schema mirrors mc's v10 shape for familiarity:
+    `{ "version": "1", "aliases": { "<alias>": { url, accessKey, secretKey, api: "S3v4", path: "auto" } } }`.
+  - **Alias key is derived from the cluster name** — slugified to
+    `[a-z0-9-]{1,32}` (lowercase, non-alphanumeric → `-`, collapse
+    repeats, trim ends). Cluster display name stays free-form;
+    `My Production East!` becomes alias `my-production-east`.
+    Implemented at the Done step (`toAliasName` in
+    `pages/wizards/new/steps/Done.tsx`) — port the same rule when M6
+    writes config.json.
+  - Atomic write: write `config.json.tmp` then rename. Mode `0600`.
+  - If an alias with the same name already exists pointing at a
+    different URL, prompt the operator before overwriting (likely an
+    unrelated collision — they probably don't want it clobbered).
+  - The Done step's "Run on another machine" disclosure stays as the
+    fallback for operators whose `bm` lives on a different host.
+- **TODO — Drive preparation wizard (post-Phase-1).** The Topology
+  step today bails to *"mount drives consistently and re-run
+  discovery"* when no common mountpoints exist (case C). A proper
+  flow would let bm format and mount raw drives during deploy with
+  passwordless sudo. Out of scope for Phase 1; in scope for a
+  follow-up milestone (call it M6.5). Safety requirements before this
+  ships:
+  - Refuse to prep any drive with an existing filesystem signature
+    unless the operator explicitly types the device path to wipe.
+    `wipefs` on the wrong drive is unrecoverable.
+  - Require passwordless sudo. If absent, the wizard is unavailable.
+  - Show every command bm will run, per host, before the operator
+    confirms (matches the History tab's literal-CLI treatment).
+  - Typed-confirm modal (cluster name or `PREPARE DRIVES`) before
+    any destructive command runs.
+  - Anchor `/etc/fstab` entries by `UUID=` not device name, so reboot
+    + drive-letter shuffles don't break the deployment.
+  - Default mountpoint pattern is `/data/disk{1..N}`. Default fs is
+    XFS (MinIO recommendation). Operator can override both.
+  - Only a single path in the codebase ever touches a raw block
+    device. No other M6/M7/M8 operations call `wipefs`/`mkfs`.
 
 ### Notes for resuming
 

@@ -1836,6 +1836,85 @@ sequenceDiagram
 
 This is cluster-local cache synchronization. Cross-site bucket metadata replication is a separate site-replication path; it is not the same thing as `globalNotificationSys.LoadBucketMetadata`.
 
+### 10.1 OS-level environment file — what lives outside `.minio.sys`
+
+Everything in section 10 so far has been server state stored on the data drives. There is one more layer of configuration that sits **outside** `.minio.sys` entirely: an OS-level environment file read by systemd (or whatever supervisor starts the process) and turned into the env vars Buckit sees on startup. This layer holds the credentials and runtime knobs that must exist **before** the object layer is available — including the root credentials needed to decrypt `.minio.sys/config/` and `.minio.sys/config/iam/` themselves.
+
+**Conventional paths.** The filename is a packaging choice; nothing in the binary cares which path it lives at. The supervisor's unit file picks one and points `EnvironmentFile=` at it.
+
+| Path | Where it came from |
+|---|---|
+| `/etc/default/minio` | Debian/Ubuntu convention. The historical path used by the official `minio-service` repo and most third-party packaging (including Buckit). |
+| `/etc/minio/config.env` | Newer upstream convention. Added to `minio/minio-service` in [commit `1194289`](https://github.com/minio/minio-service/commit/1194289e481d922d7f5e09a90f15a729238ebc6e); referenced by the current MinIO docs for distributed installs. |
+| `/etc/sysconfig/minio` | RHEL/Fedora convention. Some downstream RPM packages use this path. |
+
+The file itself is shell-style `KEY=VALUE` with optional quoting — no MinIO-specific syntax. systemd loads it via:
+
+```ini
+[Service]
+EnvironmentFile=-/etc/default/minio
+EnvironmentFile=-/etc/minio/config.env
+```
+
+The leading `-` makes the path optional. A unit can list both lines so the same unit file works regardless of which convention the deployment uses; if both files exist, later entries win for duplicate keys.
+
+**What lives in the env file.** Three categories of values:
+
+| Category | Example keys | Why it has to be here (not in `config.json`) |
+|---|---|---|
+| Root credentials | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | They are the key-encryption key for `.minio.sys/config/` and `.minio.sys/config/iam/`. Storing them inside the data they decrypt would be a chicken-and-egg problem on startup. |
+| Root credential rotation | `MINIO_ROOT_USER_OLD`, `MINIO_ROOT_PASSWORD_OLD` | Same reason. On startup the server tries the new creds first; if `.minio.sys/config/` and `.minio.sys/config/iam/` won't decrypt, it falls back to `_OLD`, re-encrypts under the new key, then the `_OLD` vars can be removed on a follow-up restart. |
+| Topology | `MINIO_VOLUMES`, `MINIO_OPTS` | Needed before the object layer exists, so cannot come from `.minio.sys`. `MINIO_VOLUMES` is the endpoint list the server uses to parse pools/sets/disks before reading `format.json`. `MINIO_OPTS` carries flags like `--address`, `--console-address`, `--certs-dir`. |
+| KMS bootstrap | `MINIO_KMS_KES_*`, `MINIO_KMS_SECRET_KEY` | The KMS client config must exist before encrypted entries in `config.json` can be unwrapped, so the same chicken-and-egg rule applies. |
+| Subsystem overrides (optional) | `MINIO_API_REQUESTS_MAX`, `MINIO_SCANNER_SPEED`, `MINIO_COMPRESSION_*`, `MINIO_NOTIFY_WEBHOOK_*`, … | Any subsystem key in `config.json` (section 10's big table) can also be set as an env var. When both are set, the env var wins. Operators use this to pin config that should not drift from declarative config management. |
+
+A minimal env file for a distributed cluster looks like:
+
+```sh
+# /etc/default/minio
+MINIO_ROOT_USER=admin
+MINIO_ROOT_PASSWORD=change-me-on-first-boot
+MINIO_VOLUMES="https://node{1...4}.example.com:9000/mnt/disk{1...4}"
+MINIO_OPTS="--address :9000 --console-address :9001 --certs-dir /etc/minio/certs"
+```
+
+**Precedence at startup.** The order from boot to "ready to serve" is:
+
+```text
+systemd reads EnvironmentFile=
+  -> process env now contains MINIO_ROOT_*, MINIO_VOLUMES, MINIO_OPTS, MINIO_<subsystem>_*
+  -> binary parses MINIO_VOLUMES into pools/sets/disk endpoints
+  -> reads each disk's .minio.sys/format.json (no creds needed yet)
+  -> builds erasure sets, server pools, ObjectLayer
+  -> uses MINIO_ROOT_PASSWORD (or _OLD on miss) to decrypt
+     .minio.sys/config/config.json and .minio.sys/config/iam/...
+  -> merges env-var subsystem overrides on top of decrypted config.json
+  -> begins serving S3 / Admin requests
+```
+
+The key invariant: **env vars are evaluated last on top of `config.json`**, but env vars are the **only** source for anything needed before `config.json` is decryptable. That's why root creds, `MINIO_VOLUMES`, and the KMS bootstrap can never be moved into `config.json` no matter how convenient it would be operationally.
+
+**Operational implications.**
+
+- The env file is on every node and must be kept in sync. Drift on `MINIO_VOLUMES` between nodes will refuse to start the cluster; drift on `MINIO_ROOT_PASSWORD` between nodes will let some nodes start but fail distributed lock and inter-node auth.
+- The env file should be mode `0640` owned `root:minio` — it contains the root password in plaintext. `mc` and the admin API never read it; only the server process does.
+- Changing anything in the env file requires `systemctl restart minio` (or `buckit`) on the affected node. There is no SIGHUP reload — the binary reads env once at startup.
+- Root credential rotation is a multi-pass operation against this file: pass 1 writes the new creds plus `_OLD` and rolling-restarts; pass 2 removes the `_OLD` vars and rolling-restarts again. The `bm` manager automates this; doing it by hand is error-prone because the two passes have to happen in the right order across every node.
+- During a MinIO → Buckit migration the existing `minio.service` `EnvironmentFile=` directive must be parsed to discover which path the source deployment used (`/etc/default/minio` vs `/etc/minio/config.env` vs `/etc/sysconfig/minio`). The cutover writes Buckit's envfile at whatever path Buckit's unit expects and leaves the source file alone — the final `dnf/apt remove minio` cleans up the dead config.
+
+**How the env file relates to the rest of section 10.**
+
+| Layer | Lives where | Read when | Holds |
+|---|---|---|---|
+| Env file (this subsection) | `/etc/default/minio`, `/etc/minio/config.env`, `/etc/sysconfig/minio` | systemd start, into process env | Root creds, topology, KMS bootstrap, optional subsystem overrides |
+| `format.json` | `<disk>/.minio.sys/format.json` per disk | After endpoint parsing, before object layer | Disk identity and erasure-set membership |
+| `config.json` | `.minio.sys/config/config.json` (erasure-coded) | After object layer + root cred decryption | Server-wide subsystem settings |
+| IAM | `.minio.sys/config/iam/...` (erasure-coded) | After object layer + root cred decryption | Users, groups, policies, service accounts, STS |
+| Bucket metadata | `.minio.sys/buckets/<bucket>/...` (erasure-coded) | After IAM, on demand and in background refresh | Per-bucket policy, versioning, lifecycle, notification, etc. |
+| `xl.meta` | Next to object data on each disk | Per S3 request | Per-object versions, `DataDir`, parts, checksums |
+
+The env file is the **only** layer that is plain-text on the host filesystem outside the data drives. Everything else lives on the drives, encrypted with keys derived from values in the env file.
+
 ---
 
 ## Glossary
