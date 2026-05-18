@@ -384,6 +384,54 @@ milestones](#implementation-milestones) above for full scope):
   and not re-selectable, and the rolling restart is mandatory because
   `MINIO_VOLUMES` is env-only (see `request-flow.md` § 10.1). Backend
   side belongs in a post-Phase-1 milestone — not part of M1–M9 today.
+- **TODO — M8 cutover: write systemd drop-in for buckit User/Group.**
+  Buckit's rpm ships `buckit.service` with `User=buckit` /
+  `Group=buckit` (verified in `buckit/packaging/buckit.service` +
+  `postinstall.sh` — postinstall does NOT auto-start the service, so
+  install-first cutover is safe). But the source minio is typically
+  running as `minio:minio` (or similar) and owns the data drives. If
+  buckit starts as `buckit:buckit` it can't read `.minio.sys/` or the
+  shard files.
+  - Cutover must detect minio's runtime user/group:
+    `systemctl show minio.service -p User -p Group` (parse the
+    `User=…` / `Group=…` lines). Falls back to `root:root` if minio
+    runs as root.
+  - Write
+    `/etc/systemd/system/buckit.service.d/override.conf` per node:
+    ```ini
+    [Service]
+    User=<source-minio-user>
+    Group=<source-minio-group>
+    ```
+    Mode `0644`, owner `root:root`. Atomic write (tmp + rename).
+  - Drop-in goes under `/etc/systemd/system/…d/` (not `/lib/…`) so
+    it survives package upgrades.
+  - `systemctl daemon-reload` after writing the drop-in, before
+    starting buckit.
+  - Rollback path: drop-in stays on disk after rollback. Harmless
+    because buckit.service isn't running. Re-running the migrate
+    wizard later replays the same logic.
+  - Preflight implication: capture the source minio user/group during
+    Discover, surface in the Plan step ("buckit will run as
+    `<user>:<group>` to match minio") so the operator sees what's
+    happening before they ack.
+  - Why drop-in vs `chown -R buckit:buckit /data/disk*`: chown on a
+    16 TiB drive with millions of files takes minutes. Drop-in is
+    instant and symmetric for rollback.
+- **TODO — Rollback-to-MinIO cluster action.** The migrate wizard no
+  longer has a Finalize step (Phase 1 prototype dropped it). The
+  minio package stays installed on every node post-cutover so the
+  operator can roll back at any time. Backend behavior to implement
+  alongside M8:
+  - Cluster detail page Actions menu gains *"Rollback to MinIO"*
+    item, visible when `cluster.migratedFrom` is set.
+  - Symmetric to cutover: for each node in sequence — stop buckit,
+    disable buckit.service, re-enable minio.service, wait for
+    node-healthy probe (minio's `:9000/minio/health/live`).
+  - On success: flip `cluster.engine` back to `"minio"`, keep both
+    packages installed (operator can re-run the migrate wizard later).
+  - Typed-confirm modal: type the cluster name.
+  - Tracked on a separate History row.
 - **TODO — M5 preflight: detect stale `.minio.sys/format.json`.**
   When a deploy reuses a drive from a prior Buckit/MinIO deployment
   (different deployment ID), the server refuses to start with a

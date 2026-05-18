@@ -124,7 +124,7 @@ same as `mc`'s `~/.mc/config.json` or `gh`'s `~/.config/gh/hosts.yml`.
             │   │  /api/v1/clusters       (read bbolt)           │ │
             │   │  /api/v1/clusters/refresh (sync re-fetch)      │ │
             │   │  /api/v1/tasks/:id/events (SSE for in-flight)  │ │
-            │   │  /api/v1/history        (CLI + UI history)     │ │
+            │   │  /api/v1/history        (operation history)    │ │
             │   └──────────┬─────────────────────────────────────┘ │
             │              │                                        │
             │     ┌────────▼─────────┐    ┌────────────────────┐   │
@@ -183,7 +183,7 @@ Bbolt buckets relevant to UI rendering:
 | `clusters` | One record per cluster: id, name, description, intended use, version pin, parity setting, lifecycle status, `lastFetchedAt`, `health`, `healthSummary`, `unreachableSince` | Wizard saves + `refresh` |
 | `node_facts` | Per-node facts from the last fetch: OS, kernel, CPU, RAM, NIC, drives, drive states, sizes, used bytes, service unit state, existing services | `refresh` |
 | `tasks` | Long-running operation records: kind, state, steps, durations, cluster id, retryable flag | Task engine |
-| `history` | CLI command + UI action log. See [History](#cli--ui-history) | CLI dispatcher + API handlers |
+| `history` | Mutable UI-action log. See [Operation history](#operation-history) | API handlers |
 | `credentials` | AES-GCM encrypted SSH and admin credentials | Wizard saves + rotation |
 | `prefs` | App preferences: theme, default cluster, remote-access settings | Settings page |
 
@@ -608,10 +608,10 @@ restarts) return a task id. The UI never polls; it subscribes to
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/history` | List recent operations: `?kind=&clusterId=&since=&until=` |
+| `GET` | `/history` | List recent operations: `?status=&clusterId=&since=&until=` |
 | `DELETE` | `/history` | Clear history (with optional `?before=<ts>`) |
 
-See [CLI + UI history](#cli--ui-history) for the row shape.
+See [Operation history](#operation-history) for the row shape.
 
 ### Settings
 
@@ -634,24 +634,24 @@ See [CLI + UI history](#cli--ui-history) for the row shape.
 }
 ```
 
-## CLI + UI history
+## Operation history
 
-`bm` keeps a running record of operations the operator has performed,
-displayed in the **History** tab. The intent is closer to shell history
-than to an audit log: a personal record the operator browses to recall
-what they did, copy a previous CLI invocation, or jump to a related
-task log.
+`bm` keeps a running record of every mutable action the operator has
+performed from the web UI, displayed in the **History** tab. The intent
+is a personal record the operator browses to recall what they did and
+jump to a related task log.
 
-### Sources
+Three menus feed history rows, all dispatched through the unified
+operation modal:
 
-Three things contribute rows in the long term; only the third applies
-in Phase 1.
-
-| Source | Display | Phase |
-|---|---|---|
-| CLI command typed in a terminal | Verbatim command line, e.g. `bm cluster restart prod-east --concurrency sequential` | Phase 2 (when the write CLI lands) |
-| CLI command typed inside a future web-UI terminal | Verbatim command line | Future phase |
-| Web-UI button action | Short human-readable description, e.g. `Rolling restart on prod-east` | Phase 1 |
+- **Cluster Actions** menu on `/clusters/:id` — cluster-wide ops
+  (Restart cluster, Rolling restart, Freeze S3 API, Rotate root
+  credentials, etc.).
+- **Bulk-host bar** on `/clusters/:id` — ops scoped to the checked-row
+  subset (Systemctl restart, Redeploy software, Reboot host, Shut down
+  host).
+- **Actions** menu on `/clusters/:id/nodes/:id` — ops scoped to one
+  node.
 
 ### Row shape
 
@@ -659,23 +659,34 @@ in Phase 1.
 interface HistoryEntry {
   id: string                                  // ULID
   at: string                                  // wall-clock ISO timestamp
-  kind: "cli" | "ui_action"                   // governs display + filter
-  display: string                             // verbatim command OR description
-  target?: string                             // cluster id, node id, etc.
-  status: "succeeded" | "failed" | "running"
+  opKind: string                              // matches the OpKind union
+                                              // (e.g. "rolling_restart",
+                                              //  "systemctl_restart")
+  opLabel: string                             // human label rendered in the row
+  clusterId: string
+  clusterName: string
+  // Host scope. Undefined for cluster-wide ops; set when the op was
+  // scoped via the bulk bar or per-node Actions menu.
+  hostScope?: {
+    hostnames: string[]
+    count: number
+  }
+  status: "succeeded" | "failed" | "running" | "canceled"
   durationSec?: number
   taskId?: string                             // jump-to-task link when applicable
-  exitCode?: number                           // CLI only
+  failureNote?: string                        // shown under opLabel on failed rows
 }
 ```
 
 ### What is not History
 
-- Read-only operations (`bm cluster ls`, browsing pages in the UI) are
-  not recorded.
+- Read-only browsing (page loads, table refreshes, drilling into a
+  cluster or node) is not recorded.
 - Background fetches by the on-demand cache loop are not recorded.
 - App lifecycle events (`bm web` started, settings changed) are not
   recorded — they go to stdout instead.
+- CLI invocations are not recorded. `bm` does not intercept terminal
+  calls; history captures only actions initiated from this web UI.
 
 ### Retention
 
@@ -692,7 +703,7 @@ React Query owns the cache. Conventions:
 
 - One query key per resource: `["clusters"]`, `["cluster", id]`,
   `["nodes", clusterId]`, `["task", id]`, `["tasks", { clusterId }]`,
-  `["history", { kind, clusterId }]`.
+  `["history", { status, clusterId }]`.
 - Mutations that change cluster state (`PATCH /clusters/:id`,
   `POST /clusters/.../refresh`, button-driven actions) invalidate the
   matching key(s) on success.
@@ -787,26 +798,26 @@ Client-side only.
 
 ### History — `/history`
 
-Reverse-chronological table of CLI commands and UI actions.
+Reverse-chronological table of actions performed from this manager.
 
 **Columns**
 
 | Column | Notes |
 |---|---|
 | Time | Relative ("2m ago"); tooltip shows full ISO |
-| Source | Icon: terminal for `cli`, cursor for `ui_action` |
-| Action | The `display` string. Mono font for `cli`, regular for `ui_action` |
-| Target | Cluster name (links to `/clusters/:id`); `—` if global |
-| Status | `Pill` (Succeeded / Failed / Running) |
+| Operation | `opLabel`; `failureNote` rendered beneath in red on failed rows |
+| Cluster | Cluster name (links to `/clusters/:id`) |
+| Scope | `cluster-wide`, a single hostname, or `N hosts` (tooltip lists the hostnames) |
+| Status | `Pill` (Succeeded / Failed / Running / Canceled) |
 | Duration | If known |
-| | Copy button on `cli` rows; "View task" link on rows with `taskId` |
+| | "View task" link on rows with `taskId` |
 
 **Filters**
 
-- Source: `All / CLI / UI`
+- Status: chips `All / Succeeded / Failed / Running / Canceled`
 - Cluster: dropdown of known clusters + "All"
-- Date range picker
-- Search box (substring match against `display`)
+- Search box (substring match against `opLabel`, `clusterName`, and any
+  `hostScope.hostnames`)
 
 **Actions**
 
