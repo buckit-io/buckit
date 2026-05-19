@@ -141,8 +141,8 @@ if [ "${expected_checksum}" != "${got_checksum}" ]; then
 	exit 1
 fi
 
-./mc ls -r myminio/versioned >decommissioned_ns.txt
-./mc ls -r --versions myminio/versioned >decommissioned_ns_versions.txt
+./mc ls -r myminio/versioned/ >decommissioned_ns.txt
+./mc ls -r --versions myminio/versioned/ >decommissioned_ns_versions.txt
 
 out=$(diff -qpruN expanded_ns.txt decommissioned_ns.txt)
 ret=$?

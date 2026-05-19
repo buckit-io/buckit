@@ -150,8 +150,8 @@ if [ $ret -ne 0 ]; then
 	exit 1
 fi
 
-./mc ls -r myminio/versioned >decommissioned_ns.txt
-./mc ls -r --versions myminio/versioned >decommissioned_ns_versions.txt
+./mc ls -r myminio/versioned/ >decommissioned_ns.txt
+./mc ls -r --versions myminio/versioned/ >decommissioned_ns_versions.txt
 
 out=$(diff -qpruN expanded_ns.txt decommissioned_ns.txt)
 ret=$?
@@ -181,8 +181,8 @@ if [ $ret -ne 0 ]; then
 	exit 1
 fi
 
-./mc ls -r myminio/bucket2 >decommissioned_bucket2_ns.txt
-./mc ls -r --versions myminio/bucket2 >decommissioned_bucket2_ns_versions.txt
+./mc ls -r myminio/bucket2/ >decommissioned_bucket2_ns.txt
+./mc ls -r --versions myminio/bucket2/ >decommissioned_bucket2_ns_versions.txt
 ./mc ls -r --versions mytier/tiered/ >tiered_ns_versions2.txt
 
 out=$(diff -qpruN bucket2_ns.txt decommissioned_bucket2_ns.txt)
