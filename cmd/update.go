@@ -57,7 +57,7 @@ var (
 	minioReleaseInfoURL = MinioReleaseURL + "buckit.sha256sum"
 
 	// For windows our files have .exe additionally.
-	minioReleaseWindowsInfoURL = MinioReleaseURL + "buckit.exe.sha256sum"
+	minioReleaseWindowsInfoURL = MinioReleaseURL + "buckit.sha256sum"
 )
 
 var releaseTagRegex = regexp.MustCompile(`RELEASE\.\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z(?:\.[A-Za-z0-9._-]+)?`)
@@ -500,7 +500,7 @@ func getBinaryURL(u *url.URL, releaseInfo string) *url.URL {
 	binURL := *u
 	if strings.Contains(u.Host, "github.io") {
 		name := "buckit"
-		if strings.HasSuffix(u.Path, ".exe.sha256sum") || runtime.GOOS == "windows" {
+		if strings.Contains(u.Path, "/windows-") || strings.HasSuffix(u.Path, ".exe.sha256sum") || runtime.GOOS == "windows" {
 			name = "buckit.exe"
 		}
 		binURL.Path = path.Join(path.Dir(u.Path), name)

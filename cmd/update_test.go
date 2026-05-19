@@ -146,7 +146,7 @@ func TestGetBinaryURL(t *testing.T) {
 		},
 		{
 			name:        "github-pages windows stable binary",
-			rawURL:      "https://buckit-io.github.io/buckit/server/buckit/release/windows-amd64/buckit.exe.sha256sum",
+			rawURL:      "https://buckit-io.github.io/buckit/server/buckit/release/windows-amd64/buckit.sha256sum",
 			releaseInfo: "buckit.RELEASE.2026-05-11T17-20-40Z",
 			expected:    "https://buckit-io.github.io/buckit/server/buckit/release/windows-amd64/buckit.exe",
 		},
