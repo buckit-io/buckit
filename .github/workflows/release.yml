@@ -164,12 +164,24 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \
+            ! -name 'buckit.rpm' \
+            ! -name 'buckit.deb' \
+            ! -name 'buckit.apk' \
+            ! -name 'buckit.rpm.sha256sum' \
+            ! -name 'buckit.deb.sha256sum' \
+            ! -name 'buckit.apk.sha256sum' \
+            -exec cp {} release-assets/ \;
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '.rc') }}
-          files: artifacts/**/*
+          files: release-assets/*
 
   update-gh-pages:
     if: "!contains(github.ref_name, '.rc')"
