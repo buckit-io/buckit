@@ -23,7 +23,7 @@ contents:
       group: root
 
   - src: ./packaging/buckit.service
-    dst: /lib/systemd/system/buckit.service
+    dst: /usr/lib/systemd/system/buckit.service
     file_info:
       mode: 0644
       owner: root
