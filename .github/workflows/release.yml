@@ -188,6 +188,11 @@ jobs:
     needs: [build, publish]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: pages
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -257,9 +262,29 @@ jobs:
           publish_package artifacts/dist/buckit-*.aarch64.rpm buckit.rpm linux-arm64
           publish_package artifacts/dist/buckit_*_aarch64.apk buckit.apk linux-arm64
 
+          # Trim archives to the 30 most recent releases per platform.
+          trim_archives() {
+            local dir="$1" keep=30
+            [ -d "${dir}" ] || return
+            mapfile -t tags < <(
+              ls "${dir}/" \
+                | grep -o 'RELEASE\.[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T[0-9]\{2\}-[0-9]\{2\}-[0-9]\{2\}Z' \
+                | sort -u
+            )
+            local excess=$(( ${#tags[@]} - keep ))
+            if (( excess > 0 )); then
+              for old_tag in "${tags[@]:0:${excess}}"; do
+                rm -f "${dir}/buckit.${old_tag}."*
+              done
+            fi
+          }
+
+          for platform in linux-amd64 linux-arm64 windows-amd64 darwin-arm64; do
+            trim_archives "pages/server/buckit/archives/${platform}"
+          done
+
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./pages
-          keep_files: true
