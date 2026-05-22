@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/minio/madmin-go/v3"
+	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/dsync"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/minio/pkg/v3/sync/errgroup"

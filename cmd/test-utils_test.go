@@ -58,8 +58,8 @@ import (
 
 	"github.com/fatih/color"
 
-	"github.com/minio/minio-go/v7/pkg/s3utils"
-	"github.com/minio/minio-go/v7/pkg/signer"
+	"github.com/buckit-io/minio-go/v7/pkg/s3utils"
+	"github.com/buckit-io/minio-go/v7/pkg/signer"
 	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/buckit-io/buckit/internal/config"
 	"github.com/buckit-io/buckit/internal/crypto"

@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/minio/kms-go/kes"
-	"github.com/minio/madmin-go/v3"
+	"github.com/buckit-io/madmin-go/v3"
 )
 
 type kesConn struct {

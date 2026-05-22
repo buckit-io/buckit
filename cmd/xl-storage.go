@@ -41,7 +41,7 @@ import (
 	"github.com/google/uuid"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/klauspost/filepathx"
-	"github.com/minio/madmin-go/v3"
+	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/bucket/lifecycle"
 	"github.com/buckit-io/buckit/internal/bucket/replication"
 	"github.com/buckit-io/buckit/internal/cachevalue"

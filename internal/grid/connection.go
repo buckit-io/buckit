@@ -37,7 +37,7 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 	"github.com/google/uuid"
-	"github.com/minio/madmin-go/v3"
+	"github.com/buckit-io/madmin-go/v3"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/buckit-io/buckit/internal/pubsub"

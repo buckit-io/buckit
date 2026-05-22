@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/gzip"
-	"github.com/minio/madmin-go/v3/logger/log"
+	"github.com/buckit-io/madmin-go/v3/logger/log"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 )
 

@@ -32,8 +32,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/minio/madmin-go/v3"
-	"github.com/minio/minio-go/v7/pkg/tags"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7/pkg/tags"
 	"github.com/buckit-io/buckit/internal/amztime"
 	sse "github.com/buckit-io/buckit/internal/bucket/encryption"
 	"github.com/buckit-io/buckit/internal/bucket/lifecycle"

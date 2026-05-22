@@ -34,7 +34,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/minio/madmin-go/v3/logger/log"
+	"github.com/buckit-io/madmin-go/v3/logger/log"
 	"github.com/buckit-io/buckit/internal/logger"
 	types "github.com/buckit-io/buckit/internal/logger/target/loggertypes"
 )

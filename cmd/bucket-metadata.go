@@ -29,8 +29,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/minio/madmin-go/v3"
-	"github.com/minio/minio-go/v7/pkg/tags"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7/pkg/tags"
 	bucketsse "github.com/buckit-io/buckit/internal/bucket/encryption"
 	"github.com/buckit-io/buckit/internal/bucket/lifecycle"
 	objectlock "github.com/buckit-io/buckit/internal/bucket/object/lock"

@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/minio/madmin-go/v3"
+	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/config"
 	"github.com/buckit-io/buckit/internal/config/etcd"
 	xldap "github.com/buckit-io/buckit/internal/config/identity/ldap"

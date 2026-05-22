@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"testing"
 
-	miniogopolicy "github.com/minio/minio-go/v7/pkg/policy"
-	"github.com/minio/minio-go/v7/pkg/set"
+	miniogopolicy "github.com/buckit-io/minio-go/v7/pkg/policy"
+	"github.com/buckit-io/minio-go/v7/pkg/set"
 	"github.com/minio/pkg/v3/policy"
 	"github.com/minio/pkg/v3/policy/condition"
 )

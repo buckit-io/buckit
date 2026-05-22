@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/minio/madmin-go/v3/logger/log"
+	"github.com/buckit-io/madmin-go/v3/logger/log"
 	"github.com/buckit-io/buckit/internal/color"
 	"github.com/buckit-io/buckit/internal/logger"
 )

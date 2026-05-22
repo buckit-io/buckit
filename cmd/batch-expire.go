@@ -29,7 +29,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/minio/minio-go/v7/pkg/tags"
+	"github.com/buckit-io/minio-go/v7/pkg/tags"
 	"github.com/buckit-io/buckit/internal/bucket/versioning"
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"

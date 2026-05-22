@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/minio/madmin-go/v3"
+	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/handlers"
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	"github.com/buckit-io/buckit/internal/mcontext"

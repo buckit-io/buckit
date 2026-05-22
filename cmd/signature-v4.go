@@ -36,8 +36,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/minio/minio-go/v7/pkg/s3utils"
-	"github.com/minio/minio-go/v7/pkg/set"
+	"github.com/buckit-io/minio-go/v7/pkg/s3utils"
+	"github.com/buckit-io/minio-go/v7/pkg/set"
 	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/buckit-io/buckit/internal/hash/sha256"
 	xhttp "github.com/buckit-io/buckit/internal/http"

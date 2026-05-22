@@ -31,7 +31,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/minio/minio-go/v7/pkg/set"
+	"github.com/buckit-io/minio-go/v7/pkg/set"
 	"github.com/buckit-io/buckit/internal/grid"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/minio/pkg/v3/env"

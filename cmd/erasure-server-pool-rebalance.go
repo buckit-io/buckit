@@ -31,7 +31,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/lithammer/shortuuid/v4"
-	"github.com/minio/madmin-go/v3"
+	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/bucket/lifecycle"
 	objectlock "github.com/buckit-io/buckit/internal/bucket/object/lock"
 	"github.com/buckit-io/buckit/internal/bucket/replication"

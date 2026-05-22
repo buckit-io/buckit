@@ -32,9 +32,9 @@ import (
 
 	"github.com/dchest/siphash"
 	"github.com/google/uuid"
-	"github.com/minio/madmin-go/v3"
-	"github.com/minio/minio-go/v7/pkg/set"
-	"github.com/minio/minio-go/v7/pkg/tags"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/buckit-io/minio-go/v7/pkg/tags"
 	"github.com/buckit-io/buckit/internal/dsync"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/minio/pkg/v3/console"

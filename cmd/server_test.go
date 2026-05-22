@@ -36,8 +36,8 @@ import (
 
 	"github.com/dustin/go-humanize"
 	jwtgo "github.com/golang-jwt/jwt/v4"
-	"github.com/minio/minio-go/v7/pkg/set"
-	"github.com/minio/minio-go/v7/pkg/signer"
+	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/buckit-io/minio-go/v7/pkg/signer"
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	"github.com/minio/pkg/v3/policy"
 )

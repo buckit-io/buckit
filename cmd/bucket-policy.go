@@ -27,8 +27,8 @@ import (
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
-	miniogopolicy "github.com/minio/minio-go/v7/pkg/policy"
-	"github.com/minio/minio-go/v7/pkg/tags"
+	miniogopolicy "github.com/buckit-io/minio-go/v7/pkg/policy"
+	"github.com/buckit-io/minio-go/v7/pkg/tags"
 	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/buckit-io/buckit/internal/handlers"
 	xhttp "github.com/buckit-io/buckit/internal/http"

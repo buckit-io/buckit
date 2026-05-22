@@ -27,9 +27,9 @@ import (
 
 	consoleapi "github.com/buckit-io/console/api"
 	"github.com/minio/dnscache"
-	"github.com/minio/madmin-go/v3"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/set"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7"
+	"github.com/buckit-io/minio-go/v7/pkg/set"
 	"github.com/buckit-io/buckit/internal/bpool"
 	"github.com/buckit-io/buckit/internal/bucket/bandwidth"
 	"github.com/buckit-io/buckit/internal/config"

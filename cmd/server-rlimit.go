@@ -22,7 +22,7 @@ import (
 	"runtime/debug"
 
 	"github.com/dustin/go-humanize"
-	"github.com/minio/madmin-go/v3/kernel"
+	"github.com/buckit-io/madmin-go/v3/kernel"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/minio/pkg/v3/sys"
 )

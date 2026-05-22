@@ -20,7 +20,7 @@ package cmd
 import (
 	"time"
 
-	miniogo "github.com/minio/minio-go/v7"
+	miniogo "github.com/buckit-io/minio-go/v7"
 	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/minio/pkg/v3/xtime"
 )

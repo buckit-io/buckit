@@ -40,7 +40,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/s2"
 	"github.com/klauspost/readahead"
-	"github.com/minio/minio-go/v7/pkg/s3utils"
+	"github.com/buckit-io/minio-go/v7/pkg/s3utils"
 	"github.com/buckit-io/buckit/internal/config/compress"
 	"github.com/buckit-io/buckit/internal/config/dns"
 	"github.com/buckit-io/buckit/internal/config/storageclass"

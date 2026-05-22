@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/minio/madmin-go/v3/logger/audit"
+	"github.com/buckit-io/madmin-go/v3/logger/audit"
 
 	"github.com/buckit-io/buckit/internal/handlers"
 	xhttp "github.com/buckit-io/buckit/internal/http"

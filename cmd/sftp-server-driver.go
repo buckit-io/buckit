@@ -30,9 +30,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/minio/madmin-go/v3"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7"
+	"github.com/buckit-io/minio-go/v7/pkg/credentials"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/minio/pkg/v3/mimedb"
 	"github.com/pkg/sftp"

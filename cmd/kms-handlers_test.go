@@ -26,7 +26,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/minio/madmin-go/v3"
+	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/kms"
 	"github.com/minio/pkg/v3/policy"
 )

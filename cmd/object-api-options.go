@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/minio/minio-go/v7/pkg/encrypt"
+	"github.com/buckit-io/minio-go/v7/pkg/encrypt"
 	"github.com/buckit-io/buckit/internal/crypto"
 	"github.com/buckit-io/buckit/internal/hash"
 	xhttp "github.com/buckit-io/buckit/internal/http"
