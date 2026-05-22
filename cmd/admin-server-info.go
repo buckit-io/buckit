@@ -27,9 +27,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/minio/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/config"
 	"github.com/buckit-io/buckit/internal/kms"
+	"github.com/buckit-io/madmin-go/v3"
 	xnet "github.com/minio/pkg/v3/net"
 )
 
@@ -95,6 +95,8 @@ func getLocalServerProperty(endpointServerPools EndpointServerPools, r *http.Req
 
 	props := madmin.ServerProperties{
 		Endpoint: addr,
+		OS:       runtime.GOOS,
+		Arch:     runtime.GOARCH,
 		Uptime:   UTCNow().Unix() - globalBootTime.Unix(),
 		Version:  Version,
 		CommitID: CommitID,
