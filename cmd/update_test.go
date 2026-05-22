@@ -139,19 +139,37 @@ func TestGetBinaryURL(t *testing.T) {
 		expected    string
 	}{
 		{
-			name:        "github-pages linux stable binary",
+			name:        "github-pages linux-amd64 redirects to GitHub Releases",
 			rawURL:      "https://buckit-io.github.io/buckit/server/buckit/release/linux-amd64/buckit.sha256sum",
 			releaseInfo: "buckit.RELEASE.2026-05-11T17-20-40Z",
+			expected:    "https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-05-11T17-20-40Z/buckit-linux-amd64.RELEASE.2026-05-11T17-20-40Z",
+		},
+		{
+			name:        "github-pages linux-arm64 redirects to GitHub Releases",
+			rawURL:      "https://buckit-io.github.io/buckit/server/buckit/release/linux-arm64/buckit.sha256sum",
+			releaseInfo: "buckit.RELEASE.2026-05-11T17-20-40Z",
+			expected:    "https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-05-11T17-20-40Z/buckit-linux-arm64.RELEASE.2026-05-11T17-20-40Z",
+		},
+		{
+			name:        "github-pages windows-amd64 redirects to GitHub Releases with .exe",
+			rawURL:      "https://buckit-io.github.io/buckit/server/buckit/release/windows-amd64/buckit.sha256sum",
+			releaseInfo: "buckit.RELEASE.2026-05-11T17-20-40Z",
+			expected:    "https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-05-11T17-20-40Z/buckit-windows-amd64.exe.RELEASE.2026-05-11T17-20-40Z",
+		},
+		{
+			name:        "github-pages darwin-arm64 redirects to GitHub Releases",
+			rawURL:      "https://buckit-io.github.io/buckit/server/buckit/release/darwin-arm64/buckit.sha256sum",
+			releaseInfo: "buckit.RELEASE.2026-05-11T17-20-40Z",
+			expected:    "https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-05-11T17-20-40Z/buckit-darwin-arm64.RELEASE.2026-05-11T17-20-40Z",
+		},
+		{
+			name:        "github-pages fallback when no release tag in releaseInfo",
+			rawURL:      "https://buckit-io.github.io/buckit/server/buckit/release/linux-amd64/buckit.sha256sum",
+			releaseInfo: "buckit",
 			expected:    "https://buckit-io.github.io/buckit/server/buckit/release/linux-amd64/buckit",
 		},
 		{
-			name:        "github-pages windows stable binary",
-			rawURL:      "https://buckit-io.github.io/buckit/server/buckit/release/windows-amd64/buckit.sha256sum",
-			releaseInfo: "buckit.RELEASE.2026-05-11T17-20-40Z",
-			expected:    "https://buckit-io.github.io/buckit/server/buckit/release/windows-amd64/buckit.exe",
-		},
-		{
-			name:        "custom checksum URL keeps releaseInfo sibling behavior",
+			name:        "custom mirror URL keeps releaseInfo sibling behavior",
 			rawURL:      "https://mirror.example.com/releases/linux-amd64/buckit.sha256sum",
 			releaseInfo: "buckit.RELEASE.2026-05-11T17-20-40Z",
 			expected:    "https://mirror.example.com/releases/linux-amd64/buckit.RELEASE.2026-05-11T17-20-40Z",

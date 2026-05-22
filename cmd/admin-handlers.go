@@ -47,10 +47,10 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/klauspost/compress/zip"
-	"github.com/minio/madmin-go/v3"
-	"github.com/minio/madmin-go/v3/estream"
-	"github.com/minio/madmin-go/v3/logger/log"
-	"github.com/minio/minio-go/v7/pkg/set"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/madmin-go/v3/estream"
+	"github.com/buckit-io/madmin-go/v3/logger/log"
+	"github.com/buckit-io/minio-go/v7/pkg/set"
 	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/buckit-io/buckit/internal/dsync"
 	"github.com/buckit-io/buckit/internal/grid"
@@ -108,9 +108,10 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 	vars := mux.Vars(r)
 	updateURL := vars["updateURL"]
 	dryRun := r.Form.Get("dry-run") == "true"
+	isDefaultUpdate := updateURL == ""
 
 	mode := getMinioMode()
-	if updateURL == "" {
+	if isDefaultUpdate {
 		updateURL = minioReleaseInfoURL
 		if runtime.GOOS == globalWindowsOSName {
 			updateURL = minioReleaseWindowsInfoURL
@@ -140,19 +141,20 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 		releaseInfo    string
 		updatedVersion string
 	)
-	if updateURL == "" {
+	if isDefaultUpdate {
 		content, err := downloadReleaseURL(u, updateTimeout, mode)
 		if err != nil {
 			writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 			return
 		}
 
-		sha256Sum, _, err = parseChecksumData(content)
+		var releaseFileName string
+		sha256Sum, releaseFileName, err = parseChecksumData(content)
 		if err != nil {
 			writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 			return
 		}
-		u = getBinaryURL(u, "")
+		u = getBinaryURL(u, releaseFileName)
 	} else {
 		releaseInfo = ""
 		updatedVersion = path.Base(u.Path)
@@ -164,7 +166,7 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 		return
 	}
-	if updateURL != "" {
+	if !isDefaultUpdate {
 		sha256Sum = checksumBytes(bin)
 	}
 	if lrTime, releaseInfo, err = extractReleaseTime(bin); err == nil {
@@ -193,7 +195,7 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 			writeSuccessResponseJSON(w, jsonBytes)
 			return
 		}
-	} else if updateURL == "" {
+	} else if isDefaultUpdate {
 		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 		return
 	}
@@ -353,8 +355,10 @@ func (a adminAPIHandlers) ServerUpdateHandler(w http.ResponseWriter, r *http.Req
 
 	vars := mux.Vars(r)
 	updateURL := vars["updateURL"]
+	isDefaultUpdate := updateURL == ""
+
 	mode := getMinioMode()
-	if updateURL == "" {
+	if isDefaultUpdate {
 		updateURL = minioReleaseInfoURL
 		if runtime.GOOS == globalWindowsOSName {
 			updateURL = minioReleaseWindowsInfoURL
@@ -373,19 +377,20 @@ func (a adminAPIHandlers) ServerUpdateHandler(w http.ResponseWriter, r *http.Req
 		releaseInfo    string
 		updatedVersion string
 	)
-	if updateURL == "" {
+	if isDefaultUpdate {
 		content, err := downloadReleaseURL(u, updateTimeout, mode)
 		if err != nil {
 			writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 			return
 		}
 
-		sha256Sum, _, err = parseChecksumData(content)
+		var releaseFileName string
+		sha256Sum, releaseFileName, err = parseChecksumData(content)
 		if err != nil {
 			writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 			return
 		}
-		u = getBinaryURL(u, "")
+		u = getBinaryURL(u, releaseFileName)
 	} else {
 		releaseInfo = ""
 		updatedVersion = path.Base(u.Path)
@@ -398,7 +403,7 @@ func (a adminAPIHandlers) ServerUpdateHandler(w http.ResponseWriter, r *http.Req
 		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 		return
 	}
-	if updateURL != "" {
+	if !isDefaultUpdate {
 		sha256Sum = checksumBytes(bin)
 	}
 	if lrTime, releaseInfo, err = extractReleaseTime(bin); err == nil {
@@ -418,7 +423,7 @@ func (a adminAPIHandlers) ServerUpdateHandler(w http.ResponseWriter, r *http.Req
 			writeSuccessResponseJSON(w, jsonBytes)
 			return
 		}
-	} else if updateURL == "" {
+	} else if isDefaultUpdate {
 		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 		return
 	}

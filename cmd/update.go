@@ -493,12 +493,26 @@ func getLatestReleaseTime(u *url.URL, timeout time.Duration, mode string) (sha25
 }
 
 // getBinaryURL returns the URL to download the release binary.
-// For the default GitHub Pages URL, the binary is served as a stable sibling
-// file in the same directory as the checksum. User-provided URLs keep the
-// same sibling-directory behavior.
+// For the default GitHub Pages URL, when releaseInfo contains a release tag,
+// the binary is fetched from the GitHub Releases download URL directly
+// (binaries are too large for gh-pages). User-provided URLs keep the
+// sibling-directory behavior.
 func getBinaryURL(u *url.URL, releaseInfo string) *url.URL {
 	binURL := *u
 	if strings.Contains(u.Host, "github.io") {
+		if tag := releaseTagRegex.FindString(releaseInfo); tag != "" {
+			// e.g. "linux-amd64" from .../release/linux-amd64/buckit.sha256sum
+			platform := path.Base(path.Dir(u.Path))
+			ext := ""
+			if strings.HasPrefix(platform, "windows") {
+				ext = ".exe"
+			}
+			binURL.Scheme = "https"
+			binURL.Host = "github.com"
+			binURL.Path = fmt.Sprintf("/buckit-io/buckit/releases/download/%s/buckit-%s%s.%s", tag, platform, ext, tag)
+			return &binURL
+		}
+		// Fallback when sha256sum carries no release tag.
 		name := "buckit"
 		if strings.Contains(u.Path, "/windows-") || strings.HasSuffix(u.Path, ".exe.sha256sum") || runtime.GOOS == "windows" {
 			name = "buckit.exe"

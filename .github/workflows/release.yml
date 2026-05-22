@@ -196,14 +196,15 @@ jobs:
       - name: Publish stable download files
         run: |
           tag="${{ github.ref_name }}"
+          # Binaries exceed GitHub's 100MB git limit; sha256sum files point the
+          # self-update mechanism at the GitHub Releases download URL instead.
           for arch in amd64 arm64; do
             dir="pages/server/buckit/release/linux-${arch}"
             mkdir -p "${dir}"
-            cp "artifacts/buckit-linux-${arch}.${tag}" "${dir}/buckit"
-            cp "artifacts/buckit-linux-${arch}.${tag}.minisig" "${dir}/buckit.minisig"
-            sha=$(sha256sum "${dir}/buckit" | awk '{print $1}')
-            echo "${sha}  buckit" > "${dir}/buckit.sha256sum"
+            sha=$(awk '{print $1}' "artifacts/buckit-linux-${arch}.${tag}.sha256sum")
+            echo "${sha}  buckit.${tag}" > "${dir}/buckit.sha256sum"
           done
+          # Linux packages are under 100MB and served at stable URLs.
           cp artifacts/dist/buckit_*_amd64.deb pages/server/buckit/release/linux-amd64/buckit.deb
           sha=$(sha256sum pages/server/buckit/release/linux-amd64/buckit.deb | awk '{print $1}')
           echo "${sha}  buckit.deb" > pages/server/buckit/release/linux-amd64/buckit.deb.sha256sum
@@ -222,20 +223,16 @@ jobs:
           cp artifacts/dist/buckit_*_aarch64.apk pages/server/buckit/release/linux-arm64/buckit.apk
           sha=$(sha256sum pages/server/buckit/release/linux-arm64/buckit.apk | awk '{print $1}')
           echo "${sha}  buckit.apk" > pages/server/buckit/release/linux-arm64/buckit.apk.sha256sum
-          # Windows
+          # Windows (sha256sum only)
           dir="pages/server/buckit/release/windows-amd64"
           mkdir -p "${dir}"
-          cp "artifacts/buckit-windows-amd64.exe.${tag}" "${dir}/buckit.exe"
-          cp "artifacts/buckit-windows-amd64.exe.${tag}.minisig" "${dir}/buckit.exe.minisig"
-          sha=$(sha256sum "${dir}/buckit.exe" | awk '{print $1}')
-          echo "${sha}  buckit.exe" > "${dir}/buckit.sha256sum"
-          # macOS
+          sha=$(awk '{print $1}' "artifacts/buckit-windows-amd64.exe.${tag}.sha256sum")
+          echo "${sha}  buckit.exe.${tag}" > "${dir}/buckit.sha256sum"
+          # macOS (sha256sum only)
           dir="pages/server/buckit/release/darwin-arm64"
           mkdir -p "${dir}"
-          cp "artifacts/buckit-darwin-arm64.${tag}" "${dir}/buckit"
-          cp "artifacts/buckit-darwin-arm64.${tag}.minisig" "${dir}/buckit.minisig"
-          sha=$(sha256sum "${dir}/buckit" | awk '{print $1}')
-          echo "${sha}  buckit" > "${dir}/buckit.sha256sum"
+          sha=$(awk '{print $1}' "artifacts/buckit-darwin-arm64.${tag}.sha256sum")
+          echo "${sha}  buckit.${tag}" > "${dir}/buckit.sha256sum"
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
