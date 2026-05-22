@@ -19,11 +19,17 @@ jobs:
           python3 - <<'EOF'
           import os, html
 
+          SKIP = {'server/buckit/release', 'server/buckit/archives'}
+
           for dirpath, dirnames, filenames in os.walk('.'):
               dirnames[:] = sorted(d for d in dirnames if d != '.git')
-              entries_files = sorted(f for f in filenames if f != 'index.html')
 
               rel = os.path.relpath(dirpath, '.')
+              if rel in SKIP:
+                  continue
+
+              entries_files = sorted(f for f in filenames if f != 'index.html')
+
               title = '/' if rel == '.' else '/' + rel + '/'
 
               lines = [

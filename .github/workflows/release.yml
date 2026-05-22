@@ -198,37 +198,19 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Publish stable download files
+      - name: Write self-update checksum files
         run: |
           tag="${{ github.ref_name }}"
 
-          # zip_binary <artifact> <inner-name> <platform>
-          # Zips the binary with a clean name (no version tag), publishes to
-          # release/<platform>/buckit.zip (latest) and
-          # archives/<platform>/buckit.<tag>.zip (versioned history).
-          zip_binary() {
-            local src="$1" inner="$2" platform="$3"
-            local rel="pages/server/buckit/release/${platform}"
-            local arc="pages/server/buckit/archives/${platform}"
-            mkdir -p "${rel}" "${arc}"
-            cp "${src}" "${inner}"
-            zip -q binary.zip "${inner}"
-            rm "${inner}"
-            cp binary.zip "${rel}/buckit.zip"
-            sha=$(sha256sum "${rel}/buckit.zip" | awk '{print $1}')
-            echo "${sha}  buckit.zip" > "${rel}/buckit.zip.sha256sum"
-            cp binary.zip "${arc}/buckit.${tag}.zip"
-            sha=$(sha256sum "${arc}/buckit.${tag}.zip" | awk '{print $1}')
-            echo "${sha}  buckit.${tag}.zip" > "${arc}/buckit.${tag}.zip.sha256sum"
-            rm binary.zip
-          }
+          # Rebuild the release tree from scratch to remove any stale assets.
+          rm -rf pages/server/buckit/release pages/server/buckit/archives
+          mkdir -p \
+            pages/server/buckit/release/linux-amd64 \
+            pages/server/buckit/release/linux-arm64 \
+            pages/server/buckit/release/windows-amd64 \
+            pages/server/buckit/release/darwin-arm64 \
+            pages/server/buckit/archives
 
-          zip_binary "artifacts/buckit-linux-amd64.${tag}"       buckit     linux-amd64
-          zip_binary "artifacts/buckit-linux-arm64.${tag}"       buckit     linux-arm64
-          zip_binary "artifacts/buckit-windows-amd64.exe.${tag}" buckit.exe windows-amd64
-          zip_binary "artifacts/buckit-darwin-arm64.${tag}"      buckit     darwin-arm64
-
-          # Self-update sha256sum files (hash of the raw binary, not the zip).
           sha=$(awk '{print $1}' "artifacts/buckit-linux-amd64.${tag}.sha256sum")
           echo "${sha}  buckit.${tag}" > "pages/server/buckit/release/linux-amd64/buckit.sha256sum"
           sha=$(awk '{print $1}' "artifacts/buckit-linux-arm64.${tag}.sha256sum")
@@ -238,53 +220,135 @@ jobs:
           sha=$(awk '{print $1}' "artifacts/buckit-darwin-arm64.${tag}.sha256sum")
           echo "${sha}  buckit.${tag}" > "pages/server/buckit/release/darwin-arm64/buckit.sha256sum"
 
-          # publish_package <src-glob> <stable-name> <platform>
-          # Copies to release/<platform>/<stable-name> (latest) and
-          # archives/<platform>/buckit.<tag>.<ext> (versioned history).
-          publish_package() {
-            local src="$1" name="$2" platform="$3"
-            local ext="${name##*.}"
-            local rel="pages/server/buckit/release/${platform}"
-            local arc="pages/server/buckit/archives/${platform}"
-            cp "${src}" "${rel}/${name}"
-            sha=$(sha256sum "${rel}/${name}" | awk '{print $1}')
-            echo "${sha}  ${name}" > "${rel}/${name}.sha256sum"
-            cp "${src}" "${arc}/buckit.${tag}.${ext}"
-            sha=$(sha256sum "${arc}/buckit.${tag}.${ext}" | awk '{print $1}')
-            echo "${sha}  buckit.${tag}.${ext}" > "${arc}/buckit.${tag}.${ext}.sha256sum"
-          }
+      - name: Generate release index page
+        run: |
+          tag="${{ github.ref_name }}"
+          base="https://github.com/buckit-io/buckit/releases/download/${tag}"
+          PKG_VERSION=$(echo "${tag}" | sed 's/^RELEASE\.//' | sed 's/\.rc[0-9]*$//' | tr -d '\-:TZ').0.0
+          cat > pages/server/buckit/release/index.html <<HTML
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Buckit ${tag}</title>
+            <style>
+              body { font-family: sans-serif; max-width: 860px; margin: 2em auto; padding: 0 1em; }
+              h2 { margin-bottom: 0.25em; }
+              p { margin-top: 0.25em; color: #555; }
+              table { border-collapse: collapse; width: 100%; margin-bottom: 2em; }
+              th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #ddd; }
+              th { background: #f4f4f4; font-weight: 600; }
+              a { color: #0366d6; text-decoration: none; }
+              a:hover { text-decoration: underline; }
+            </style>
+          </head>
+          <body>
+            <h2>Buckit ${tag}</h2>
+            <p>Latest stable release &mdash; <a href="../archives/">all releases &rarr;</a></p>
+            <h3>Binaries</h3>
+            <table>
+              <tr><th>Platform</th><th>Binary</th><th>Checksum</th><th>Signature</th></tr>
+              <tr>
+                <td>Linux x86_64</td>
+                <td><a href="${base}/buckit-linux-amd64.${tag}">buckit-linux-amd64</a></td>
+                <td><a href="${base}/buckit-linux-amd64.${tag}.sha256sum">.sha256sum</a></td>
+                <td><a href="${base}/buckit-linux-amd64.${tag}.minisig">.minisig</a></td>
+              </tr>
+              <tr>
+                <td>Linux arm64</td>
+                <td><a href="${base}/buckit-linux-arm64.${tag}">buckit-linux-arm64</a></td>
+                <td><a href="${base}/buckit-linux-arm64.${tag}.sha256sum">.sha256sum</a></td>
+                <td><a href="${base}/buckit-linux-arm64.${tag}.minisig">.minisig</a></td>
+              </tr>
+              <tr>
+                <td>Windows x86_64</td>
+                <td><a href="${base}/buckit-windows-amd64.exe.${tag}">buckit-windows-amd64.exe</a></td>
+                <td><a href="${base}/buckit-windows-amd64.exe.${tag}.sha256sum">.sha256sum</a></td>
+                <td><a href="${base}/buckit-windows-amd64.exe.${tag}.minisig">.minisig</a></td>
+              </tr>
+              <tr>
+                <td>macOS arm64</td>
+                <td><a href="${base}/buckit-darwin-arm64.${tag}">buckit-darwin-arm64</a></td>
+                <td><a href="${base}/buckit-darwin-arm64.${tag}.sha256sum">.sha256sum</a></td>
+                <td><a href="${base}/buckit-darwin-arm64.${tag}.minisig">.minisig</a></td>
+              </tr>
+            </table>
+            <h3>Linux packages</h3>
+            <table>
+              <tr><th>Format</th><th>amd64</th><th>arm64</th></tr>
+              <tr>
+                <td>Debian/Ubuntu (.deb)</td>
+                <td><a href="${base}/buckit_${PKG_VERSION}_amd64.deb">buckit_${PKG_VERSION}_amd64.deb</a></td>
+                <td><a href="${base}/buckit_${PKG_VERSION}_arm64.deb">buckit_${PKG_VERSION}_arm64.deb</a></td>
+              </tr>
+              <tr>
+                <td>RPM (.rpm)</td>
+                <td><a href="${base}/buckit-${PKG_VERSION}.x86_64.rpm">buckit-${PKG_VERSION}.x86_64.rpm</a></td>
+                <td><a href="${base}/buckit-${PKG_VERSION}.aarch64.rpm">buckit-${PKG_VERSION}.aarch64.rpm</a></td>
+              </tr>
+              <tr>
+                <td>Alpine (.apk)</td>
+                <td><a href="${base}/buckit_${PKG_VERSION}_x86_64.apk">buckit_${PKG_VERSION}_x86_64.apk</a></td>
+                <td><a href="${base}/buckit_${PKG_VERSION}_aarch64.apk">buckit_${PKG_VERSION}_aarch64.apk</a></td>
+              </tr>
+            </table>
+          </body>
+          </html>
+          HTML
 
-          # Linux packages: already compressed. Published at stable URLs and archived.
-          publish_package artifacts/dist/buckit_*_amd64.deb   buckit.deb linux-amd64
-          publish_package artifacts/dist/buckit-*.x86_64.rpm  buckit.rpm linux-amd64
-          publish_package artifacts/dist/buckit_*_x86_64.apk  buckit.apk linux-amd64
-          publish_package artifacts/dist/buckit_*_arm64.deb   buckit.deb linux-arm64
-          publish_package artifacts/dist/buckit-*.aarch64.rpm buckit.rpm linux-arm64
-          publish_package artifacts/dist/buckit_*_aarch64.apk buckit.apk linux-arm64
+      - name: Generate archives index page
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/buckit-io/buckit/releases --paginate \
+            --jq '.[] | select(.prerelease == false) | {tag: .tag_name, date: .published_at[:10], url: .html_url}' \
+            > /tmp/releases.jsonl
 
-          # Trim archives to the 30 most recent releases per platform.
-          trim_archives() {
-            local dir="$1" keep=30
-            [ -d "${dir}" ] || return
-            mapfile -t tags < <(
-              ls "${dir}/" \
-                | grep -o 'RELEASE\.[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T[0-9]\{2\}-[0-9]\{2\}-[0-9]\{2\}Z' \
-                | sort -u
-            )
-            local excess=$(( ${#tags[@]} - keep ))
-            if (( excess > 0 )); then
-              for old_tag in "${tags[@]:0:${excess}}"; do
-                rm -f "${dir}/buckit.${old_tag}."*
-              done
-            fi
-          }
+          python3 - /tmp/releases.jsonl pages/server/buckit/archives/index.html <<'PYEOF'
+          import json, html, sys
 
-          for platform in linux-amd64 linux-arm64 windows-amd64 darwin-arm64; do
-            trim_archives "pages/server/buckit/archives/${platform}"
-          done
+          releases = [json.loads(line) for line in open(sys.argv[1]) if line.strip()]
+
+          rows = '\n'.join(
+              f'<tr>'
+              f'<td>{html.escape(r["date"])}</td>'
+              f'<td><a href="{html.escape(r["url"])}">{html.escape(r["tag"])}</a></td>'
+              f'<td><a href="{html.escape(r["url"])}">Assets &rarr;</a></td>'
+              f'</tr>'
+              for r in releases
+          )
+
+          page = f'''<!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Buckit Releases</title>
+            <style>
+              body {{ font-family: sans-serif; max-width: 860px; margin: 2em auto; padding: 0 1em; }}
+              table {{ border-collapse: collapse; width: 100%; }}
+              th, td {{ text-align: left; padding: 8px 12px; border-bottom: 1px solid #ddd; }}
+              th {{ background: #f4f4f4; font-weight: 600; }}
+              a {{ color: #0366d6; text-decoration: none; }}
+              a:hover {{ text-decoration: underline; }}
+            </style>
+          </head>
+          <body>
+            <h2>Buckit Releases</h2>
+            <p><a href="../release/">Latest release &rarr;</a></p>
+            <table>
+              <tr><th>Date</th><th>Release</th><th>Downloads</th></tr>
+              {rows}
+            </table>
+          </body>
+          </html>'''
+
+          with open(sys.argv[2], 'w') as f:
+              f.write(page)
+          PYEOF
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./pages
+          force_orphan: true
