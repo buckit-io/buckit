@@ -1,0 +1,65 @@
+name: Generate Directory Indexes
+
+on:
+  push:
+    branches: [gh-pages]
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Generate directory indexes
+        run: |
+          python3 - <<'EOF'
+          import os, html
+
+          for dirpath, dirnames, filenames in os.walk('.'):
+              dirnames[:] = sorted(d for d in dirnames if d != '.git')
+              entries_files = sorted(f for f in filenames if f != 'index.html')
+
+              rel = os.path.relpath(dirpath, '.')
+              title = '/' if rel == '.' else '/' + rel + '/'
+
+              lines = [
+                  '<!DOCTYPE html><html><head>',
+                  f'<title>Index of {html.escape(title)}</title>',
+                  '<style>',
+                  'body { font-family: monospace; max-width: 800px; margin: 2em auto; }',
+                  'a { display: block; padding: 2px 0; }',
+                  'hr { margin: 1em 0; }',
+                  '</style>',
+                  '</head><body>',
+                  f'<h2>Index of {html.escape(title)}</h2><hr><pre>',
+              ]
+
+              if rel != '.':
+                  lines.append('<a href="../">../</a>')
+
+              for name in dirnames:
+                  lines.append(f'<a href="{html.escape(name)}/">{html.escape(name)}/</a>')
+              for name in entries_files:
+                  lines.append(f'<a href="{html.escape(name)}">{html.escape(name)}</a>')
+
+              lines += ['</pre><hr></body></html>']
+
+              with open(os.path.join(dirpath, 'index.html'), 'w') as f:
+                  f.write('\n'.join(lines) + '\n')
+          EOF
+
+      - name: Commit indexes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No index changes"
+          else
+            git commit -m "chore: regenerate directory indexes [skip ci]"
+            git push
+          fi
