@@ -37,9 +37,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/klauspost/compress/zstd"
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/klauspost/compress/zstd"
 	"github.com/minio/pkg/v3/env"
 	xnet "github.com/minio/pkg/v3/net"
 	"github.com/minio/selfupdate"
@@ -444,6 +444,43 @@ func parseChecksumData(data string) (sha256Sum []byte, fileName string, err erro
 	return sha256Sum, fileName, nil
 }
 
+func candidateChecksumURLs(u *url.URL) []*url.URL {
+	base := *u
+	return []*url.URL{
+		func() *url.URL {
+			v := base
+			v.Path = base.Path + ".sha256sum"
+			return &v
+		}(),
+		func() *url.URL {
+			v := base
+			v.Path = base.Path + ".sha256"
+			return &v
+		}(),
+	}
+}
+
+func fetchChecksumForBinaryURL(u *url.URL, timeout time.Duration, mode string) (sha256Sum []byte, source string, err error) {
+	var lastErr error
+	for _, candidate := range candidateChecksumURLs(u) {
+		content, derr := downloadReleaseURL(candidate, timeout, mode)
+		if derr != nil {
+			lastErr = derr
+			continue
+		}
+		sum, _, perr := parseChecksumData(content)
+		if perr != nil {
+			lastErr = perr
+			continue
+		}
+		return sum, candidate.String(), nil
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no checksum URL candidates for %s", u.String())
+	}
+	return nil, "", lastErr
+}
+
 func extractReleaseTag(data []byte) (string, error) {
 	tag := releaseTagRegex.Find(data)
 	if len(tag) == 0 {
@@ -492,11 +529,18 @@ func getLatestReleaseTime(u *url.URL, timeout time.Duration, mode string) (sha25
 	return sha256Sum, releaseTime, err
 }
 
-// getBinaryURL returns the URL to download the release binary.
-// For the default GitHub Pages URL, when releaseInfo contains a release tag,
-// the binary is fetched from the GitHub Releases download URL directly
-// (binaries are too large for gh-pages). User-provided URLs keep the
-// sibling-directory behavior.
+// getBinaryURL returns the final binary URL for an update.
+//
+// The input URL is interpreted differently depending on the source:
+//   - Default update flow: u points at the built-in release info file
+//     (buckit.sha256sum) on GitHub Pages. releaseInfo comes from that checksum
+//     file. When releaseInfo contains a release tag, the binary is resolved to
+//     the matching GitHub Releases asset, because Buckit does not publish large
+//     server binaries directly on gh-pages.
+//   - User-provided update flow: u is expected to already point at the direct
+//     binary download URL. The existing non-gh-pages branch keeps the original
+//     sibling-directory behavior, so callers should supply a direct binary URL,
+//     not a release HTML page, checksum file, or directory URL.
 func getBinaryURL(u *url.URL, releaseInfo string) *url.URL {
 	binURL := *u
 	if strings.Contains(u.Host, "github.io") {
@@ -602,6 +646,7 @@ var updateInProgress atomic.Uint32
 
 // Function to get the reader from an architecture
 func downloadBinary(u *url.URL, mode string) (binCompressed []byte, bin []byte, err error) {
+	logger.Info("Admin update: downloading binary from %s", u.String())
 	transport := getUpdateTransport(30 * time.Second)
 	var reader io.ReadCloser
 	if u.Scheme == "https" || u.Scheme == "http" {
@@ -649,6 +694,8 @@ func verifyBinary(u *url.URL, sha256Sum []byte, releaseInfo, mode string, reader
 	}
 	defer updateInProgress.Store(0)
 
+	logger.Info("Admin update: preparing binary verification for %s", u.String())
+
 	transport := getUpdateTransport(30 * time.Second)
 	opts := selfupdate.Options{
 		Hash:     crypto.SHA256,
@@ -665,8 +712,11 @@ func verifyBinary(u *url.URL, sha256Sum []byte, releaseInfo, mode string, reader
 
 	minisignPubkey := env.Get(envMinisignPubKey, defaultMinisignPubkey)
 	if minisignPubkey != "" {
+		logger.Info("Admin update: loading minisign signature for %s", u.String())
 		v := selfupdate.NewVerifier()
-		// Derive .minisig URL as sibling of the binary URL
+		// Derive .minisig URL as a sibling of the final binary URL.
+		// This applies both to the default release-channel flow and to an
+		// operator-supplied direct binary URL.
 		u.Path = u.Path + ".minisig"
 		if err = v.LoadFromURL(u.String(), minisignPubkey, transport); err != nil {
 			return AdminError{
@@ -678,6 +728,7 @@ func verifyBinary(u *url.URL, sha256Sum []byte, releaseInfo, mode string, reader
 		opts.Verifier = v
 	}
 
+	logger.Info("Admin update: verifying and preparing replacement binary")
 	if err = selfupdate.PrepareAndCheckBinary(reader, opts); err != nil {
 		var pathErr *os.PathError
 		if errors.As(err, &pathErr) {
@@ -695,6 +746,7 @@ func verifyBinary(u *url.URL, sha256Sum []byte, releaseInfo, mode string, reader
 		}
 	}
 
+	logger.Info("Admin update: binary verification and prepare succeeded")
 	return nil
 }
 
@@ -703,6 +755,8 @@ func commitBinary() (err error) {
 		return errors.New("update already in progress")
 	}
 	defer updateInProgress.Store(0)
+
+	logger.Info("Admin update: committing prepared binary")
 
 	opts := selfupdate.Options{}
 
@@ -730,5 +784,6 @@ func commitBinary() (err error) {
 		}
 	}
 
+	logger.Info("Admin update: binary commit succeeded")
 	return nil
 }

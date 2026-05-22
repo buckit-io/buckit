@@ -45,12 +45,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dustin/go-humanize"
-	"github.com/klauspost/compress/zip"
-	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/madmin-go/v3/estream"
-	"github.com/buckit-io/madmin-go/v3/logger/log"
-	"github.com/buckit-io/minio-go/v7/pkg/set"
 	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/buckit-io/buckit/internal/dsync"
 	"github.com/buckit-io/buckit/internal/grid"
@@ -59,6 +53,12 @@ import (
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/buckit/internal/kms"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/madmin-go/v3/estream"
+	"github.com/buckit-io/madmin-go/v3/logger/log"
+	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/dustin/go-humanize"
+	"github.com/klauspost/compress/zip"
 	"github.com/minio/mux"
 	xnet "github.com/minio/pkg/v3/net"
 	"github.com/minio/pkg/v3/policy"
@@ -84,7 +84,29 @@ const (
 
 // ServerUpdateV2Handler - POST /minio/admin/v3/update?updateURL={updateURL}&type=2
 // ----------
-// updates all minio servers and restarts them gracefully.
+// Updates all servers and restarts them gracefully.
+//
+// Behavior depends on whether updateURL is supplied:
+//   - When updateURL is empty, the server uses the built-in release info URL
+//     for the current OS/arch (for example
+//     https://buckit-io.github.io/buckit/server/buckit/release/linux-arm64/buckit.sha256sum).
+//     That checksum file is downloaded first, the release tag is parsed from
+//     its contents, and getBinaryURL() derives the final binary URL. For the
+//     Buckit GitHub Pages layout that derived binary URL points at the matching
+//     GitHub Releases asset, not a file on gh-pages itself.
+//   - When updateURL is non-empty, it is expected to be a direct downloadable
+//     Buckit server binary URL. It must not be a release HTML page, checksum
+//     file, or directory URL.
+//
+// Validation URLs also differ slightly by mode:
+//   - Empty updateURL: checksum comes from the downloaded *.sha256sum file, and
+//     verifyBinary() derives a sibling *.minisig URL from the resolved binary
+//     URL for signature verification.
+//   - Non-empty updateURL: the server derives sibling checksum URLs
+//     (<binary>.sha256sum first, then <binary>.sha256) and validates the
+//     downloaded binary against the first checksum file that resolves
+//     successfully. verifyBinary() also derives a sibling *.minisig URL from
+//     the provided binary URL for signature verification.
 func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -128,6 +150,7 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 		return
 	}
+	logger.Info("Admin update: requested update URL %s (dry-run=%t)", u.String(), dryRun)
 
 	updateStatus := madmin.ServerUpdateStatusV2{
 		DryRun:  dryRun,
@@ -155,9 +178,15 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 			return
 		}
 		u = getBinaryURL(u, releaseFileName)
+		logger.Info("Admin update: resolved default binary URL %s", u.String())
 	} else {
 		releaseInfo = ""
 		updatedVersion = path.Base(u.Path)
+		sha256Sum, _, err = fetchChecksumForBinaryURL(u, updateTimeout, mode)
+		if err != nil {
+			writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
+			return
+		}
 	}
 	// Download Binary Once
 	binC, bin, err := downloadBinary(u, mode)
@@ -166,12 +195,18 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 		return
 	}
-	if !isDefaultUpdate {
-		sha256Sum = checksumBytes(bin)
-	}
 	if lrTime, releaseInfo, err = extractReleaseTime(bin); err == nil {
 		updatedVersion = strings.TrimPrefix(releaseInfo, "buckit.")
+		logger.Info("Admin update: extracted target release %s", updatedVersion)
+		logger.Info(
+			"Admin update: current runtime version=%s releaseTag=%s currentReleaseTime=%s targetReleaseTime=%s",
+			Version,
+			ReleaseTag,
+			currentReleaseTime.UTC().Format(time.RFC3339),
+			lrTime.UTC().Format(time.RFC3339),
+		)
 		if lrTime.Sub(currentReleaseTime) <= 0 {
+			logger.Info("Admin update: skipping because target release is not newer than current runtime")
 			updateStatus.Results = append(updateStatus.Results, madmin.ServerPeerUpdateStatus{
 				Host:           local,
 				Err:            fmt.Sprintf("server is running the latest version: %s", Version),
@@ -201,6 +236,7 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 	}
 
 	if globalIsDistErasure {
+		logger.Info("Admin update: pushing binary to %d peer(s) for verification", len(globalNotificationSys.peerClients))
 		// Push binary to other servers
 		for idx, nerr := range globalNotificationSys.VerifyBinary(ctx, u, sha256Sum, releaseInfo, binC) {
 			if nerr.Err != nil {
@@ -220,6 +256,7 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	logger.Info("Admin update: verifying binary on local node %s", local)
 	if err = verifyBinary(u, sha256Sum, releaseInfo, mode, bytes.NewReader(bin)); err != nil {
 		peerResults[local] = madmin.ServerPeerUpdateStatus{
 			Host:           local,
@@ -236,6 +273,7 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 
 	if !dryRun {
 		if globalIsDistErasure {
+			logger.Info("Admin update: committing prepared binary on peer nodes")
 			ng := WithNPeers(len(globalNotificationSys.peerClients))
 			for idx, client := range globalNotificationSys.peerClients {
 				if failedClients[idx] {
@@ -266,6 +304,7 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 		}
 		prs := peerResults[local]
 		if prs.Err == "" {
+			logger.Info("Admin update: committing prepared binary on local node %s", local)
 			if err = commitBinary(); err != nil {
 				prs.Err = err.Error()
 			}
@@ -326,11 +365,13 @@ func (a adminAPIHandlers) ServerUpdateV2Handler(w http.ResponseWriter, r *http.R
 	}
 
 	writeSuccessResponseJSON(w, jsonBytes)
+	logger.Info("Admin update: update request completed for target %s", updatedVersion)
 
 	if !dryRun {
 		prs, ok := peerResults[local]
 		// We restart only on success, not for any failures.
 		if ok && prs.Err == "" {
+			logger.Info("Admin update: signaling local process restart")
 			globalServiceSignalCh <- serviceRestart
 		}
 	}
@@ -394,6 +435,11 @@ func (a adminAPIHandlers) ServerUpdateHandler(w http.ResponseWriter, r *http.Req
 	} else {
 		releaseInfo = ""
 		updatedVersion = path.Base(u.Path)
+		sha256Sum, _, err = fetchChecksumForBinaryURL(u, updateTimeout, mode)
+		if err != nil {
+			writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
+			return
+		}
 	}
 
 	// Download Binary Once
@@ -402,9 +448,6 @@ func (a adminAPIHandlers) ServerUpdateHandler(w http.ResponseWriter, r *http.Req
 		adminLogIf(ctx, fmt.Errorf("server update failed with %w", err))
 		writeErrorResponseJSON(ctx, w, toAdminAPIErr(ctx, err), r.URL)
 		return
-	}
-	if !isDefaultUpdate {
-		sha256Sum = checksumBytes(bin)
 	}
 	if lrTime, releaseInfo, err = extractReleaseTime(bin); err == nil {
 		updatedVersion = strings.TrimPrefix(releaseInfo, "buckit.")
