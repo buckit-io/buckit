@@ -233,25 +233,29 @@ jobs:
           sha=$(awk '{print $1}' "artifacts/buckit-darwin-arm64.${tag}.sha256sum")
           echo "${sha}  buckit.${tag}" > "pages/server/buckit/release/darwin-arm64/buckit.sha256sum"
 
-          # Linux packages: already compressed, published at stable URLs.
-          cp artifacts/dist/buckit_*_amd64.deb pages/server/buckit/release/linux-amd64/buckit.deb
-          sha=$(sha256sum pages/server/buckit/release/linux-amd64/buckit.deb | awk '{print $1}')
-          echo "${sha}  buckit.deb" > pages/server/buckit/release/linux-amd64/buckit.deb.sha256sum
-          cp artifacts/dist/buckit-*.x86_64.rpm pages/server/buckit/release/linux-amd64/buckit.rpm
-          sha=$(sha256sum pages/server/buckit/release/linux-amd64/buckit.rpm | awk '{print $1}')
-          echo "${sha}  buckit.rpm" > pages/server/buckit/release/linux-amd64/buckit.rpm.sha256sum
-          cp artifacts/dist/buckit_*_x86_64.apk pages/server/buckit/release/linux-amd64/buckit.apk
-          sha=$(sha256sum pages/server/buckit/release/linux-amd64/buckit.apk | awk '{print $1}')
-          echo "${sha}  buckit.apk" > pages/server/buckit/release/linux-amd64/buckit.apk.sha256sum
-          cp artifacts/dist/buckit_*_arm64.deb pages/server/buckit/release/linux-arm64/buckit.deb
-          sha=$(sha256sum pages/server/buckit/release/linux-arm64/buckit.deb | awk '{print $1}')
-          echo "${sha}  buckit.deb" > pages/server/buckit/release/linux-arm64/buckit.deb.sha256sum
-          cp artifacts/dist/buckit-*.aarch64.rpm pages/server/buckit/release/linux-arm64/buckit.rpm
-          sha=$(sha256sum pages/server/buckit/release/linux-arm64/buckit.rpm | awk '{print $1}')
-          echo "${sha}  buckit.rpm" > pages/server/buckit/release/linux-arm64/buckit.rpm.sha256sum
-          cp artifacts/dist/buckit_*_aarch64.apk pages/server/buckit/release/linux-arm64/buckit.apk
-          sha=$(sha256sum pages/server/buckit/release/linux-arm64/buckit.apk | awk '{print $1}')
-          echo "${sha}  buckit.apk" > pages/server/buckit/release/linux-arm64/buckit.apk.sha256sum
+          # publish_package <src-glob> <stable-name> <platform>
+          # Copies to release/<platform>/<stable-name> (latest) and
+          # archives/<platform>/buckit.<tag>.<ext> (versioned history).
+          publish_package() {
+            local src="$1" name="$2" platform="$3"
+            local ext="${name##*.}"
+            local rel="pages/server/buckit/release/${platform}"
+            local arc="pages/server/buckit/archives/${platform}"
+            cp "${src}" "${rel}/${name}"
+            sha=$(sha256sum "${rel}/${name}" | awk '{print $1}')
+            echo "${sha}  ${name}" > "${rel}/${name}.sha256sum"
+            cp "${src}" "${arc}/buckit.${tag}.${ext}"
+            sha=$(sha256sum "${arc}/buckit.${tag}.${ext}" | awk '{print $1}')
+            echo "${sha}  buckit.${tag}.${ext}" > "${arc}/buckit.${tag}.${ext}.sha256sum"
+          }
+
+          # Linux packages: already compressed. Published at stable URLs and archived.
+          publish_package artifacts/dist/buckit_*_amd64.deb   buckit.deb linux-amd64
+          publish_package artifacts/dist/buckit-*.x86_64.rpm  buckit.rpm linux-amd64
+          publish_package artifacts/dist/buckit_*_x86_64.apk  buckit.apk linux-amd64
+          publish_package artifacts/dist/buckit_*_arm64.deb   buckit.deb linux-arm64
+          publish_package artifacts/dist/buckit-*.aarch64.rpm buckit.rpm linux-arm64
+          publish_package artifacts/dist/buckit_*_aarch64.apk buckit.apk linux-arm64
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
