@@ -8,7 +8,7 @@ require (
 	github.com/klauspost/compress v1.17.11
 	github.com/klauspost/filepathx v1.1.1
 	github.com/minio/colorjson v1.0.8
-	github.com/minio/madmin-go/v3 v3.0.88
+	github.com/buckit-io/madmin-go/v3 v3.0.88
 	github.com/secure-io/sio-go v0.3.1
 	github.com/tinylib/msgp v1.2.5
 )

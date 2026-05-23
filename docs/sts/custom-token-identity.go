@@ -27,8 +27,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/minio/minio-go/v7"
-	cr "github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/buckit-io/minio-go/v7"
+	cr "github.com/buckit-io/minio-go/v7/pkg/credentials"
 )
 
 var (

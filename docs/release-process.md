@@ -52,10 +52,10 @@ gh run list --workflow=release.yml --repo buckit-io/buckit
 
 The workflow runs these jobs in order:
 
-1. **build** — Compiles binaries for linux/amd64, linux/arm64, windows/amd64, darwin/arm64. Signs each with minisign. Generates `.deb`, `.rpm`, `.apk` packages (Linux only).
+1. **build** — Compiles binaries for linux/amd64, linux/arm64, windows/amd64, darwin/arm64. Signs each with minisign. Generates `.deb`, `.rpm`, and `.apk` packages with `nfpm` on Linux, plus checksum files for those packages.
 2. **docker** — Builds and pushes multi-arch Docker images to ghcr.io and Docker Hub.
 3. **publish** — Creates a GitHub Release with all artifacts attached.
-4. **update-gh-pages** — Updates the self-update pointer on GitHub Pages (stable releases only).
+4. **update-gh-pages** — Publishes stable per-platform download files to GitHub Pages (stable releases only).
 
 All jobs should show ✅. If any job fails, click into it to see the error log.
 
@@ -138,7 +138,7 @@ apk add --allow-untrusted buckit-20260510233035.0.0-r0.apk
 ```
 
 The packages install the binary to `/usr/local/bin/buckit` and include a
-systemd service unit at `/lib/systemd/system/minio.service`.
+systemd service unit at `/lib/systemd/system/buckit.service`.
 
 ## Verifying Signatures
 
@@ -152,6 +152,16 @@ minisign -Vm buckit-linux-amd64.RELEASE.2026-05-10T23-30-35Z \
 
 The public key (`buckit.pub`) is in the repository root.
 
+Package artifacts also have checksum files in the GitHub Release:
+
+- `buckit_*.deb.sha256sum`
+- `buckit-*.rpm.sha256sum`
+- `buckit_*.apk.sha256sum`
+
+GitHub Releases contain the immutable versioned artifacts. GitHub Pages
+publishes the stable latest filenames such as `buckit`, `buckit.rpm`, and
+their matching checksum files.
+
 ## Upgrading a Running Server
 
 ### Using `mc admin update`
@@ -163,8 +173,16 @@ mc admin update <alias>
 This automatically discovers the latest release and performs a rolling
 update across all nodes in the cluster.
 
-How it works: the server fetches a small `buckit.sha256sum` pointer file
-from GitHub Pages to check if a newer version exists. One file per platform:
+How it works by default:
+
+1. The server fetches `buckit.sha256sum` from GitHub Pages for its platform.
+2. It derives the stable sibling binary URL in the same directory.
+3. It downloads the stable binary once.
+4. It verifies the binary against the checksum and `.minisig`.
+5. It inspects the embedded Buckit release tag in the downloaded binary.
+6. If the binary is newer than the running server, it performs the rolling update.
+
+Stable update URLs:
 
 ```
 https://buckit-io.github.io/buckit/server/buckit/release/linux-amd64/buckit.sha256sum
@@ -173,15 +191,30 @@ https://buckit-io.github.io/buckit/server/buckit/release/windows-amd64/buckit.sh
 https://buckit-io.github.io/buckit/server/buckit/release/darwin-arm64/buckit.sha256sum
 ```
 
-Each file contains one line (`<sha256> buckit.RELEASE.<timestamp>`) which
-the server uses to determine the latest version and verify the downloaded
-binary. These files are updated automatically on each stable release (not
-RCs) via the `gh-pages` branch.
+The GitHub Pages branch also publishes the actual stable files that match
+those checksums, for example:
 
-You can also point to a specific release or a private mirror:
+```
+https://buckit-io.github.io/buckit/server/buckit/release/linux-amd64/buckit
+https://buckit-io.github.io/buckit/server/buckit/release/linux-amd64/buckit.minisig
+https://buckit-io.github.io/buckit/server/buckit/release/linux-amd64/buckit.rpm
+https://buckit-io.github.io/buckit/server/buckit/release/linux-amd64/buckit.rpm.sha256sum
+```
+
+`buckit.sha256sum` is a normal checksum file for the stable `buckit` binary,
+not a version-pointer file.
+
+For an explicit custom update URL, Buckit uses the simplest contract:
+
+- the provided URL is treated as the binary itself
+- the signature is fetched from `<URL>.minisig`
+- the checksum is computed from the downloaded binary bytes
+- no custom `.sha256sum` sidecar is required
+
+Example:
 
 ```sh
-mc admin update <alias> https://my-mirror.example.com/buckit/linux-amd64/buckit.sha256sum
+mc admin update <alias> https://my-mirror.example.com/buckit/linux-amd64/buckit
 ```
 
 ### Manual upgrade
@@ -206,7 +239,7 @@ These are configured in GitHub Actions (Settings → Secrets):
 | Service | Purpose | URL |
 |---------|---------|-----|
 | GitHub Releases | Binary/package hosting | https://github.com/buckit-io/buckit/releases |
-| GitHub Pages | Self-update pointer (`buckit.sha256sum`) | https://buckit-io.github.io/buckit/ |
+| GitHub Pages | Stable latest binaries, packages, and checksum files | https://buckit-io.github.io/buckit/ |
 | ghcr.io | Docker images | ghcr.io/buckit-io/buckit |
 | Docker Hub | Docker images (mirror) | docker.io/buckitio/buckit |
 

@@ -36,8 +36,8 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/buckit-io/minio-go/v7"
+	"github.com/buckit-io/minio-go/v7/pkg/credentials"
 )
 
 // Returns a base64 encoded random 32 byte string.

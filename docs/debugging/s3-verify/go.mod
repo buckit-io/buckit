@@ -4,7 +4,7 @@ go 1.23.0
 
 toolchain go1.24.8
 
-require github.com/minio/minio-go/v7 v7.0.83
+require github.com/buckit-io/minio-go/v7 v7.0.83
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

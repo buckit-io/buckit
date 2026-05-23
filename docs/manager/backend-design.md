@@ -59,7 +59,7 @@ keep parity with the `mc` CLI.
 |  ├── admin/    madmin-go wrapper exposing the calls we use  |
 |  ├── deploy/   New-cluster install + MinIO→Buckit cutover   |
 |  ├── cluster/  Cluster repo (load, save, refresh, health)   |
-|  ├── alias/    Bridge: cluster store → ~/.bm/aliases.json   |
+|  ├── alias/    Bridge: store → ~/.config/bm/config.json     |
 |  ├── auth/     Optional remote-access passcode + TLS        |
 |  ├── config/   $XDG_CONFIG_HOME/bm/, KEK material, perms    |
 |  └── health/   On-demand cache loop, admin-info probes      |
@@ -328,9 +328,10 @@ Two structural options were considered for the mc fork:
 1. Vendor `mc` directly under `buckit-io/bm/cmd/bm/mc/`. Simpler
    dependency graph; only one binary ever ships the CLI.
 2. **(chosen)** Standalone `buckit-io/bm-cli` repo, imported by `bm`
-   via go.mod. Lets `buckit-cli` (or similar) ship independently of
-   the manager for server-only installs where an operator just wants
-   the CLI without the manager UI.
+   via go.mod as a **library** (the upstream `package main` was
+   removed at fork time; `bm` is the only binary). Keeps the option
+   open of a standalone `buckit-cli` build in the future without
+   forcing the repo split later.
 
 The CLI has independent value outside `bm`. Standalone forces a
 clean public API boundary and keeps the manager-specific code
@@ -358,14 +359,16 @@ listed in mc's config). bm's source of truth for clusters is bbolt,
 not the alias file. Bridge approach:
 
 - `internal/alias/` watches the cluster store. Every cluster create
-  / update / delete also writes to `${XDG_CONFIG_HOME}/bm/aliases.json`
-  (the rebranded path; same format as `~/.mc/config.json`).
+  / update / delete also writes to `${XDG_CONFIG_HOME}/bm/config.json`
+  (same filename and JSON shape as `~/.mc/config.json`, just a different
+  directory).
 - Forked mc commands are patched to read aliases from the bm path
   instead of `~/.mc/`. Single-line change in the forked
   `buckit-io/bm-cli` (the alias-resolution helper).
 - If an operator has an existing `~/.mc/config.json`, `bm` doesn't
   touch it. The two configs stay independent. Operators who want
-  unified aliases can `cp ~/.mc/config.json ~/.bm/aliases.json` once.
+  unified aliases can `cp ~/.mc/config.json ~/.config/bm/config.json`
+  once.
 
 The alias file contains admin URL + access/secret pairs per cluster.
 On disk it's the operator's responsibility to mode it 0600; the bm
@@ -431,7 +434,7 @@ The full mc verb set, identical flag surface and output:
 ```
 bm cp / mv / ls / rm / mb / rb / cat / head / tail / pipe / find / du / stat / tree / mirror / diff / sql / version / share
 
-bm admin service restart / stop / freeze / unfreeze / start
+bm admin service restart / stop / freeze / unfreeze
 bm admin heal
 bm admin trace
 bm admin info
@@ -446,11 +449,14 @@ bm batch / license / support / idp / tier
 These come unchanged from the fork; nothing for us to maintain on the
 command-implementation side unless we deliberately diverge.
 
-Every command — both bm-native and inherited — writes a history row
-through `internal/tasks/`. mc's command Action functions are patched
-in the fork to call `tasks.Record(opKind, …)` immediately before
-performing the side effect. `--json` and `--quiet` flags inherit
-their mc semantics.
+Only operations dispatched through the HTTP `POST /operations` path
+(i.e. the web UI's unified operation modal) write rows into the
+`history` bucket via `internal/tasks/`. Inherited bm-cli verbs (`cp`,
+`ls`, `admin service restart`, ...) behave exactly like `mc` —
+they print to stdout, return an exit code, and do **not** touch the
+history bucket. Operators who run a verb from a shell and want a
+record of it can rely on their shell history, the same way they do
+with `mc`. `--json` and `--quiet` flags inherit their mc semantics.
 
 ## Security model
 
@@ -509,24 +515,26 @@ prerequisite fork pass before M1.
 | Milestone | Scope informed by this doc |
 |---|---|
 | M0 — Module bootstrap | Done. |
-| **M0.5 — Fork the MinIO Go ecosystem** | **Coordinated one-pass fork of Tier 1 + Tier 2 repos under `buckit-io/*`. Rebrand package paths. Confirm `bm-cli` builds cleanly against forked siblings. Pin every fork in `bm/go.mod` to a known-good commit. After this, no upstream rebase obligation anywhere.** |
-| M1 — Storage + server shell | bbolt setup; `internal/{app,store,api,config}/`; `bm web` starts a chi server with empty handlers. **Plus**: import `buckit-io/bm-cli` and wire bm-native verbs alongside; alias bridge writes `${XDG_CONFIG_HOME}/bm/aliases.json` on cluster save. |
+| M0.5 — Fork the MinIO Go ecosystem | Done. All seven forks live under `buckit-io/*` with rebranded module paths, all CI workflows green: `cli`, `selfupdate`, `minio-go`, `pkg`, `madmin-go`, `colorjson`, `bm-cli`. `bm-cli` is library-only (no root `package main`); user-facing `mc`/`MinIO` strings rebranded; upstream copyright headers preserved for AGPL attribution. `bm/go.mod` is currently bare — pins materialise automatically once M1 imports the forks. See [§ Forking the MinIO Go ecosystem](#forking-the-minio-go-ecosystem). |
+| M1 — Storage + server shell | bbolt setup; `internal/{app,store,api,config,alias}/`; `bm web` starts a chi server with shape-correct empty handlers for the UI's read paths. **Plus**: import `buckit-io/bm-cli` and wire bm-native verbs alongside; alias bridge writes `${XDG_CONFIG_HOME}/bm/config.json` on cluster save. See [§ M1 — Storage + server shell](#m1--storage--server-shell) for the punch list. |
 | M2 — Task engine + SSE | `internal/tasks/`; the orchestrator pipeline; pub/sub for `OperationProgress`; SSE endpoint. |
 | M3 — SSH layer + node CRUD | `internal/ssh/`; node bucket; per-cluster client cache. |
 | M4 — Discovery | `/clusters/import/discover` + commit. `madmin-go` AccountInfo + ServerInfo. |
 | M5 — Topology + preflight | New-cluster + migrate preflight checks. |
 | M6 — New-cluster deploy | `internal/deploy/` install loop; SCP + dnf + daemon-reload + systemctl. |
-| M7 — Cluster operations | The full operation catalog (restart, stop, freeze, heal, rolling restart, etc.) using `internal/admin/` + `internal/ssh/`. |
-| M8 — MinIO migration | Snapshot + cutover + verify. |
+| M7 — Cluster operations | The operation catalog under `internal/operations/`: 3 signal ops (freeze/unfreeze/stop), 2 admin-with-progression (restart_cluster, start_heal), 4 SSH-orchestrated (start_cluster parallel, rolling_restart sequential, rolling_upgrade + redeploy_software both Buckit-only), 5 host-scoped (3 systemctl verbs + reboot + shutdown). Most ops support both Buckit and MinIO clusters; `rolling_upgrade` and `redeploy_software` are Buckit-only and reject MinIO at dispatch with `engine_mismatch`. `start_cluster` is NOT a madmin call (no `ServiceStart` exists) — it's parallel SSH `systemctl start` followed by a cluster-wide health-wait. `rotate_root_creds` and `add_pool` deferred to M7.5; `remove_cluster` dropped (use `DELETE /clusters/:id`). |
+| M8 — MinIO migration | Done. Snapshot writer captures buckets / users / groups / canned policies / service accounts / lifecycle / notifications / per-bucket versioning + object-lock + tags into `~/.config/bm/snapshots/<clusterId>-<ts>.json` mode 0600 (wire-stable across versions, soft per-field failures recorded in `Warnings`). Cutover executor runs the install pipeline sequentially (`stopping_minio` → `uploading_pkg` → `installing` → `switching_unit` → `waiting_health` → `waiting_cluster` → `done`), backing up `/etc/default/minio` to `/etc/default/minio.bm-bak` per host and waiting for cluster-wide health between hosts. Rollback reverses the unit swap on hosts where buckit.service is currently active; hosts already on MinIO are skipped cleanly. Engine flips at commit time on success and back on rollback; `MigratedFrom` is stamped/cleared accordingly. Post-cutover verify pass populates the wizard's audit table; failures surface as a warning on the history row, not an auto-rollback. See [§ M8 — MinIO migration](#m8--minio-migration) for the punch list. |
 | M9 — Packaging + installers + embed | nfpm, install.sh, install.ps1; embed `web/dist/`. |
 
 Three adjustments to call out vs. the original M-plan:
 
-- **New M0.5: the fork pass.** Forking five Tier-1 repos (`mc`,
-  `madmin-go`, `minio-go`, `pkg`, `cli`) plus Tier 2 (`selfupdate`,
-  `colorjson`) in one coordinated commit. After this, every
-  cross-import in our tree points at `buckit-io/*` paths — no
-  `go.mod replace` directives, no upstream sync work.
+- **New M0.5: the fork pass.** Done as of 2026-05-18. Five Tier-1 repos
+  (`bm-cli` ex `mc`, `madmin-go`, `minio-go`, `pkg`, `cli`) and two
+  Tier-2 (`selfupdate`, `colorjson`) live under `buckit-io/*`. Every
+  cross-import in the fork tree points at `buckit-io/*` paths — no
+  `go.mod replace` directives, no upstream sync work. `bm-cli` is
+  library-only (the root `main.go` was removed; `bm` is the binary
+  entry point and will consume the package in M1).
 - **Drop the separate `Tasks` page work.** The UI consolidates onto
   the History page (every op writes a `result` snapshot; History's
   View modal renders it). No `/tasks/:id` page; no Task records
@@ -535,6 +543,159 @@ Three adjustments to call out vs. the original M-plan:
 - **`mc` is vendored, not selectively ported.** Original plan was
   silent on this. This doc lands on "fork the whole CLI tree and own
   it" — see the "Forking the MinIO Go ecosystem" section above.
+
+## M1 — Storage + server shell
+
+Goal: `bm web` boots, opens bbolt, serves a chi router with shape-correct
+empty responses for the read paths the UI calls, and the urfave/cli
+dispatch mounts both bm-native verbs and the forked `bm-cli` verbs. No
+real cluster operations yet — every mutating endpoint stays 501 with a
+milestone tag.
+
+Each bullet is `work item → acceptance check`.
+
+### Dependencies
+
+- Import `buckit-io/bm-cli`, `buckit-io/madmin-go/v3`, `buckit-io/cli`, `go-chi/chi/v5`, `go.etcd.io/bbolt` into `go.mod` → `go build ./...` succeeds and the binary still fits the ~10–12 MB target.
+
+### `internal/config/`
+
+- Resolve XDG paths (`~/.config/bm/` on unix, `%APPDATA%\bm\` on Windows) → `config.Dir()` returns the right path per-OS.
+- KEK bootstrap chain: `BM_DATA_KEY` env → `data.key` file → auto-generate 32-byte key at `~/.config/bm/data.key` mode 0600 → `config.DataKey()` returns 32 bytes; auto-generation logs the path once on first launch.
+- Settings struct (remote access off, version pin nil) loaded from the `settings/app` bucket → defaults applied on first launch; `PATCH /settings` persists across restarts.
+
+### `internal/store/`
+
+- bbolt opened at `~/.config/bm/bm.db` mode 0600 with 5s lock timeout → second `bm web` fails fast with a wrapped, friendly "another bm process is using ~/.config/bm/bm.db" error (bbolt's `flock` is kernel-held and released on crash, so there is no stale-lock case).
+- `View(fn)` / `Update(fn)` helpers wrap `db.View` / `db.Update` with a 5s per-txn timeout → both helpers covered by unit tests.
+- Buckets auto-created on first open: `clusters`, `nodes`, `node_facts`, `cluster_ssh`, `cluster_admin`, `history`, `settings` → bucket-list assertion test passes.
+- `PutEncrypted` / `GetEncrypted` AES-GCM helpers for `cluster_ssh` and `cluster_admin` buckets → round-trip test on a random 1 KiB payload passes; callers never see ciphertext.
+- History bucket sweep deferred — a code comment notes M2's `tasks.Finalize` owns it.
+
+### `internal/app/`
+
+- SIGINT / SIGTERM handler triggers graceful shutdown of the chi server with a 5s deadline → Ctrl-C on a running `bm web` exits 0 within 5s.
+- Single-instance enforcement piggy-backs on bbolt's file lock (above). No separate `bm.lock`.
+
+### `internal/api/`
+
+- chi router mounted at `/api/v1`, listener default `127.0.0.1:9443`, refuses non-loopback bind in M1 → `bm web --addr 0.0.0.0:9443` errors out pointing at the (future) remote-access milestone.
+- Middleware: recoverer, request logger, JSON content-type → a panic in a handler returns 500 + structured JSON, not a stack trace.
+- `GET /api/v1/healthz` returns `{"status":"ok","version":...}` → `curl` returns 200.
+- Shape-correct read stubs so the UI loads against the real backend with empty state:
+  - `GET /clusters` → `[]`
+  - `GET /clusters/:id` → 404
+  - `GET /history` → `[]`
+  - `GET /settings` → the settings struct from bbolt
+  - `GET /sessions/me` → `{"username":"admin"}` (no auth in loopback default)
+- All other endpoints listed in [§ REST API](#rest-api) → 501 with `{"error":"not implemented","milestone":"Mn"}` and the owning milestone tag.
+- Static-asset handler: if `web/dist/` exists on disk, serve it; else return 404 with a hint to run `npm run build` → manual `npm run build` + `bm web` renders the Clusters page in a browser.
+
+### `internal/alias/`
+
+- Write-through helper `alias.Sync(store)` that snapshots all clusters into `~/.config/bm/config.json` mode 0600 in mc-compatible JSON shape → on-demand call produces a file `bm-cli` verbs can read; no clusters yet so the output is the empty mc config skeleton.
+- Patch bm-cli at startup to read its config from `~/.config/bm/` (the fork already has `setMcConfigDir` at `cmd/config.go:40` — promote to exported if needed) → `bm alias list` reads from the bm path, not `~/.mc/`.
+
+### `cmd/bm/`
+
+- Replace the hand-rolled switch in `cmd/bm/main.go` with `buckit-io/cli` (urfave/cli fork) dispatch → existing `bm version` and `bm help` keep working; `bm` with no args prints the unified help.
+- Register only `web` and `version` as bm-native commands in M1 — the other bm-native verbs (`cluster`, `manager`, `migrate`, `rolling`, `node`, `history`, `settings`) land in their owning milestones, not as M1 stubs.
+- Mount bm-cli's `appCmds` slice alongside the bm-native commands → `bm alias list`, `bm admin info --help`, and at least one `cp`/`ls` smoke run dispatch correctly.
+- New `cmd/bm/web.go` with the `web` action: flags `--addr` (default `127.0.0.1:9443`), `--no-browser`, `--data-dir` → starting `bm web` opens the default browser (unless `--no-browser`) and binds the listener.
+
+### Milestone exit criteria
+
+1. `bm web` starts, serves `/api/v1/healthz`, exits cleanly on SIGINT.
+2. `~/.config/bm/{bm.db,data.key,config.json}` all exist mode 0600 after a first run.
+3. The Clusters page in the UI loads against the real backend and shows the empty state.
+4. A second `bm web` started while the first is running exits non-zero with the wrapped bbolt-timeout message.
+5. `bm version`, `bm help`, and `bm alias list` all dispatch under the unified urfave/cli tree.
+6. `make build` produces a binary in the ~10–12 MB range; the cross-compile sanity loop in CLAUDE.md still passes.
+
+### M1-local open questions
+
+- **`appCmds` export.** Is bm-cli's `appCmds` slice exported today, or does it need a one-line fork patch (`Cmds` or `Commands()`)? Decide before the urfave/cli wiring lands.
+- **Dev fallback for the static handler.** When `web/dist/` is missing, should `bm web` 404 strictly, or redirect to `http://localhost:5173` so `vite dev` is the natural inner loop? Strict 404 is simpler; redirect is friendlier.
+- **Browser auto-open on headless hosts.** `open` / `xdg-open` fails silently on macOS without a GUI session and on bare Linux. Log a warning vs. surface an error?
+- **Default listener port.** The doc commits to `127.0.0.1:9443`. 9443 is IANA-registered as `tungsten-https` and is **Portainer's default HTTPS port** — a real conflict for operators running both tools on one machine. Decide before M1 merge: keep 9443 and rely on `--addr` overrides, or move to a less-crowded port (`9543` and `9445` are the cleanest nearby options; `8443` collides with Tomcat / K8s).
+
+## M8 — MinIO migration
+
+Goal: an operator on the Migrate wizard can capture a MinIO cluster's
+state, run a sequential per-host cutover that swaps `minio.service` for
+`buckit.service`, and roll the change back if needed. All of it goes
+through the M2 orchestrator, so progress streams over SSE and history
+rows record `Result` snapshots like every other op.
+
+The cutover is **roll-forward only inside one task** — verify failures
+surface as warnings on the history row, not an auto-rollback. The
+operator triggers rollback explicitly. That keeps the failure mode
+visible instead of silently masking real bugs.
+
+Each bullet is `work item → acceptance check`.
+
+### Snapshot capture (`internal/migration/`, `internal/admin/`)
+
+- Extend `internal/admin/Client` with `ListUsers`, `ListGroups` (+ per-group `GetGroupDescription`), `ListCannedPolicies`, `ListServiceAccounts(users)` → admin client returns the typed slices the snapshot writer consumes.
+- Add `internal/admin/S3Client` (minio-go wrapper) for bucket-level reads: `ListBuckets`, `EnrichBucket` (versioning + object-lock + tags), `BucketLifecycle`, `BucketNotifications` → 404/NotImplemented on older MinIO versions becomes a snapshot warning, not a fetch failure.
+- `migration.Snapshot(ctx, dir, clusterID, creds)` populates the full `domain.MinioSnapshot` and writes it to `~/.config/bm/snapshots/<clusterId>-<ts>.json` mode 0600 → file written, in-memory snapshot returned, soft per-field errors collected in `snap.Warnings`.
+- `migration.Summarize(snap)` derives `domain.MinioSnapshotSummary` (counts + `largestBucket`) for the wizard's Review step → counts match what the wizard's `MinioSnapshot` interface in `state.ts` expects.
+- `migration.ReadSnapshot(path)` reloads a snapshot for the cutover/rollback executors → wire-stable round trip; new optional fields don't break older files.
+
+### Cutover executor (`internal/migration/`)
+
+- `CutoverParams` + `MigrationBody` (wire shape) + `Stage` enum (mirrors UI's `CutoverNodeState.state` byte-for-byte) → `Validate()` rejects empty hosts, missing snapshot, unsupported version.
+- `Installer.Install(ctx, host, params, emit)` per-host pipeline: backup `/etc/default/minio` → stop minio → curl rpm → dnf/yum/apt install → disable minio.service + enable --now buckit.service → curl `/minio/health/live` → done. Reuses `deploy.PickInstallCmd`, `deploy.SudoWrap`, `deploy.ShellEscape`, `deploy.RunStep` (exported from `internal/deploy/install.go`) → emits a `StepEvent` per stage.
+- `CutoverExecutor` (sequential, no parallel knob): per-host loop with `waitClusterHealthy` between hosts via `admin.Pool` ServerInfo (default 120s timeout) → halts on first host failure with `FailureNote` listing the failed host; remaining hosts stay on MinIO.
+- After all hosts done: `commitEngineFlip` updates the persisted `domain.Cluster`: `Engine: minio→buckit`, sets `Version`, stamps `MigratedFrom{Product:"minio", Version: snap.Version, FinalizedAt: now}` → cluster row reflects the new engine; UI banner shows the migration source.
+- Cancellation: `markCanceled` records the in-flight host's stage in `FailureNote` ("cutover canceled at <host> (stage: <stage>)"), keeps earlier hosts as `HostSucceeded`, leaves later hosts as `HostPending` → operator reads exactly which hosts are on Buckit and which are still on MinIO from the History result modal.
+
+### Verify pass (`internal/migration/verify.go`)
+
+- After commit, `Verify(ctx, pool, params)` reads back the migrated cluster: `ServerInfo` for `clusterHealthy + nodesReporting`, `AccountInfo` for bucket count + smoke check (every snapshot bucket still exists), `ListUsers/ListGroups/ListCannedPolicies/ListServiceAccounts` for IAM counts → result populates the wizard's `VerifyResult` shape.
+- Verify failures land in `OperationResult.FailureNote` and surface as a warning on the history row. **No auto-rollback** → operator decides; bm doesn't second-guess.
+- Time-boxed at 60s so a wedged cluster doesn't push the cutover history row past the operator's expectation.
+
+### Rollback executor (`internal/migration/rollback.go`)
+
+- `RollbackExecutor` validates, then per host: `systemctl is-active buckit.service` → if inactive, mark `HostSucceeded` with detail "Already on MinIO" and skip; otherwise run `Installer.Rollback`: stop buckit.service → restore env-file backup → enable --now minio.service → wait `/minio/health/live` → if at least one host actually rolled back, flip `Cluster.Engine` back to `EngineMinio` and clear `MigratedFrom`.
+- Pure no-op rollback (every host already on MinIO) leaves the cluster row alone → idempotent; safe to call twice.
+
+### Preflight check
+
+- `bak_writable` (blocking, per host) — `sudo touch + rm /etc/default/.bm-bak-probe` → catches sudo-required hosts where `/etc/default` isn't writable before the cutover hits the same step on host #2.
+
+### REST surface
+
+- `POST /clusters/:id/migrate/snapshot` — returns `{snapshot, summary, path}`. Already mounted in M5; M8 fills in the body.
+- `POST /clusters/:id/migrate/preflight` — already mounted in M5; M8 adds `bak_writable`.
+- `POST /clusters/:id/migrate/cutover` — body is the wizard's MigrationBody, dispatches `migrate_cutover`. 404 on missing cluster, 404 on missing admin creds, 400 on validation, 409 cluster_busy.
+- `POST /clusters/:id/migrate/rollback` — same body shape minus the snapshot requirement, dispatches `migrate_rollback`. 404/400/409 as above.
+- The wire stays compatible with the wizard's existing `MigrationDraft` shape — `FromMigrationBody` picks the executor-relevant fields.
+
+### Wiring (`cmd/bm/web.go`)
+
+- `migration.Register(deps)` wires `CutoverExecutor` + `RollbackExecutor` into the tasks registry. Added alongside `operations.RegisterAll(...)` after the existing `deploy.Register(...)` block. New `OpKind` constants `OpMigrateCutover` / `OpMigrateRollback` live in `internal/tasks/types.go`.
+
+### Tests
+
+- `internal/migration/snapshot_test.go` — write/read round-trip + 0600 mode + Summarize counts + end-to-end against fake httptest admin/S3 endpoints.
+- `internal/migration/cutover_test.go` — 1-host happy path, snapshot-missing rejection, 2-host with cluster-healthy wait between hosts. Uses the in-memory `internal/sshtest` server.
+- `internal/migration/rollback_test.go` — full rollback (engine flips back) + no-op when buckit isn't active (uses a new `sshtest.Server.CmdOverride` hook to simulate the inactive probe).
+- `internal/api/m8_integration_test.go` — full HTTP path: dispatch cutover → poll terminal → assert engine, then dispatch rollback → assert engine flips back. Includes 404 (missing cluster) and 400 (validation) cases.
+
+### Milestone exit criteria
+
+1. `make build` + `make test` clean (`-race -count=1 ./...`).
+2. The wizard's Migrate step renders against the real backend: snapshot endpoint returns counts the Review step renders, cutover dispatch streams stage events over SSE.
+3. Cluster row's `Engine` flips deterministically on success and on rollback. `MigratedFrom` is stamped on cutover, cleared on rollback.
+4. The 5-platform cross-compile sanity loop in `CLAUDE.md` still passes.
+
+### M8-local open questions
+
+- **Snapshot file format versioning.** The on-disk JSON has no schema version field today — adding fields with `omitempty` keeps older files decodable, but a future breaking change would need an explicit `schemaVersion` int. Defer until a real schema break is needed.
+- **Per-bucket smoke read.** `Verify` doesn't yet HEAD the largest bucket to confirm reads work post-cutover — `ObjectsSampled` is `0/0` today. Cheap to add when minio-go's anonymous read is already wired in for `bm cp` parity.
+- **Parallel cutover.** Sequential is the M8 contract because the UI's per-node state machine assumes one host at a time. If operators want a parallel knob (à la `BM_DEPLOY_CONCURRENCY`), it lands as a future M8.5 alongside the corresponding wizard change.
 
 ## Open questions
 
@@ -557,9 +718,9 @@ Three adjustments to call out vs. the original M-plan:
    socket — not just bbolt locks. To revisit when M3 lands.
 5. **Alias-file coexistence with an existing `mc` install.** If the
    operator already runs `mc` and has `~/.mc/config.json` populated,
-   does `bm aliases.json` shadow it, supplement it, or stay isolated?
-   Current design says isolated — `bm` reads its own file only. Revisit
-   if user feedback says otherwise.
+   does `~/.config/bm/config.json` shadow it, supplement it, or stay
+   isolated? Current design says isolated — `bm` reads its own file
+   only. Revisit if user feedback says otherwise.
 6. **Rebrand depth in the forked CLI.** Forked mc still says "mc" in
    error messages, help text, and the binary name. Decide once how
    aggressively to rebrand (all strings → "bm", or leave as-is with
