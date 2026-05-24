@@ -17,7 +17,7 @@ require (
 	github.com/IBM/sarama v1.45.1
 	github.com/alecthomas/participle v0.7.1
 	github.com/beevik/ntp v1.4.3
-	github.com/buckit-io/console v0.0.0-20260502012154-a500b6db00f3
+	github.com/buckit-io/console v0.0.0-20260524020438-f8ce35f8fcdb
 	github.com/buckit-io/madmin-go/v3 v3.0.0-20260522015421-d3ce3b5623dd
 	github.com/buckit-io/minio-go/v7 v7.0.0-20260518233947-e88e1acf1753
 	github.com/buger/jsonparser v1.1.2
