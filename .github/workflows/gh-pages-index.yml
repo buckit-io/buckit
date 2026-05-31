@@ -19,7 +19,8 @@ jobs:
           python3 - <<'EOF'
           import os, html
 
-          SKIP = {'server/buckit/release', 'server/buckit/archives'}
+          # '.' keeps the hand-written, styled root index.html in place.
+          SKIP = {'.', 'server/buckit/release', 'server/buckit/archives'}
 
           for dirpath, dirnames, filenames in os.walk('.'):
               dirnames[:] = sorted(d for d in dirnames if d != '.git')
