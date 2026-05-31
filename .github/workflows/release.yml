@@ -230,68 +230,189 @@ jobs:
           <html>
           <head>
             <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>Buckit ${tag}</title>
             <style>
-              body { font-family: sans-serif; max-width: 860px; margin: 2em auto; padding: 0 1em; }
-              h2 { margin-bottom: 0.25em; }
-              p { margin-top: 0.25em; color: #555; }
-              table { border-collapse: collapse; width: 100%; margin-bottom: 2em; }
-              th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #ddd; }
-              th { background: #f4f4f4; font-weight: 600; }
-              a { color: #0366d6; text-decoration: none; }
+              :root { color-scheme: light; --bg: #f3f5f9; --surface: #ffffff; --surface-alt: #f8fafc; --border: #d8dee9; --text: #0f172a; --muted: #475569; --link: #0f766e; --link-hover: #115e59; --accent: #dcfce7; --accent-text: #166534; --shadow: 0 18px 40px rgba(15, 23, 42, 0.08); }
+              * { box-sizing: border-box; }
+              body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+              .page { max-width: 1080px; margin: 0 auto; padding: 40px 20px 64px; }
+              .hero, .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
+              .hero { padding: 28px; margin-bottom: 24px; }
+              .eyebrow { display: inline-block; padding: 6px 10px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: uppercase; }
+              h1 { margin: 14px 0 10px; font-size: 34px; line-height: 1.1; }
+              .subhead { margin: 0 0 20px; max-width: 760px; color: var(--muted); font-size: 16px; line-height: 1.6; }
+              .hero-actions, .meta { display: flex; flex-wrap: wrap; gap: 12px; }
+              .meta { margin-top: 18px; }
+              .meta-item { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-alt); min-width: 160px; }
+              .meta-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+              .meta-value { font-size: 14px; font-weight: 600; }
+              .button, .text-link { color: var(--link); text-decoration: none; font-weight: 600; }
+              .button { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 0 16px; border-radius: 10px; border: 1px solid #99f6e4; background: #f0fdfa; }
+              .button:hover, .text-link:hover { color: var(--link-hover); }
+              .panel { padding: 24px; margin-bottom: 24px; }
+              .panel:last-child { margin-bottom: 0; }
+              .section-title { margin: 0 0 8px; font-size: 24px; }
+              .section-copy { margin: 0 0 20px; color: var(--muted); line-height: 1.6; }
+              .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+              .card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface-alt); padding: 18px; }
+              .card h3 { margin: 0 0 8px; font-size: 18px; }
+              .card p { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+              .card-links { display: grid; gap: 10px; }
+              .download { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 14px; border-radius: 10px; background: #0f172a; color: #ffffff; text-decoration: none; font-weight: 600; }
+              .download:hover { background: #1e293b; }
+              .aux-links { display: flex; flex-wrap: wrap; gap: 12px; }
+              .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-alt); }
+              table { width: 100%; border-collapse: collapse; }
+              th, td { text-align: left; padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+              th { font-size: 12px; text-transform: uppercase; color: var(--muted); background: #eef2f7; letter-spacing: 0.04em; }
+              tbody tr:last-child td { border-bottom: 0; }
+              td strong { display: block; margin-bottom: 4px; }
+              .footer-note { margin-top: 18px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+              a { color: var(--link); text-decoration: none; }
               a:hover { text-decoration: underline; }
+              @media (max-width: 720px) {
+                .page { padding: 24px 16px 48px; }
+                .hero, .panel { padding: 20px; }
+                h1 { font-size: 28px; }
+              }
             </style>
           </head>
           <body>
-            <h2>Buckit ${tag}</h2>
-            <p>Latest stable release &mdash; <a href="../archives/">all releases &rarr;</a></p>
-            <h3>Binaries</h3>
-            <table>
-              <tr><th>Platform</th><th>Binary</th><th>Checksum</th><th>Signature</th></tr>
-              <tr>
-                <td>Linux x86_64</td>
-                <td><a href="${base}/buckit-linux-amd64.${tag}">buckit-linux-amd64</a></td>
-                <td><a href="${base}/buckit-linux-amd64.${tag}.sha256sum">.sha256sum</a></td>
-                <td><a href="${base}/buckit-linux-amd64.${tag}.minisig">.minisig</a></td>
-              </tr>
-              <tr>
-                <td>Linux arm64</td>
-                <td><a href="${base}/buckit-linux-arm64.${tag}">buckit-linux-arm64</a></td>
-                <td><a href="${base}/buckit-linux-arm64.${tag}.sha256sum">.sha256sum</a></td>
-                <td><a href="${base}/buckit-linux-arm64.${tag}.minisig">.minisig</a></td>
-              </tr>
-              <tr>
-                <td>Windows x86_64</td>
-                <td><a href="${base}/buckit-windows-amd64.exe.${tag}">buckit-windows-amd64.exe</a></td>
-                <td><a href="${base}/buckit-windows-amd64.exe.${tag}.sha256sum">.sha256sum</a></td>
-                <td><a href="${base}/buckit-windows-amd64.exe.${tag}.minisig">.minisig</a></td>
-              </tr>
-              <tr>
-                <td>macOS arm64</td>
-                <td><a href="${base}/buckit-darwin-arm64.${tag}">buckit-darwin-arm64</a></td>
-                <td><a href="${base}/buckit-darwin-arm64.${tag}.sha256sum">.sha256sum</a></td>
-                <td><a href="${base}/buckit-darwin-arm64.${tag}.minisig">.minisig</a></td>
-              </tr>
-            </table>
-            <h3>Linux packages</h3>
-            <table>
-              <tr><th>Format</th><th>amd64</th><th>arm64</th></tr>
-              <tr>
-                <td>Debian/Ubuntu (.deb)</td>
-                <td><a href="${base}/buckit_${PKG_VERSION}_amd64.deb">buckit_${PKG_VERSION}_amd64.deb</a></td>
-                <td><a href="${base}/buckit_${PKG_VERSION}_arm64.deb">buckit_${PKG_VERSION}_arm64.deb</a></td>
-              </tr>
-              <tr>
-                <td>RPM (.rpm)</td>
-                <td><a href="${base}/buckit-${PKG_VERSION}.x86_64.rpm">buckit-${PKG_VERSION}.x86_64.rpm</a></td>
-                <td><a href="${base}/buckit-${PKG_VERSION}.aarch64.rpm">buckit-${PKG_VERSION}.aarch64.rpm</a></td>
-              </tr>
-              <tr>
-                <td>Alpine (.apk)</td>
-                <td><a href="${base}/buckit_${PKG_VERSION}_x86_64.apk">buckit_${PKG_VERSION}_x86_64.apk</a></td>
-                <td><a href="${base}/buckit_${PKG_VERSION}_aarch64.apk">buckit_${PKG_VERSION}_aarch64.apk</a></td>
-              </tr>
-            </table>
+            <div class="page">
+              <section class="hero">
+                <span class="eyebrow">Latest Stable Release</span>
+                <h1>Buckit</h1>
+                <p class="subhead">Signed release binaries for the Buckit S3-compatible object storage server.</p>
+                <div class="hero-actions">
+                  <a class="button" href="../archives/">Browse release archive</a>
+                </div>
+                <div class="meta">
+                  <div class="meta-item">
+                    <span class="meta-label">Release tag</span>
+                    <span class="meta-value">${tag}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">Repository</span>
+                    <span class="meta-value">buckit-io/buckit</span>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <h2 class="section-title">Downloads</h2>
+                <p class="section-copy">Choose the binary for your OS and architecture. Each platform card includes the signed artifact, checksum, and minisign signature.</p>
+                <div class="cards">
+                  <article class="card">
+                    <h3>Linux x86_64</h3>
+                    <p>Standard Linux build for x86_64 hosts.</p>
+                    <div class="card-links">
+                      <a class="download" href="${base}/buckit-linux-amd64.${tag}">Download binary</a>
+                      <div class="aux-links">
+                        <a href="${base}/buckit-linux-amd64.${tag}.sha256sum">Checksum</a>
+                        <a href="${base}/buckit-linux-amd64.${tag}.minisig">Signature</a>
+                      </div>
+                    </div>
+                  </article>
+                  <article class="card">
+                    <h3>Linux arm64</h3>
+                    <p>Linux build for ARM64 systems and cloud hosts.</p>
+                    <div class="card-links">
+                      <a class="download" href="${base}/buckit-linux-arm64.${tag}">Download binary</a>
+                      <div class="aux-links">
+                        <a href="${base}/buckit-linux-arm64.${tag}.sha256sum">Checksum</a>
+                        <a href="${base}/buckit-linux-arm64.${tag}.minisig">Signature</a>
+                      </div>
+                    </div>
+                  </article>
+                  <article class="card">
+                    <h3>macOS arm64</h3>
+                    <p>Native Apple Silicon build for modern Macs.</p>
+                    <div class="card-links">
+                      <a class="download" href="${base}/buckit-darwin-arm64.${tag}">Download binary</a>
+                      <div class="aux-links">
+                        <a href="${base}/buckit-darwin-arm64.${tag}.sha256sum">Checksum</a>
+                        <a href="${base}/buckit-darwin-arm64.${tag}.minisig">Signature</a>
+                      </div>
+                    </div>
+                  </article>
+                  <article class="card">
+                    <h3>Windows x86_64</h3>
+                    <p>Windows build for 64-bit desktop and server environments.</p>
+                    <div class="card-links">
+                      <a class="download" href="${base}/buckit-windows-amd64.exe.${tag}">Download binary</a>
+                      <div class="aux-links">
+                        <a href="${base}/buckit-windows-amd64.exe.${tag}.sha256sum">Checksum</a>
+                        <a href="${base}/buckit-windows-amd64.exe.${tag}.minisig">Signature</a>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+                <p class="footer-note">Need the raw artifact names for automation or mirrors? The manifest below keeps the exact filenames and verification links in one place.</p>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>Platform</th><th>Binary</th><th>Checksum</th><th>Signature</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Linux x86_64</strong>Standard Linux</td>
+                        <td><a href="${base}/buckit-linux-amd64.${tag}">buckit-linux-amd64.${tag}</a></td>
+                        <td><a href="${base}/buckit-linux-amd64.${tag}.sha256sum">.sha256sum</a></td>
+                        <td><a href="${base}/buckit-linux-amd64.${tag}.minisig">.minisig</a></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Linux arm64</strong>ARM64 Linux</td>
+                        <td><a href="${base}/buckit-linux-arm64.${tag}">buckit-linux-arm64.${tag}</a></td>
+                        <td><a href="${base}/buckit-linux-arm64.${tag}.sha256sum">.sha256sum</a></td>
+                        <td><a href="${base}/buckit-linux-arm64.${tag}.minisig">.minisig</a></td>
+                      </tr>
+                      <tr>
+                        <td><strong>macOS arm64</strong>Apple Silicon</td>
+                        <td><a href="${base}/buckit-darwin-arm64.${tag}">buckit-darwin-arm64.${tag}</a></td>
+                        <td><a href="${base}/buckit-darwin-arm64.${tag}.sha256sum">.sha256sum</a></td>
+                        <td><a href="${base}/buckit-darwin-arm64.${tag}.minisig">.minisig</a></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Windows x86_64</strong>64-bit Windows</td>
+                        <td><a href="${base}/buckit-windows-amd64.exe.${tag}">buckit-windows-amd64.exe.${tag}</a></td>
+                        <td><a href="${base}/buckit-windows-amd64.exe.${tag}.sha256sum">.sha256sum</a></td>
+                        <td><a href="${base}/buckit-windows-amd64.exe.${tag}.minisig">.minisig</a></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section class="panel">
+                <h2 class="section-title">Linux packages</h2>
+                <p class="section-copy">Native packages for Debian/Ubuntu, RPM, and Alpine distributions.</p>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>Format</th><th>amd64</th><th>arm64</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Debian/Ubuntu</strong>.deb</td>
+                        <td><a href="${base}/buckit_${PKG_VERSION}_amd64.deb">buckit_${PKG_VERSION}_amd64.deb</a></td>
+                        <td><a href="${base}/buckit_${PKG_VERSION}_arm64.deb">buckit_${PKG_VERSION}_arm64.deb</a></td>
+                      </tr>
+                      <tr>
+                        <td><strong>RPM</strong>.rpm</td>
+                        <td><a href="${base}/buckit-${PKG_VERSION}.x86_64.rpm">buckit-${PKG_VERSION}.x86_64.rpm</a></td>
+                        <td><a href="${base}/buckit-${PKG_VERSION}.aarch64.rpm">buckit-${PKG_VERSION}.aarch64.rpm</a></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Alpine</strong>.apk</td>
+                        <td><a href="${base}/buckit_${PKG_VERSION}_x86_64.apk">buckit_${PKG_VERSION}_x86_64.apk</a></td>
+                        <td><a href="${base}/buckit_${PKG_VERSION}_aarch64.apk">buckit_${PKG_VERSION}_aarch64.apk</a></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
           </body>
           </html>
           HTML
@@ -322,23 +443,58 @@ jobs:
           <html>
           <head>
             <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>Buckit Releases</title>
             <style>
-              body {{ font-family: sans-serif; max-width: 860px; margin: 2em auto; padding: 0 1em; }}
+              :root {{ color-scheme: light; --bg: #f3f5f9; --surface: #ffffff; --surface-alt: #f8fafc; --border: #d8dee9; --text: #0f172a; --muted: #475569; --link: #0f766e; --shadow: 0 18px 40px rgba(15, 23, 42, 0.08); }}
+              * {{ box-sizing: border-box; }}
+              body {{ margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }}
+              .page {{ max-width: 1080px; margin: 0 auto; padding: 40px 20px 64px; }}
+              .hero, .panel {{ background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }}
+              .hero {{ padding: 28px; margin-bottom: 24px; }}
+              .eyebrow {{ display: inline-block; padding: 6px 10px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 12px; font-weight: 700; text-transform: uppercase; }}
+              h1 {{ margin: 14px 0 10px; font-size: 34px; line-height: 1.1; }}
+              .subhead {{ margin: 0; max-width: 720px; color: var(--muted); line-height: 1.6; }}
+              .actions {{ margin-top: 18px; }}
+              .button {{ display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 0 16px; border-radius: 10px; border: 1px solid #99f6e4; background: #f0fdfa; color: var(--link); text-decoration: none; font-weight: 600; }}
+              .panel {{ padding: 24px; }}
+              .table-wrap {{ overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-alt); }}
               table {{ border-collapse: collapse; width: 100%; }}
-              th, td {{ text-align: left; padding: 8px 12px; border-bottom: 1px solid #ddd; }}
-              th {{ background: #f4f4f4; font-weight: 600; }}
-              a {{ color: #0366d6; text-decoration: none; }}
+              th, td {{ text-align: left; padding: 14px 16px; border-bottom: 1px solid var(--border); }}
+              th {{ background: #eef2f7; font-weight: 600; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }}
+              tbody tr:last-child td {{ border-bottom: 0; }}
+              a {{ color: var(--link); text-decoration: none; }}
               a:hover {{ text-decoration: underline; }}
+              @media (max-width: 720px) {{
+                .page {{ padding: 24px 16px 48px; }}
+                .hero, .panel {{ padding: 20px; }}
+                h1 {{ font-size: 28px; }}
+              }}
             </style>
           </head>
           <body>
-            <h2>Buckit Releases</h2>
-            <p><a href="../release/">Latest release &rarr;</a></p>
-            <table>
-              <tr><th>Date</th><th>Release</th><th>Downloads</th></tr>
+            <div class="page">
+              <section class="hero">
+                <span class="eyebrow">Release Archive</span>
+                <h1>Buckit Releases</h1>
+                <p class="subhead">Stable Buckit releases published to GitHub. Open any release to inspect artifacts, checksums, and signed binaries, or jump back to the current release landing page.</p>
+                <div class="actions">
+                  <a class="button" href="../release/">Open latest release</a>
+                </div>
+              </section>
+              <section class="panel">
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>Date</th><th>Release</th><th>Downloads</th></tr>
+                    </thead>
+                    <tbody>
               {rows}
-            </table>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
           </body>
           </html>'''
 
