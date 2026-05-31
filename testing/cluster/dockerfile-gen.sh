@@ -10,17 +10,17 @@ generate_dockerfile() {
 	local install_cmd
 	case "$base_image" in
 	*ubuntu* | *debian*)
-		install_cmd="sed -i 's|http://ports.ubuntu.com/ubuntu-ports/|http://mirrors.mit.edu/ubuntu-ports/|g' /etc/apt/sources.list.d/*.sources 2>/dev/null; sed -i 's|http://ports.ubuntu.com|http://mirrors.mit.edu/ubuntu-ports|g' /etc/apt/sources.list 2>/dev/null; apt-get update && apt-get install -y --no-install-recommends systemd xfsprogs openssh-server && apt-get clean && rm -rf /var/lib/apt/lists/*"
+		install_cmd="sed -i 's|http://ports.ubuntu.com/ubuntu-ports/|http://mirrors.mit.edu/ubuntu-ports/|g' /etc/apt/sources.list.d/*.sources 2>/dev/null; sed -i 's|http://ports.ubuntu.com|http://mirrors.mit.edu/ubuntu-ports|g' /etc/apt/sources.list 2>/dev/null; apt-get update && apt-get install -y --no-install-recommends systemd systemd-sysv xfsprogs openssh-server curl ca-certificates iputils-ping && apt-get clean && rm -rf /var/lib/apt/lists/*"
 		;;
 	*rocky* | *centos* | *alma* | *fedora* | *rhel* | *amazonlinux*)
-		install_cmd="dnf install -y systemd xfsprogs openssh-server && dnf clean all"
+		install_cmd="dnf install -y systemd xfsprogs openssh-server curl ca-certificates iputils && dnf clean all"
 		;;
 	*alpine*)
 		echo "Error: Alpine does not support systemd. Use Ubuntu, Debian, Rocky, or Fedora."
 		exit 1
 		;;
 	*)
-		install_cmd="apt-get update && apt-get install -y systemd xfsprogs openssh-server && apt-get clean && rm -rf /var/lib/apt/lists/*"
+		install_cmd="apt-get update && apt-get install -y systemd systemd-sysv xfsprogs openssh-server curl ca-certificates iputils-ping && apt-get clean && rm -rf /var/lib/apt/lists/*"
 		;;
 	esac
 

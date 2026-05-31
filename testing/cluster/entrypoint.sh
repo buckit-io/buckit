@@ -14,6 +14,14 @@ fi
 # Ensure loop device support
 modprobe loop 2>/dev/null || true
 
+# Pre-populate /dev/loop0.../dev/loop63 so that losetup --find --show can open
+# the device node immediately after the kernel atomically allocates its index.
+# Without this a freshly-started container may be missing higher-numbered nodes.
+for _n in $(seq 0 63); do
+	[ -e "/dev/loop${_n}" ] || mknod "/dev/loop${_n}" b 7 "${_n}" 2>/dev/null || true
+done
+unset _n
+
 # Detach any orphaned loop devices pointing to deleted backing files (e.g. from
 # prior container runs on Docker Desktop, whose loop attachments leak into the
 # host VM kernel even after the container's volume is removed).
@@ -24,15 +32,20 @@ if command -v losetup >/dev/null 2>&1; then
 fi
 
 attach_loop() {
-	# Allocate next free loop device, materializing its /dev node inside the
-	# container if it doesn't already exist (the kernel may return an index
-	# above the ones present in our /dev namespace).
+	# losetup --find --show atomically selects the next free loop device and
+	# attaches the image in one kernel operation (LOOP_CTL_GET_FREE +
+	# LOOP_SET_FD).  The old two-step approach — losetup -f to read the next
+	# free device, then a separate losetup <dev> <img> to attach — has a TOCTOU
+	# race: when N nodes start concurrently they all observe the same "next
+	# free" number before any of them has attached, so N-1 of them hit
+	# "Device or resource busy".  The atomic form closes that window entirely.
 	local img="$1"
 	local loop num
-	loop=$(losetup -f) || return 1
+	loop=$(losetup --find --show "$img") || return 1
+	# Materialise the /dev node if the kernel assigned an index above the
+	# pre-populated range inside this container's /dev namespace.
 	num=${loop##/dev/loop}
 	[ -e "$loop" ] || mknod "$loop" b 7 "$num" 2>/dev/null || true
-	losetup "$loop" "$img" || return 1
 	echo "$loop"
 }
 

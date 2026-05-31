@@ -1,0 +1,61 @@
+# Dockerfile for MinIO migration test container.
+#
+# Follows the MinIO RHEL deployment guide at:
+#   https://buckit-io.github.io/docs/operations/deployments/baremetal-deploy-minio-on-redhat-linux.html
+#
+# The MinIO RPM is downloaded at build time from the official download server.
+# The correct architecture variant is selected automatically via Docker
+# BuildKit's TARGETARCH build argument (amd64 on GitHub Actions standard
+# runners; arm64 on Apple Silicon / self-hosted ARM runners).  No manual
+# flag is required — `docker build` and `docker compose build` set it.
+#
+# Usage (via cluster.sh):
+#   ./cluster.sh minio start
+#   ./cluster.sh minio stop
+
+FROM rockylinux:9
+
+# Install system dependencies: systemd (init), xfsprogs (mkfs.xfs), wget, openssh-server
+RUN dnf install -y systemd xfsprogs wget openssh-server && dnf clean all
+
+# Download and install the MinIO RPM for the target architecture.
+# TARGETARCH is injected by BuildKit (e.g. "amd64", "arm64"); it matches
+# MinIO's URL path segment exactly, so no extra mapping is needed.
+ARG TARGETARCH
+RUN wget "https://dl.min.io/server/minio/release/linux-${TARGETARCH}/minio.rpm" \
+        -O /tmp/minio.rpm \
+    && dnf install -y /tmp/minio.rpm \
+    && rm -f /tmp/minio.rpm
+
+# Create the minio service user and group (per MinIO deployment guide)
+RUN groupadd -r minio-user \
+    && useradd -M -r -g minio-user minio-user
+
+# Directories: persistent backing images live in /var/lib/minio-drives
+# (mounted as a named Docker volume); XFS filesystems are mounted under
+# /mnt/data/drive{N} at container start time.
+RUN mkdir -p /var/lib/minio-drives /mnt/data
+
+# Configure sshd: allow root login with a password, disable PAM (not needed
+# in a container), create the run directory required by sshd.
+RUN mkdir -p /var/run/sshd \
+    && sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/'       /etc/ssh/sshd_config \
+    && sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config \
+    && sed -i 's/^UsePAM.*/UsePAM no/' /etc/ssh/sshd_config \
+    && grep -q '^UsePAM ' /etc/ssh/sshd_config || echo 'UsePAM no' >> /etc/ssh/sshd_config
+
+# Enable minio and sshd systemd services via wants symlinks.
+# (systemctl enable does not work during docker build — no running systemd.)
+RUN mkdir -p /etc/systemd/system/multi-user.target.wants \
+    && ln -sf /usr/lib/systemd/system/minio.service \
+              /etc/systemd/system/multi-user.target.wants/minio.service \
+    && ln -sf /usr/lib/systemd/system/sshd.service \
+              /etc/systemd/system/multi-user.target.wants/sshd.service
+
+COPY minio-entrypoint.sh /minio-entrypoint.sh
+RUN chmod +x /minio-entrypoint.sh
+
+EXPOSE 9000 9001 22
+
+STOPSIGNAL SIGRTMIN+3
+ENTRYPOINT ["/minio-entrypoint.sh"]
