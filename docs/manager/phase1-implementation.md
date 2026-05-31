@@ -271,14 +271,33 @@ order so the UI always has working endpoints to call.
 - Finalize task: `dnf/apt remove minio`, snapshot archived, status → Active.
 
 ### M9 — Packaging + installers + embed
-- `web/embed.go` with `//go:embed dist/*`.
-- Per-user install: Homebrew tap (`buckit-io/tap` → `bm`), Scoop manifest, direct binary downloads. No system-wide install, no systemd unit, no `bm` system user — `bm` is a personal-tool binary.
-- Goreleaser config or Makefile target producing checksummed artifacts for all 5 target platforms.
+- Embed `web/dist` into the binary via `//go:embed all:web/dist`
+  (lives at repo-root `uiassets.go`, package `bmassets`, not the
+  originally-sketched `web/embed.go`).
+- Release pipeline (`.github/workflows/release.yml`, triggered on
+  `RELEASE.*` tags) cross-compiles all 5 target platforms, emits
+  per-binary `.sha256sum` + a `checksums.txt` manifest, and signs each
+  artifact with minisign. Publishes a GitHub Release plus a gh-pages
+  download site (`buckit-io.github.io/bm`) with self-update pointer
+  files at `manager/bm/release/<platform>/bm.sha256sum`.
+- In-app self-update: `bm update [--check]` (`internal/update`) reads
+  the gh-pages pointer and applies the new binary, verifying SHA-256 +
+  minisign signature against the embedded Buckit public key.
+- Per-user install: `packaging/install.sh` (curl|sh) and
+  `packaging/install.ps1` (PowerShell `irm|iex`), published to gh-pages
+  as `install.sh` / `install.ps1`. They detect OS/arch, download the
+  matching signed binary, hard-gate on SHA-256 (best-effort minisign),
+  and install to `~/.local/bin` (`%LOCALAPPDATA%\Programs\bm` on
+  Windows) with no sudo. macOS quarantine xattr is stripped client-side
+  — binaries are intentionally not codesigned/notarized. No system-wide
+  install, no systemd unit, no `bm` system user — `bm` is a
+  personal-tool binary. Homebrew tap and Scoop manifest were considered
+  and dropped in favour of the two install scripts + `bm update`.
 
 ## Progress
 
 Canonical state for resuming work in a new session. Last updated
-**2026-05-15**. The git repo (`git@github.com:buckit-io/bm.git`,
+**2026-05-31**. The git repo (`git@github.com:buckit-io/bm.git`,
 branch `main`) holds everything checked off below.
 
 ### ✅ Completed
@@ -348,19 +367,21 @@ mock layer at `web/src/mock/{data.ts,api.ts}` + `web/src/api/hooks.ts`)
   `overflow-x: auto` so wide tables scroll horizontally instead of
   clipping at narrow viewports
 
-### ⬜ Not yet started
+**Backend implementation milestones M1–M9 — all landed.** The real Go
+backend (bbolt store, chi API, task engine + SSE, SSH layer, discovery,
+topology + preflight, new-cluster deploy, cluster operations, MinIO
+migration) and the React UI fetching against the live HTTP surface are
+in `main`. M9 specifically: the UI bundle is embedded
+(`//go:embed all:web/dist` in `uiassets.go`), a signed multi-platform
+release pipeline publishes to GitHub Releases + a gh-pages download
+site, `bm update` self-updates with SHA-256 + minisign verification,
+and `packaging/install.sh` + `packaging/install.ps1` provide the
+per-user one-liner installers (see the M9 milestone above for detail).
+The cross-cutting TODOs listed below (cutover drop-in, rollback action,
+preflight checks, alias auto-save, follow-up wizards) remain open and
+are tracked individually.
 
-**Backend implementation milestones** (M1–M9 — see [Implementation
-milestones](#implementation-milestones) above for full scope):
-- M1 — Storage + server shell *(next; bbolt + chi + `bm web` foreground process; localhost-only by default; remote-access mode deferred)*
-- M2 — Task engine + SSE
-- M3 — SSH layer + node CRUD
-- M4 — Node discovery
-- M5 — Topology + preflight
-- M6 — New-cluster deploy
-- M7 — Cluster operations
-- M8 — MinIO migration
-- M9 — Packaging + installers + embed
+### ⬜ Not yet started
 
 **Web UI prototype**
 - UI-P6 — Cross-cutting polish: skeleton loaders, lost-connection
@@ -496,21 +517,22 @@ milestones](#implementation-milestones) above for full scope):
 
 ### Notes for resuming
 
-- **Next chunk of work** is M1. Suggested first PR: `internal/store`
-  (bbolt with the open-per-transaction pattern), `internal/config`
-  (load `~/.config/bm/`), and `cmd/bm/web.go` that opens
-  `127.0.0.1:9443` with chi serving `/api/v1/healthz` and the
-  embedded UI. Auth is intentionally not part of M1 anymore — it's
-  optional and only kicks in when remote access is enabled (later
-  milestone).
-- **The mock layer is the API contract.** When implementing the real
-  backend, `web/src/mock/api.ts` enumerates exactly what shape each
-  endpoint needs to return. Swapping it for a `fetch`-based real
-  client is the planned cutover.
-- **Reference implementations in TypeScript** — `computeHealthSummary`,
-  `computeHealth`, `summarizePools`, `compareNodes` (sort comparator
-  with stable tiebreaker) all live in `web/src/mock/` and need to be
-  ported to Go in M1+. Behaviour is well-exercised by the prototype.
+- **M1–M9 are landed.** Remaining work is the cross-cutting TODOs above
+  (cutover systemd drop-in, rollback-to-MinIO action, the two M5
+  preflight checks, alias auto-save, and the follow-up wizards) plus
+  the optional remote-access mode (passcode + TLS), which stays
+  deferred — the listener is localhost-only today.
+- **The mock layer is gone.** `web/src/mock/` was removed once the real
+  backend landed; every UI fetch now funnels through
+  `web/src/api/client.ts` (SSE via `web/src/api/sse.ts`). The live REST
+  surface — not a mock — is now the contract. Wire types stay in
+  lockstep between `internal/domain/` (Go) and `web/src/api/types.ts`.
+- **The TS reference implementations were ported to Go.**
+  `computeHealthSummary`, `computeHealth`, `summarizePools`, and
+  `compareNodes` (sort comparator with stable tiebreaker) now live in
+  the Go backend; the node-table default sort (pool asc, hostname asc
+  within pool) and pool-card severity ordering are the canonical
+  behaviours to preserve.
 - **The prototype does not yet use** the proposed `madmin-go` `HostInfo`
   fork — fields like `cpuModel`, `kernel` are populated directly in
   the mock fixture. When the real backend lands, the merge step in
