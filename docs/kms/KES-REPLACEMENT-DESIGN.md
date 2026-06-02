@@ -3,9 +3,12 @@
 **Status:** Draft / discussion notes
 
 **Summary:** MinIO KES is deprecated, and its successors are proprietary. This
-document proposes an open-source replacement: Buckit caches a short-lived
-**per-cluster encryption key** to keep costs low, and a small **stateless proxy**
-holds the cloud KMS credentials so they never live inside Buckit.
+document proposes an open-source replacement. Buckit encrypts objects using a small
+ladder of derived keys, and a separate stateless proxy holds the cloud credentials so
+they never live inside Buckit. The **master key never leaves the KMS** — unlike KES
+and MinKMS, which load it into memory — so no single compromise can ever expose it.
+The result is near-zero KMS cost, fast performance, and a bounded blast radius if any
+working key is exposed.
 
 ---
 
@@ -15,58 +18,38 @@ holds the cloud KMS credentials so they never live inside Buckit.
 
 MinIO KES was archived in June 2025 and is no longer maintained. The replacements
 MinIO points to — Enterprise KES and MinKMS — are **proprietary**, so they are not
-options for an open-source Buckit. KES still works in Buckit today, but building on
+options for an open-source Buckit. KES still works in Buckit today, but relying on
 unmaintained software long-term is not viable. We need our own approach.
 
 ### 1.2 How encryption works in Buckit today
 
-Buckit uses **envelope encryption**, which keeps the KMS out of the data path. It
-works through a small hierarchy of keys:
+Buckit uses **envelope encryption**, which keeps the KMS out of the data path:
 
-- **Master key** — held by the key service (KES today). It is fetched once from
-  the root KMS and reused; its only job is to wrap and unwrap the keys below it.
-- **Data Encryption Key (DEK)** — a ~32-byte key the key service produces on
-  request. Crucially, it is **generated locally** by whoever holds the master key —
-  not fetched from the root KMS each time. It comes in two forms: a plaintext copy
-  Buckit uses immediately, and a sealed copy (wrapped by the master key) that is
-  safe to store on disk.
-- **Object key** — derived inside Buckit from the DEK plus fresh randomness. This
-  is what actually encrypts the object's bytes, and it is unique for every object.
+- A **master key** lives in the KMS and never leaves it. Its only job is to wrap and
+  unwrap the smaller keys below it.
+- For each object, the key service produces a small **data key**. It comes in two
+  forms: a plaintext copy, used immediately to encrypt, and a sealed copy, wrapped by
+  the master key and safe to store on disk next to the object.
+- The plaintext data key derives a unique **object key** that actually encrypts the
+  object's bytes.
 
-```
-Master key   (in KMS; fetched once, then cached and reused)
-   │   wraps / unwraps DEKs locally — no root-KMS call per DEK
-   ▼
-DEK          (generated locally per request; can be cached)
-   │   derives
-   ▼
-Object key   (unique per object; encrypts the data)
-```
-
-The important consequences:
-
-- **The KMS only handles tiny keys, never object data.** All bulk encryption
-  happens inside Buckit.
-- **Per-object key material is stored with the object**, in its metadata. The KMS
-  stores only the master key. This means switching KMS backends requires no
-  per-object migration — only the master key moves.
+So the KMS only ever handles tiny keys, never object data, and all the per-object key
+material is stored with the object. The KMS holds nothing but the master key.
 
 ### 1.3 Buckit does not cache keys today
 
-Every encrypted upload asks the key service (KES) for a fresh DEK, and every
-encrypted download asks it to unwrap one. Buckit itself caches nothing. KES answers
-those requests locally using the master key it already holds, so it rarely needs to
-call the root KMS — that local caching is what makes encryption affordable today.
-When we remove KES, we remove the only cache in the chain, and the replacement has
-to provide one.
+Every encrypted upload asks the key service (KES) for a fresh data key, and every
+download asks it to unwrap one. Buckit itself caches nothing. KES answers these
+requests locally from the master key it already holds, so it rarely calls the cloud
+KMS — and that local caching is what makes encryption cheap today. Removing KES
+removes the only cache in the chain, so the replacement has to provide one.
 
 ---
 
 ## 2. The cost problem
 
-Because the KMS is contacted once per object operation, the bill scales with
-traffic when nothing caches. Using AWS KMS pricing ($1/key/month, $3 per million
-requests):
+Without a cache, the KMS is contacted once per object operation, so the bill grows
+with traffic. Using AWS KMS pricing ($1 per key per month, $3 per million requests):
 
 | Object ops/sec | KMS requests/month | Monthly cost |
 |---|---|---|
@@ -76,170 +59,200 @@ requests):
 
 At higher rates you also hit AWS KMS rate limits and get throttled.
 
-A cache changes the cost driver entirely: the KMS is contacted per *key per time
-window* instead of per *object*, which drops the bill to a few dollars a month.
-**This caching is the entire value KES provided, and any replacement must keep
-it.**
+A cache changes this completely: the KMS is contacted per *time window* instead of
+per *object*, dropping the bill to a few dollars a month. This caching was the entire
+value of KES, and any replacement must keep it.
 
 ---
 
 ## 3. Recommended design
 
-The design has two parts, each placed where it naturally belongs:
+The design has two parts:
 
 | Part | Lives in | Job |
 |---|---|---|
-| **Hot key cache (L1)** | Buckit | avoid a network call on every object (the cost/latency win) |
-| **Proxy + history cache (L2)** | long-running service (Fargate) | hold the cloud credentials, and cache all historical keys so cold reads stay fast |
+| **Key cache** | Buckit | derive object keys locally, avoiding a network call per object |
+| **KMS proxy** | a small long-running service | hold the cloud credentials and the key history, so Buckit holds neither |
 
-**How this maps to KES.** It helps to see the design as redistributing the jobs KES
-does today:
+### 3.1 A ladder of derived keys
 
-| KES job today | Moves to | Notes |
-|---|---|---|
-| Hold the cloud credentials and the master key | **Proxy (Fargate)** | fetches and caches the master key under its IAM role |
-| Generate keys under the master key | **Proxy (Fargate)** | generation must happen where the master key lives |
-| Per-object key derivation | **Buckit** | unchanged — Buckit already does this today |
-| *(a reusable key cache)* | **Buckit (L1) + Fargate (L2)** | new — KES answers a fresh key per request and caches none |
+Buckit encrypts each object using keys built from a short chain. The crucial property
+is that **the master key never leaves the KMS** — not even the proxy ever holds it.
+The KMS is asked once per time window to produce an *epoch key*; everything below the
+epoch key is then derived locally with HKDF, which is a fast CPU operation that costs
+nothing.
 
-The genuinely new piece is the **cache**. Today the Buckit↔KES call is local and
-cheap, so KES never needed to cache — it just answers every request. In the new
-design the Buckit↔proxy call is remote and crosses a trust boundary, so Buckit
-caches keys (L1) and reuses them for many objects, making that call rare instead of
-per-object; Fargate keeps a full history (L2) so even cold reads stay fast.
+```
+Master key   (inside the KMS / HSM; never exported)
+   │  the KMS produces one epoch key per window  ← the only operation needing the KMS
+   ▼
+Epoch key    (one per time window, e.g. every 12 hours; cached in the proxy)
+   │  derive locally:  HKDF(epoch key, "tenant + bucket")
+   ▼
+Bucket key   (one per tenant + bucket)
+   │  wraps
+   ▼
+Data key     (random, one per object)
+   │  derives
+   ▼
+Object key   (encrypts the object's bytes with AES-256-GCM)
+```
 
-### 3.1 A cached per-cluster key
+Each layer has a clear purpose:
 
-Instead of contacting the key service for every object, Buckit obtains one
-**short-lived cluster key**, caches it, and derives every object's DEK from it
-locally. The proxy and KMS are only contacted when that cluster key needs to be
-created or, on reads, reconstructed. This is the same idea as AWS's S3 Bucket Keys —
-but scoped to the whole cluster rather than per bucket.
+- **The epoch key** is produced by the KMS once per time window and reused for many
+  objects. This is the only step that touches the KMS, and it happens per window — not
+  per object — which is what makes the design cheap. The KMS produces it
+  deterministically from the master key and the window number (an HSM MAC operation),
+  so the proxy can recover any past epoch key with one KMS call and stores nothing.
+- **The bucket key** is derived from the epoch key for a specific tenant and bucket.
+  This is the safety boundary: if a bucket key is ever exposed, it can decrypt only
+  that one bucket for that one window — not other buckets, tenants, or other windows.
+  Always include the tenant and bucket names in the derivation, even though Buckit
+  runs one server per tenant today, so any future shared deployment is isolated from
+  the start.
+- **The data key** stays random per object, exactly as today. Random keys avoid the
+  pitfalls of deterministic derivation and match standard envelope encryption.
 
-**Why per cluster, not per bucket.** AWS scopes its bucket key to each bucket. For
-Buckit that scaling is wrong: an on-prem deployment can have thousands of buckets,
-and a per-bucket key would multiply both cost and key count by the number of
-buckets. A single per-cluster key removes that multiplier and needs only one master
-key. It also fits how Buckit does multi-tenancy — each tenant runs a **separate
-Buckit server**, so a per-cluster key already isolates tenants from one another.
-Separating users *within* a cluster is the access-control system's job, not the
-encryption key's.
+**Why keep the master key in the KMS.** KES and the proprietary MinKMS both load the
+master key into the key service's *memory* and do the crypto in software. That is
+cheaper but means a compromise of that service exposes the master key — and with it,
+the ability to derive every key, past and future, forever. Keeping the master inside
+the KMS/HSM removes that single point of total failure: an attacker who compromises
+the proxy gets only the epoch keys currently cached, never the master. The cost of
+this is one KMS call per window (a few dollars a month — see §4), which is well worth
+it. A real HSM (via PKCS#11, CloudHSM, or similar) can anchor the master key for
+hardware-grade protection; a software KMS is the cheaper option.
 
-**Rotation happens only on writes.** The rotation window controls how often *new
-uploads* begin using a fresh cluster key. Reads never rotate: an object is tied to
-the key version recorded in its metadata, and a read only ever reconstructs that
-version. Rotating the write key never makes old objects unreadable — it just
-starts a new version going forward.
+**Where each key is generated and stored.** Only two things are durable: the master
+key, inside the KMS, and each object's wrapped data key, in that object's metadata.
+Everything else is produced on demand and held only in memory.
 
-**Choosing the window.** A shorter window means the key spends less time in memory
-but costs slightly more and creates more historical versions to reconstruct later.
-A window of **5 minutes to 1 hour** is a sensible range; **15 minutes** is a good
-default. Even aggressive 5-minute rotation costs only about $26/month at 1,000
-writers, so cost rarely forces the decision — the exposure window does.
-
-**The cache has two parts** (detailed in §3.2). Inside Buckit, one slot holds the
-single active write key and a small bounded set of recently-used read keys. The
-full history of older keys is kept by the proxy. A cold scan reconstructs one key
-per *time window* of history it touches — not one per object — so even large scans
-stay cheap.
-
-**The KMS still stores only the master key.** Old cluster keys are never kept in
-the KMS; they are wrapped and stored alongside the objects, exactly as DEKs are
-today, and reconstructed from object metadata when needed.
-
-This is a contained change. Buckit's encryption code already separates "where the
-key comes from" from "how it seals an object," so the cluster key simply becomes a
-new source feeding the existing sealing machinery. The work touches two call sites
-(encrypt and decrypt), adds a key-version field to object metadata, and adds the
-cache and configuration. The decrypt path — reconstructing the right historical key
-— is the part to implement and test most carefully, because errors there mean data
-loss or key reuse.
-
-### 3.2 The proxy, and a two-tier cache
-
-The proxy is a service whose job is to hold the cloud credentials (an IAM role) and
-call the KMS on Buckit's behalf, so **Buckit holds no cloud credentials at all**. A
-long-running container — **AWS Fargate** is a good fit — is preferable to a Lambda
-function here: it has no cold-start latency, has flat predictable cost, and, most
-usefully, it can hold a large in-memory cache of its own.
-
-That leads to a **two-tier cache**, like a CPU cache hierarchy applied to keys:
-
-| Tier | Where | Holds | Size |
+| Key | Produced where | Stored where | Lifetime |
 |---|---|---|---|
-| **L1** | Buckit | the active write key + recently-used read keys | sub-MB |
-| **L2** | Fargate proxy | every cluster-key version ever generated | ~90 MB for 10 years |
-| source | root KMS | only the master key | — |
+| Master key | inside the KMS | **KMS / HSM** (never exported) | permanent |
+| Epoch key | by the KMS, from the master key + window | not stored — cached in proxy memory | one window |
+| Bucket key | in the **proxy**, derived from the epoch key | not stored — cached in Buckit memory | one window |
+| Data key | in **Buckit**, random per object | **wrapped, in the object's metadata** | life of the object |
+| Object key | in **Buckit**, derived from the data key | not stored — re-derived each time | per request |
+
+Because the epoch key is produced deterministically from the master key and the
+window number (recorded in each object's metadata), any past key can be recreated on
+demand without storing it. Switching KMS backends moves only the master key.
+
+**Rotation only affects new uploads.** The epoch window controls how often new
+uploads start using a fresh epoch key. Reads are unaffected: each object records its
+window in metadata and always re-derives the same key, so rotating forward never
+makes old objects unreadable.
+
+**Two separate windows — don't conflate them.** There are two independent knobs, and
+keeping them separate is what makes the design both cheap and safe:
+
+- **The epoch window** (how often the KMS mints a new epoch key) should be **long —
+  a default of 12 hours**. Longer is better here: it means fewer KMS calls and far
+  fewer historical epoch keys to track (12-hour epochs are ~7,300 over a decade,
+  versus ~350,000 at 15 minutes). Cost barely moves with this knob, so optimize it
+  for simplicity.
+- **The Buckit cache lifetime** (how long a usable plaintext key lingers in a storage
+  node) should be **short — a default of ~15 minutes, idle/sliding**. This is the
+  real exposure window: it bounds how long a key sits in the data plane where a memory
+  dump could catch it. An actively-used bucket keeps resetting the timer and stays
+  cached; an idle bucket drops its key quickly.
+
+So a 12-hour epoch does **not** mean keys live in Buckit for 12 hours — Buckit evicts
+its copy after ~15 idle minutes and re-fetches from the proxy if the bucket is used
+again, even though the epoch itself is still current.
+
+This is a contained change. Buckit's crypto code already separates *where a key comes
+from* from *how it seals an object*, so the bucket key simply becomes a new source
+feeding the existing machinery. The work adds the derivation, a tenant/bucket/window
+field to object metadata, and the cache. The decrypt path — re-deriving the right key
+for old objects — is the part to build and test most carefully, since a mistake there
+means data loss.
+
+### 3.2 The proxy and its cache
+
+The proxy's job is to hold the cloud credentials and call the KMS for Buckit, so
+**Buckit holds no cloud credentials**. A long-running container — AWS Fargate is a
+good fit — is better here than a Lambda function: no cold-start delay, flat cost, and
+it can hold a large cache of its own.
+
+That gives a **two-level cache**:
+
+| Level | Where | Holds | Lifetime |
+|---|---|---|---|
+| Near cache | Buckit | bucket keys used recently (well under a megabyte) | ~15 min idle (§3.1) |
+| Far cache | proxy | epoch keys currently in use (a handful at 12-hour epochs) | the epoch window |
+
+A request flows like this:
 
 ```
 upload / download
    │
-   ├─ L1 hit (Buckit)      → derive DEK locally          → no network at all
-   ├─ L1 miss → L2 hit     → Fargate returns the key     → one fast hop, no KMS
-   └─ L1 & L2 miss (rare)  → Fargate reconstructs        → one KMS-ish op, then cached
+   ├─ found in Buckit's cache   → encrypt/decrypt locally   → no network at all
+   ├─ not in Buckit, ask proxy  → proxy derives bucket key   → one fast hop, no KMS
+   └─ proxy lacks the epoch     → proxy asks the KMS          → one KMS call, then cached
 ```
 
-Each tier earns its place:
+Buckit's cache keeps the common case entirely local — no network, no latency. The
+proxy's cache keeps cold reads fast: a read of older data is served from the proxy's
+memory without touching the KMS. With 12-hour epochs there are very few epoch keys to
+hold (a few thousand over a decade, all tiny), so after warm-up the proxy rarely has
+to call the KMS at all — and when it does, the epoch key is recovered deterministically
+from the master key, so nothing is ever stored.
 
-- **L1 keeps the hot path local.** Common reads and writes never leave Buckit, so
-  there is no per-object network call and no latency added.
-- **L2 makes cold reads fast.** A read of old data whose key has aged out of L1 hits
-  Fargate's warm in-memory map and gets the key back immediately — no root-KMS call,
-  no cryptographic reconstruction. Because Fargate holds the full history, L2 misses
-  effectively never happen after warm-up. (Sizing is a non-issue: keys are 32 bytes,
-  so a decade of 15-minute rotation is ~350,000 keys ≈ 90 MB.)
+**Only the bucket key is cached.** Buckit caches the bucket key because it unwraps
+*every* object in that bucket. The per-object data key and object key are **not**
+cached — each object's wrapped data key is read from its metadata and unwrapped with
+the cached bucket key on every request, and the object key is derived from it. So a
+single cached bucket key serves all of a bucket's objects locally, and the cache holds
+a small number of bucket keys rather than one entry per object.
 
-This is strictly better than caching in only one place: keeping everything in Buckit
-made cold reads slow, while keeping everything in Fargate would put a network hop on
-*every* object. The two-tier split gives a local hot path **and** fast cold reads.
+**The proxy derives the bucket keys.** Buckit never receives the epoch key — it asks
+the proxy for a specific bucket's key, and the proxy derives and returns only that.
+This keeps the blast radius small: if a Buckit node is compromised, only the buckets
+that node actually served are exposed, never the epoch key or other buckets. The cost
+is one proxy request per bucket per window instead of one per window, but these are
+cheap local derivations on the proxy with no extra KMS cost, and Buckit caches each
+bucket key after the first use.
 
-**How Buckit authenticates to the proxy.** The recommended method is a **signed
-token (JWT)**: Buckit signs a short-lived token with its own private key, and the
-proxy verifies it with the matching public key before serving a key. This is
-preferred because Buckit often runs outside AWS, where AWS's own IAM authentication
-would need extra machinery, whereas a signed token needs nothing AWS-specific on
-Buckit's side. Use asymmetric keys so a leak of the proxy's configuration cannot
-forge tokens, keep token lifetimes short, and have the proxy strictly validate
-signature, expiry, and audience. (AWS IAM auth or mutual TLS also work if Buckit
-runs inside AWS.)
+**How Buckit proves who it is.** Buckit signs a short-lived token with its own
+private key, and the proxy checks it with the matching public key before returning a
+key. This is the recommended method because Buckit often runs outside AWS, where
+using AWS's own authentication would need extra setup, while a signed token needs
+nothing AWS-specific. (Mutual TLS or AWS IAM are alternatives when Buckit runs inside
+AWS.) Buckit holds no cloud credentials, so there is nothing to rotate on its side;
+its only secret is its own signing key.
 
-**Latency on cold reads.** When a read does miss L1 and must ask the proxy, that
-call can run **in parallel with fetching the object data** — the two are
-independent and only the final decrypt step needs both. This hides the proxy
-round-trip behind the storage read that was happening anyway.
-
-**Credential rotation becomes a non-issue.** Buckit holds no cloud credentials, so
-there is nothing to rotate there. The proxy's IAM role issues short-lived tokens
-that the cloud rotates automatically. The only secret on Buckit's side is its own
-token-signing key, which it rotates on its own schedule.
-
-**One caveat to be clear about:** the two-tier cache is a latency-and-cost
-optimization, not a security change. Because L1 still holds plaintext keys inside
-Buckit, key material lives in the data plane — see §5.
+**Hiding cold-read latency.** When a read does need the proxy, that request can run
+**at the same time** as fetching the object's data from disk — they don't depend on
+each other, and only the final decrypt step needs both. This hides the proxy round
+trip behind the storage read that was happening anyway.
 
 ---
 
-## 4. Cost with this design
+## 4. Cost
 
-Because the key is per cluster, the KMS cost depends only on how many writers there
-are and how often the key rotates — **not on how many objects or buckets exist**.
-One shared master key costs $1/month, and the proxy itself is negligible.
+The KMS is contacted only to produce an epoch key — once per epoch window, shared
+across the whole proxy — so the cost depends only on the epoch window, **not on the
+number of objects, buckets, or writers**. Everything below the epoch key is derived
+locally for free.
 
-Write-side cost at 1,000 concurrent writers:
+At a **12-hour epoch**, that is about **60 KMS calls a month**, which is free under
+the AWS KMS free tier. Cold reads of old data add one KMS call per historical epoch
+they touch — and there are very few epochs (a few thousand over a decade), each
+recovered with one call and then cached. So ongoing KMS cost is essentially just the
+**$1/month** to store the master key.
 
-| Rotation window | KMS requests/month | Monthly cost |
+| Epoch window | KMS calls/month (active key) | Monthly cost |
 |---|---|---|
-| 5 minutes | ~8.6 M | ~$26 |
-| 15 minutes (default) | ~2.9 M | ~$8.6 |
-| 1 hour | ~720 K | ~$2.2 |
-
-Reads add cost only when they reconstruct an uncached historical key, and that
-depends on how much *history* a read sweeps, not how many objects. A full scan of a
-year's data reconstructs a few thousand keys at most — a few cents, once, then
-cached.
+| 12 hours (default) | ~60 | ~$1 (storage only) |
+| 1 hour | ~720 | ~$1 |
+| 15 minutes | ~2,900 | ~$1 |
 
 Compared with the ~$7,800/month an uncached deployment would pay at 1,000 ops/sec,
-the cache turns KMS cost into a rounding error.
+KMS cost effectively disappears. (The proxy is a small always-on container; its cost
+is compute, not KMS.)
 
 ---
 
@@ -247,45 +260,66 @@ the cache turns KMS cost into a rounding error.
 
 **What the design achieves:**
 
-- Cloud credentials never enter Buckit, so a compromise of Buckit cannot steal
-  them. This is the property KES gave us, now from components we own.
-- Cost stays low because the cache lives in the long-running server.
+- **The master key never leaves the KMS.** This is the central win. KES and MinKMS
+  load the master key into the key service's memory, so compromising that service
+  exposes the master — and the power to derive every key, past and future, forever.
+  Here the master stays in the KMS (optionally a hardware HSM), so no compromise of
+  the proxy or Buckit can ever yield it. A breach is bounded, never total.
+- **Cloud credentials never enter Buckit**, so compromising a storage node cannot
+  steal them.
+- **Keys are scoped per tenant and bucket**, so a leaked working key can decrypt only
+  that bucket for one window — not the deployment.
 - No proprietary dependency.
-- The proxy is a natural place to scope permissions, rate-limit, and audit every
-  KMS call.
 
-**The limit to be honest about.** This design isolates *credentials*, not *key
-material*. A compromised Buckit can still read whatever keys are currently in its
-cache, and can still ask the proxy to decrypt anything the proxy's role allows. So
-the worst case shrinks from "attacker gains permanent cloud KMS access" to
-"attacker abuses a scoped, audited, rate-limited service while they remain inside
-Buckit" — a large improvement, but not immunity.
+**Tamper-proofing object metadata.** Each object's sealed key must be tied to the
+object's identity so its metadata cannot be altered or rolled back. Buckit already
+binds the sealed key to the bucket and object path; extend this to also cover the
+tenant, the object version, and the key's window. This stops an attacker from
+swapping key versions or replaying an old wrapped key to force a decrypt.
 
-If a deployment requires that key material **never** reside in Buckit at all, this
-design is not enough. That stricter goal requires a separate key-broker process
-that holds the cache itself — essentially maintaining an open-source KES — with the
-ongoing cost of owning that project.
+**The bounded worst case.** Working keys still pass through Buckit and the proxy, so a
+compromise of either is not nothing — but it is *bounded*. A compromised Buckit node
+can use the bucket keys in its cache (only for buckets it serves) and ask the proxy
+for more, which the proxy can rate-limit and audit. A compromised proxy exposes the
+epoch keys it currently holds. In **neither case does the attacker get the master
+key** — so they cannot derive arbitrary past or future keys, and rotating the epoch
+locks them out going forward. This is exactly the property the in-memory-master
+designs (KES, MinKMS) give up.
 
-One concrete hardening note: Buckit does not currently wipe plaintext keys from
-memory after use. With a cache holding keys longer, that becomes worth addressing
-through short cache lifetimes, memory locking, or explicit zeroization.
+**Memory hygiene.** Buckit does not currently wipe plaintext keys from memory after
+use. Pair the short cache lifetime (§3.1) with a bounded cache size, zeroization on
+eviction, memory locking, and disabled core dumps — partial but worthwhile
+protections in a garbage-collected language.
 
 ---
 
 ## 6. Open decisions
 
-1. **Proxy auth** — signed token (recommended), AWS IAM, or mutual TLS?
-2. **Rotation window** — the trade-off between cost and how long a key stays in
-   memory.
-3. **Is an in-Buckit (L1) cache acceptable?** It puts plaintext keys in the data
-   plane. If full key-material isolation is mandatory, the L1 cache must be dropped
-   — which means a network call per object and pushes this toward a separate
-   key-broker design.
-4. **Backend scope** — AWS only at first, or also Vault, GCP, and Azure later?
+1. **How Buckit authenticates to the proxy** — signed token (recommended), mutual
+   TLS, or AWS IAM.
+2. **Epoch window and cache lifetime** — defaults of 12 hours and ~15 minutes
+   respectively (§3.1); tune the cache lifetime down for higher-isolation deployments.
+3. **Which KMS backends to support, and whether to anchor the master key in a
+   hardware HSM** — AWS KMS first; Vault, GCP, Azure, or PKCS#11/CloudHSM later.
 
-**Suggested order:** build the cached per-cluster key first (it stands alone if you
-accept Buckit holding scoped KMS credentials), then add the proxy to remove those
-credentials from Buckit.
+**Suggested order:** build the key ladder and cache first, then add the proxy to take
+credentials out of Buckit, then the hardening below.
+
+### Later hardening
+
+These matter for production but can follow the core design:
+
+- **Scoped tokens** — limit each token to a specific node, tenant/bucket, and key
+  versions, with a short lifetime and replay protection, so a stolen token can't
+  decrypt outside its scope.
+- **Revocation** — a way to cut off a compromised node: a revocation list, signing-key
+  rotation, an emergency cache flush, and a cluster off-switch. Short cache lifetimes
+  shrink the exposure window.
+- **The proxy owns key versions** — nodes never invent their own time-window numbers;
+  the proxy assigns them, avoiding clock-skew and partition bugs.
+- **Rate limiting** at the proxy to catch and bound mass-decrypt abuse.
+- **Logging discipline** — never log keys, tokens, or wrapped keys; audit logs record
+  only who did what, when, and with which key version.
 
 ---
 
@@ -294,12 +328,12 @@ credentials from Buckit.
 For implementers, the relevant code:
 
 - `internal/kms/config.go` — how Buckit connects to a KMS backend
-- `internal/kms/conn.go` — the backend interface and the `DEK` type
+- `internal/kms/conn.go` — the backend interface and the data-key type
 - `internal/kms/kms.go` — the KMS API (`GenerateKey`, `Decrypt`)
-- `internal/kms/secret-key.go` — in-process key derivation and sealing (reusable
-  for the cluster-key logic)
+- `internal/kms/secret-key.go` — in-process key derivation and sealing (reusable for
+  the new key ladder)
 - `internal/crypto/key.go` — object-key generation, sealing, and unsealing
-- `internal/crypto/sse.go` — the `sio`/DARE library that encrypts object data
+- `internal/crypto/sse.go` — the library that encrypts object data
 - `internal/crypto/metadata.go` — the per-object sealed-key metadata fields
-- `cmd/encryption-v1.go` — the encrypt and decrypt paths to branch (the two call
-  sites that fetch keys today)
+- `cmd/encryption-v1.go` — the encrypt and decrypt paths to change (the two places
+  that fetch keys today)
