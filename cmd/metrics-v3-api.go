@@ -32,12 +32,14 @@ const (
 	apiRequestsWaitingTotal  MetricName = "waiting_total"
 	apiRequestsIncomingTotal MetricName = "incoming_total"
 
-	apiRequestsInFlightTotal  MetricName = "inflight_total"
-	apiRequestsTotal          MetricName = "total"
-	apiRequestsErrorsTotal    MetricName = "errors_total"
-	apiRequests5xxErrorsTotal MetricName = "5xx_errors_total"
-	apiRequests4xxErrorsTotal MetricName = "4xx_errors_total"
-	apiRequestsCanceledTotal  MetricName = "canceled_total"
+	apiRequestsInFlightTotal    MetricName = "inflight_total"
+	apiRequestsTotal            MetricName = "total"
+	apiRequestsErrorsTotal      MetricName = "errors_total"
+	apiRequests5xxErrorsTotal   MetricName = "5xx_errors_total"
+	apiRequests4xxErrorsTotal   MetricName = "4xx_errors_total"
+	apiRequestsCanceledTotal    MetricName = "canceled_total"
+	apiRequestsFastGetHits      MetricName = "fast_get_hits_total"
+	apiRequestsFastGetFallbacks MetricName = "fast_get_fallbacks_total"
 
 	apiRequestsTTFBSecondsDistribution MetricName = "ttfb_seconds_distribution"
 
@@ -72,6 +74,10 @@ var (
 		"Total number of requests with 4xx errors", "name", "type")
 	apiRequestsCanceledTotalMD = NewCounterMD(apiRequestsCanceledTotal,
 		"Total number of requests canceled by the client", "name", "type")
+	apiRequestsFastGetHitsMD = NewCounterMD(apiRequestsFastGetHits,
+		"Total number of GET requests served by the single-trip fast path", "type")
+	apiRequestsFastGetFallbacksMD = NewCounterMD(apiRequestsFastGetFallbacks,
+		"Total number of single-trip eligible GET requests that fell back to the normal path", "type")
 
 	apiRequestsTTFBSecondsDistributionMD = NewCounterMD(apiRequestsTTFBSecondsDistribution,
 		"Distribution of time to first byte across API calls", "name", "type", "le")
@@ -121,6 +127,8 @@ func loadAPIRequestsHTTPMetrics(ctx context.Context, m MetricValues, _ *metricsC
 	for name, value := range httpStats.TotalS3Canceled.APIStats {
 		m.Set(apiRequestsCanceledTotal, float64(value), "name", name, "type", "s3")
 	}
+	m.Set(apiRequestsFastGetHits, float64(fastGetHits.Load()), "type", "s3")
+	m.Set(apiRequestsFastGetFallbacks, float64(fastGetFallbacks.Load()), "type", "s3")
 	return nil
 }
 

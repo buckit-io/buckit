@@ -35,9 +35,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/klauspost/readahead"
-	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7/pkg/tags"
 	"github.com/buckit-io/buckit/internal/bucket/lifecycle"
 	"github.com/buckit-io/buckit/internal/bucket/object/lock"
 	"github.com/buckit-io/buckit/internal/bucket/replication"
@@ -49,6 +46,9 @@ import (
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7/pkg/tags"
+	"github.com/klauspost/readahead"
 	"github.com/minio/pkg/v3/mimedb"
 	"github.com/minio/pkg/v3/sync/errgroup"
 	"github.com/minio/sio"
@@ -234,6 +234,22 @@ func (er erasureObjects) GetObjectNInfo(ctx context.Context, bucket, object stri
 		//   concurrent writers
 		unlockOnDefer = true
 		nsUnlocker = func() { lock.RUnlock(lkctx) }
+	}
+
+	if fastGetRequestEligible(h, rs, opts) {
+		gr, ok, err := er.tryFastGet(ctx, bucket, object, rs, h, opts, nsUnlocker)
+		if err != nil {
+			if ok {
+				fastGetFallbacks.Add(1)
+			}
+			return gr, err
+		}
+		if ok {
+			unlockOnDefer = false
+			fastGetHits.Add(1)
+			return gr, nil
+		}
+		fastGetFallbacks.Add(1)
 	}
 
 	fi, metaArr, onlineDisks, err := er.getObjectFileInfo(ctx, bucket, object, opts, true)
@@ -1560,6 +1576,10 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 		defer lk.Unlock(lkctx)
 	}
 
+	if err = er.invalidateSingleTripShadow(ctx, bucket, object, onlineDisks, writeQuorum); err != nil {
+		return ObjectInfo{}, toObjectErr(err, bucket, object)
+	}
+
 	// Rename the successfully written temporary object to final location.
 	onlineDisks, versions, oldDataDir, err := renameData(ctx, onlineDisks, minioMetaTmpBucket, tempObj, partsMetadata, bucket, object, writeQuorum)
 	if err != nil {
@@ -1576,6 +1596,10 @@ func (er erasureObjects) putObject(ctx context.Context, bucket string, object st
 
 	if err = er.commitRenameDataDir(ctx, bucket, object, oldDataDir, onlineDisks, writeQuorum); err != nil {
 		return ObjectInfo{}, toObjectErr(err, bucket, object)
+	}
+
+	if err = er.installSingleTripShadow(ctx, bucket, object, onlineDisks, partsMetadata, writeQuorum); err != nil {
+		bugLogIf(ctx, err)
 	}
 
 	for i := range len(onlineDisks) {
@@ -1632,6 +1656,10 @@ func (er erasureObjects) deleteObjectVersion(ctx context.Context, bucket, object
 	// due to storage class - this only needs to be honored
 	// for Read() requests alone that we already do.
 	writeQuorum := len(disks)/2 + 1
+
+	if err := er.invalidateSingleTripShadow(ctx, bucket, object, disks, writeQuorum); err != nil {
+		return err
+	}
 
 	g := errgroup.WithNErrs(len(disks))
 	for index := range disks {
