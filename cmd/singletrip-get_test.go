@@ -94,23 +94,19 @@ func TestSingleTripFastGetEndToEnd(t *testing.T) {
 
 	resetSingleTripReadFileStreamCounts(countingDisks)
 	globalFastGetEnabled = false
+	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
 	baseline, baselineInfo := readSingleTripTestObject(t, xl, bucket, object)
-	if fastGetHits.Load() != 0 || fastGetFallbacks.Load() != 0 {
-		t.Fatalf("baseline unexpectedly used fast path: hits=%d fallbacks=%d", fastGetHits.Load(), fastGetFallbacks.Load())
-	}
+	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 0, 0, "baseline")
 
 	resetSingleTripReadFileStreamCounts(countingDisks)
-	fastGetHits.Store(0)
-	fastGetFallbacks.Store(0)
 	globalFastGetEnabled = true
+	hitsBefore, fallbacksBefore = singleTripCounterSnapshot()
 	fast, fastInfo := readSingleTripTestObject(t, xl, bucket, object)
 
 	if !bytes.Equal(fast, baseline) {
 		t.Fatalf("fast bytes differ from baseline: got %d bytes, want %d", len(fast), len(baseline))
 	}
-	if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
-		t.Fatalf("fast counters = hits:%d fallbacks:%d, want hits:1 fallbacks:0", fastGetHits.Load(), fastGetFallbacks.Load())
-	}
+	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 1, 0, "fast")
 	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
 	for i, disk := range countingDisks {
 		if got := disk.readFileStreamCalls.Load(); got != 1 {
@@ -119,16 +115,13 @@ func TestSingleTripFastGetEndToEnd(t *testing.T) {
 	}
 
 	resetSingleTripReadFileStreamCounts(countingDisks)
-	fastGetHits.Store(0)
-	fastGetFallbacks.Store(0)
 	rangeLen := smallFileThreshold*3 + 123
+	hitsBefore, fallbacksBefore = singleTripCounterSnapshot()
 	fastRange, _ := readSingleTripTestObjectRange(t, xl, bucket, object, &HTTPRangeSpec{Start: 0, End: int64(rangeLen - 1)})
 	if !bytes.Equal(fastRange, data[:rangeLen]) {
 		t.Fatalf("fast range bytes differ: got %d bytes, want %d", len(fastRange), rangeLen)
 	}
-	if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
-		t.Fatalf("range counters = hits:%d fallbacks:%d, want hits:1 fallbacks:0", fastGetHits.Load(), fastGetFallbacks.Load())
-	}
+	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 1, 0, "range")
 	for i, disk := range countingDisks {
 		if got := disk.readFileStreamCalls.Load(); got != 1 {
 			t.Fatalf("range disk %d ReadFileStream calls = %d, want 1", i, got)
@@ -163,13 +156,12 @@ func TestSingleTripFastGetFallbackWithoutShadow(t *testing.T) {
 	}
 
 	globalFastGetEnabled = true
+	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
 	got, _ := readSingleTripTestObject(t, xl, bucket, object)
 	if !bytes.Equal(got, data) {
 		t.Fatalf("fallback bytes differ: got %d bytes, want %d", len(got), len(data))
 	}
-	if fastGetHits.Load() != 0 || fastGetFallbacks.Load() != 1 {
-		t.Fatalf("fallback counters = hits:%d fallbacks:%d, want hits:0 fallbacks:1", fastGetHits.Load(), fastGetFallbacks.Load())
-	}
+	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 0, 1, "fallback")
 }
 
 func TestSingleTripFastGetOverwriteAndDeleteInvalidatesShadow(t *testing.T) {
@@ -191,38 +183,31 @@ func TestSingleTripFastGetOverwriteAndDeleteInvalidatesShadow(t *testing.T) {
 	if _, err := z.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(dataA), int64(len(dataA)), "", ""), ObjectOptions{}); err != nil {
 		t.Fatal(err)
 	}
+	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
 	if got, _ := readSingleTripTestObject(t, xl, bucket, object); !bytes.Equal(got, dataA) {
 		t.Fatal("initial fast GET did not return object A")
 	}
-	if fastGetHits.Load() != 1 {
-		t.Fatalf("initial fast hits = %d, want 1", fastGetHits.Load())
-	}
+	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 1, 0, "initial")
 
-	fastGetHits.Store(0)
-	fastGetFallbacks.Store(0)
 	if _, err := z.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(dataB), int64(len(dataB)), "", ""), ObjectOptions{}); err != nil {
 		t.Fatal(err)
 	}
+	hitsBefore, fallbacksBefore = singleTripCounterSnapshot()
 	if got, _ := readSingleTripTestObject(t, xl, bucket, object); !bytes.Equal(got, dataB) {
 		t.Fatal("overwrite fast GET did not return object B")
 	}
-	if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
-		t.Fatalf("overwrite counters = hits:%d fallbacks:%d, want hits:1 fallbacks:0", fastGetHits.Load(), fastGetFallbacks.Load())
-	}
+	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 1, 0, "overwrite")
 
-	fastGetHits.Store(0)
-	fastGetFallbacks.Store(0)
 	if _, err := z.DeleteObject(ctx, bucket, object, ObjectOptions{}); err != nil {
 		t.Fatal(err)
 	}
+	hitsBefore, fallbacksBefore = singleTripCounterSnapshot()
 	gr, err := xl.GetObjectNInfo(ctx, bucket, object, nil, http.Header{}, ObjectOptions{})
 	if err == nil {
 		gr.Close()
 		t.Fatal("GET after delete unexpectedly succeeded")
 	}
-	if fastGetHits.Load() != 0 || fastGetFallbacks.Load() != 1 {
-		t.Fatalf("delete counters = hits:%d fallbacks:%d, want hits:0 fallbacks:1", fastGetHits.Load(), fastGetFallbacks.Load())
-	}
+	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 0, 1, "delete")
 }
 
 func TestSingleTripFastGetEligibleToIneligibleOverwriteFallsBack(t *testing.T) {
@@ -245,8 +230,6 @@ func TestSingleTripFastGetEligibleToIneligibleOverwriteFallsBack(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fastGetHits.Store(0)
-	fastGetFallbacks.Store(0)
 	if _, err := z.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(dataB), int64(len(dataB)), "", ""), ObjectOptions{
 		UserDefined: map[string]string{
 			"x-amz-meta-test": "forces-fallback",
@@ -254,13 +237,12 @@ func TestSingleTripFastGetEligibleToIneligibleOverwriteFallsBack(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
 	got, _ := readSingleTripTestObject(t, xl, bucket, object)
 	if !bytes.Equal(got, dataB) {
 		t.Fatal("eligible-to-ineligible overwrite did not return object B")
 	}
-	if fastGetHits.Load() != 0 || fastGetFallbacks.Load() != 1 {
-		t.Fatalf("ineligible overwrite counters = hits:%d fallbacks:%d, want hits:0 fallbacks:1", fastGetHits.Load(), fastGetFallbacks.Load())
-	}
+	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 0, 1, "ineligible overwrite")
 }
 
 func TestSingleTripFastGetOverCapMetadataFallsBack(t *testing.T) {
@@ -286,6 +268,7 @@ func TestSingleTripFastGetOverCapMetadataFallsBack(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
 	got, info := readSingleTripTestObject(t, xl, bucket, object)
 	if !bytes.Equal(got, data) {
 		t.Fatal("over-cap fallback did not return object bytes")
@@ -293,9 +276,7 @@ func TestSingleTripFastGetOverCapMetadataFallsBack(t *testing.T) {
 	if info.ContentType != longContentType {
 		t.Fatalf("content-type = len %d, want len %d", len(info.ContentType), len(longContentType))
 	}
-	if fastGetHits.Load() != 0 || fastGetFallbacks.Load() != 1 {
-		t.Fatalf("over-cap counters = hits:%d fallbacks:%d, want hits:0 fallbacks:1", fastGetHits.Load(), fastGetFallbacks.Load())
-	}
+	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 0, 1, "over-cap")
 }
 
 func TestSingleTripFastGetMidStreamCorruptionErrors(t *testing.T) {
@@ -325,8 +306,7 @@ func TestSingleTripFastGetMidStreamCorruptionErrors(t *testing.T) {
 	}
 
 	globalFastGetEnabled = true
-	fastGetHits.Store(0)
-	fastGetFallbacks.Store(0)
+	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
 	got, _, err := readSingleTripTestObjectRangeAllowError(t, xl, bucket, object, nil)
 	if err == nil {
 		t.Fatal("fast GET unexpectedly succeeded with corrupted direct shadow")
@@ -337,9 +317,7 @@ func TestSingleTripFastGetMidStreamCorruptionErrors(t *testing.T) {
 	if bytes.Equal(got, data) {
 		t.Fatal("fast GET returned complete data despite corrupted direct shadow")
 	}
-	if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
-		t.Fatalf("corruption counters = hits:%d fallbacks:%d, want hits:1 fallbacks:0", fastGetHits.Load(), fastGetFallbacks.Load())
-	}
+	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 1, 0, "corruption")
 }
 
 type singleTripGetObjectNInfo interface {
@@ -467,6 +445,20 @@ func withSingleTripEnabled(t *testing.T, enabled bool) {
 		fastGetHits.Store(0)
 		fastGetFallbacks.Store(0)
 	})
+}
+
+func singleTripCounterSnapshot() (hits, fallbacks uint64) {
+	return fastGetHits.Load(), fastGetFallbacks.Load()
+}
+
+func assertSingleTripCounterDelta(t *testing.T, hitsBefore, fallbacksBefore, wantHits, wantFallbacks uint64, label string) {
+	t.Helper()
+
+	gotHits := fastGetHits.Load() - hitsBefore
+	gotFallbacks := fastGetFallbacks.Load() - fallbacksBefore
+	if gotHits != wantHits || gotFallbacks != wantFallbacks {
+		t.Fatalf("%s counters delta = hits:%d fallbacks:%d, want hits:%d fallbacks:%d", label, gotHits, gotFallbacks, wantHits, wantFallbacks)
+	}
 }
 
 func assertSingleTripObjectInfoEqual(t *testing.T, got, want ObjectInfo) {
