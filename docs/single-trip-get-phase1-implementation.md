@@ -805,6 +805,8 @@ reuse in one change.
 - [x] Run a local single-process 16-drive smoke validation to confirm shadow
   install, byte correctness, and fast-path counters before attempting the full
   A/B benchmark.
+- [x] Fix and run the Docker cluster rig far enough to execute a container
+  cold-TTFB A/B pilot on 4 nodes x 4 XFS loopback drives.
 - [ ] Run the §9 A/B benchmark playbook only after all correctness tests pass.
 
 Local smoke result (2026-06-04): with `BUCKIT_FAST_GET=1`, a disposable
@@ -815,6 +817,23 @@ whose bytes matched the uploaded payload, and reported
 does not measure the Phase 1 performance delta because all drives are directories
 on the same local filesystem and the run does not compare cold-cache OFF vs ON
 arms.
+
+Docker cluster A/B pilot (2026-06-04): after wiring the cluster image to install
+the current Linux Buckit binary and start it through systemd, a 4-node x 4-drive
+loopback-XFS cluster loaded 64 x 1 MiB objects with `BUCKIT_FAST_GET=1`, then
+restarted against the same Docker volumes for OFF and ON arms. For 32 distinct
+cold GETs with page cache dropped in all containers before each request:
+
+| Arm | Samples | p50 TTFB | p95 TTFB | Average TTFB |
+|---|---:|---:|---:|---:|
+| `BUCKIT_FAST_GET=0` | 32 | 5.365 ms | 6.374 ms | 5.430 ms |
+| `BUCKIT_FAST_GET=1` | 32 | 5.303 ms | 6.250 ms | 5.388 ms |
+
+The ON arm reported `minio_api_requests_fast_get_hits_total=32`, so the fast
+path was exercised. Treat this as a rig/mechanism check only: loopback storage on
+Docker Desktop is too fast and too cache-heavy to model HDD seek collapse, and
+`warp` was not available in this environment for the saturated throughput
+measurement.
 
 ---
 
@@ -862,9 +881,9 @@ or the `xl.meta` path.
 
 ```sh
 cd testing/cluster
-./cluster.sh create                 # 4 nodes × 4 drives = 16 drive paths in one EC:4 set
+./cluster.sh create --fast-get 1    # 4 nodes × 4 drives = 16 drive paths in one EC:4 set
 # bigger drives if your dataset needs it (default 1G/drive):
-# ./cluster.sh create --drive-size 4G
+# ./cluster.sh create --fast-get 1 --drive-size 4G
 ```
 
 The rig's drives are XFS-on-loopback files, **not** independent physical
@@ -884,12 +903,12 @@ Facts the playbook relies on (from `cluster.sh`):
 | SSH (for `drop_caches`) | `localhost:2201`–`2204`, root password `buckitadmin` |
 | Drive mounts inside a node | `/data/drive0` … `/data/drive3` (XFS loopback) |
 
-Deploy the **Phase 1 binary** to the nodes and start the server per the rig's
-`README.md`. Toggle the arm with the `BUCKIT_FAST_GET` environment variable in
-the node service environment (the `environment:` block in
-`testing/cluster/docker-compose.yml`, alongside `MINIO_ROOT_USER`): unset/`0` for
-the baseline arm, `1` for the fast arm; restart the server between arms. No
-rebuild is needed between arms.
+`cluster.sh create` builds the current repo's Phase 1 binary for Linux, copies it
+into the node image, and starts it through systemd. Toggle the arm with
+`--fast-get`: use `1` while loading the dataset so shadows are written, then use
+`0` for the baseline arm and `1` for the fast arm when regenerating/restarting
+the rig. The same source binary is used; only the `BUCKIT_FAST_GET` service
+environment changes.
 
 Configure an `mc` alias once:
 

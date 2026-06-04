@@ -11,6 +11,16 @@ if command -v chpasswd >/dev/null 2>&1; then
 	echo "root:${SSH_ROOT_PASSWORD}" | chpasswd
 fi
 
+mkdir -p /etc/buckit
+{
+	printf 'MINIO_ROOT_USER=%q\n' "${MINIO_ROOT_USER:-buckitadmin}"
+	printf 'MINIO_ROOT_PASSWORD=%q\n' "${MINIO_ROOT_PASSWORD:-buckitadmin}"
+	printf 'MINIO_CONFIG_ENV_FILE=\n'
+	printf 'BUCKIT_FAST_GET=%q\n' "${BUCKIT_FAST_GET:-0}"
+	printf 'BUCKIT_ENDPOINTS=%q\n' "${BUCKIT_ENDPOINTS:-}"
+} >/etc/buckit/buckit.env
+chmod 0600 /etc/buckit/buckit.env
+
 # Ensure loop device support
 modprobe loop 2>/dev/null || true
 

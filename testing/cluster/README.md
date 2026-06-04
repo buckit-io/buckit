@@ -140,11 +140,12 @@ Builds the cluster image and starts N nodes.
 
 **What happens:**
 
-1. `dockerfile-gen.sh` generates a `Dockerfile` tailored to the chosen base
+1. Builds the current repo's Buckit binary for Linux into `testing/cluster/buckit`.
+2. `dockerfile-gen.sh` generates a `Dockerfile` tailored to the chosen base
    image.
-2. `docker-compose.yml` is generated with one service per node.
-3. `docker compose up -d --build` builds the image and starts all containers.
-4. Each container's entrypoint creates loopback XFS drives, sets the root SSH
+3. `docker-compose.yml` is generated with one service per node.
+4. `docker compose up -d --build` builds the image and starts all containers.
+5. Each container's entrypoint creates loopback XFS drives, sets the root SSH
    password, then hands off to systemd.
 
 **Example:**
@@ -158,6 +159,9 @@ Builds the cluster image and starts N nodes.
 
 # Named cluster (useful when running multiple clusters in parallel)
 ./cluster.sh create --name my-test --nodes 4
+
+# Enable the single-trip GET prototype in the generated Buckit service env
+./cluster.sh create --fast-get 1
 ```
 
 ### `expand`
@@ -206,6 +210,7 @@ Removes `Dockerfile`, `docker-compose.yml`, and `.state/`.
 | `-i, --image IMAGE` | `ubuntu:24.04` | Base Docker image |
 | `--ssh-base-port PORT` | `2201` | First host port mapped to node SSH |
 | `--ssh-password PASS` | `buckitadmin` | Root password for SSH |
+| `--fast-get VALUE` | `0` | `BUCKIT_FAST_GET` value for Buckit nodes |
 | `-N, --name NAME` | `buckit-test` | Compose project / cluster name |
 
 ### Port Allocation

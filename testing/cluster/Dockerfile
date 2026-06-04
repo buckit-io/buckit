@@ -6,6 +6,9 @@ RUN mkdir -p /var/run/sshd /etc/systemd/system/multi-user.target.wants  && if [ 
 
 RUN mkdir -p /var/lib/buckit-drives /data
 
+COPY buckit /usr/local/bin/buckit
+RUN chmod +x /usr/local/bin/buckit  && printf '%s\n'     '[Unit]'     'Description=Buckit Object Storage Server'     'After=network-online.target'     'Wants=network-online.target'     ''     '[Service]'     'EnvironmentFile=-/etc/buckit/buckit.env'     'ExecStart=/usr/local/bin/buckit server --address :9000 --console-address :9001 $BUCKIT_ENDPOINTS'     'Restart=always'     'RestartSec=5s'     'LimitNOFILE=1048576'     ''     '[Install]'     'WantedBy=multi-user.target'     > /etc/systemd/system/buckit.service  && ln -sf /etc/systemd/system/buckit.service /etc/systemd/system/multi-user.target.wants/buckit.service
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

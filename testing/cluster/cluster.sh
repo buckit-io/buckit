@@ -16,6 +16,7 @@ IMAGE="ubuntu:24.04"
 BASE_PORT=9000
 SSH_BASE_PORT=2201
 SSH_PASSWORD="buckitadmin"
+BUCKIT_FAST_GET="${BUCKIT_FAST_GET:-0}"
 STATE_DIR="$SCRIPT_DIR/.state"
 
 usage() {
@@ -37,6 +38,7 @@ Options (create / expand):
   -i, --image IMAGE        Base Docker image (default: $IMAGE)
   --ssh-base-port PORT     First host port mapped to container SSH (default: $SSH_BASE_PORT)
   --ssh-password PASS      Root password for SSH in test containers (default: $SSH_PASSWORD)
+  --fast-get VALUE         BUCKIT_FAST_GET value for Buckit nodes (default: $BUCKIT_FAST_GET)
   -N, --name NAME          Cluster name (default: $CLUSTER_NAME)
   -h, --help               Show this help
 
@@ -80,6 +82,10 @@ parse_args() {
 			SSH_PASSWORD="$2"
 			shift 2
 			;;
+		--fast-get)
+			BUCKIT_FAST_GET="$2"
+			shift 2
+			;;
 		-N | --name)
 			CLUSTER_NAME="$2"
 			shift 2
@@ -88,6 +94,22 @@ parse_args() {
 		*) shift ;;
 		esac
 	done
+}
+
+build_buckit_binary() {
+	local repo_root goos goarch
+
+	repo_root="$(cd "$SCRIPT_DIR/../.." && pwd)"
+	goos="${GOOS:-linux}"
+	goarch="${GOARCH:-$(go env GOHOSTARCH)}"
+
+	echo "Building Buckit binary for ${goos}/${goarch}..."
+	(
+		cd "$repo_root"
+		CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build -tags kqueue -trimpath \
+			--ldflags "$(go run buildscripts/gen-ldflags.go)" \
+			-o "$SCRIPT_DIR/buckit"
+	)
 }
 
 generate_compose() {
@@ -135,6 +157,7 @@ EOF
       - MINIO_ROOT_USER=buckitadmin
       - MINIO_ROOT_PASSWORD=buckitadmin
       - BUCKIT_ENDPOINTS=${endpoints}
+      - BUCKIT_FAST_GET=${BUCKIT_FAST_GET}
       - SSH_ROOT_PASSWORD=${SSH_PASSWORD}
     volumes:
       - node${i}-drives:/var/lib/buckit-drives
@@ -181,6 +204,7 @@ MEMORY=${MEMORY}
 IMAGE=${IMAGE}
 SSH_BASE_PORT=${SSH_BASE_PORT}
 SSH_PASSWORD=${SSH_PASSWORD}
+BUCKIT_FAST_GET=${BUCKIT_FAST_GET}
 EOF
 }
 
@@ -197,6 +221,8 @@ cmd_create() {
 	parse_args "$@"
 
 	echo "Creating cluster '${CLUSTER_NAME}': ${NODES} nodes, ${DRIVES} drives/node (${DRIVE_SIZE} each), image: ${IMAGE}"
+
+	build_buckit_binary
 
 	# Generate Dockerfile
 	generate_dockerfile "$IMAGE" "$SCRIPT_DIR/Dockerfile"
@@ -233,6 +259,8 @@ cmd_expand() {
 
 	echo "Expanding cluster '${CLUSTER_NAME}': adding ${add_nodes} nodes (total: ${new_total})"
 
+	build_buckit_binary
+
 	# Regenerate everything with new total
 	NODES=$new_total
 	generate_dockerfile "$IMAGE" "$SCRIPT_DIR/Dockerfile"
@@ -261,7 +289,7 @@ cmd_destroy() {
 	if [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then
 		docker compose -p "$CLUSTER_NAME" -f "$SCRIPT_DIR/docker-compose.yml" down -v 2>/dev/null || true
 	fi
-	rm -f "$SCRIPT_DIR/Dockerfile" "$SCRIPT_DIR/docker-compose.yml"
+	rm -f "$SCRIPT_DIR/Dockerfile" "$SCRIPT_DIR/docker-compose.yml" "$SCRIPT_DIR/buckit"
 	rm -rf "$STATE_DIR"
 	echo "Buckit cluster destroyed."
 

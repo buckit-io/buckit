@@ -55,3 +55,6 @@ xattr
 xl-meta
 .claude/
 issues/
+testing/cluster/buckit
+testing/cluster/.state/
+testing/cluster/.state-minio/
