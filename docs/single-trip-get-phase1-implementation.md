@@ -802,7 +802,19 @@ reuse in one change.
 - [x] Expose or log `fastGetHits` / `fastGetFallbacks` enough for the §9 playbook.
 - [x] Run focused `go test -tags kqueue,dev ./cmd -run SingleTrip` plus any
   touched-package tests.
+- [x] Run a local single-process 16-drive smoke validation to confirm shadow
+  install, byte correctness, and fast-path counters before attempting the full
+  A/B benchmark.
 - [ ] Run the §9 A/B benchmark playbook only after all correctness tests pass.
+
+Local smoke result (2026-06-04): with `BUCKIT_FAST_GET=1`, a disposable
+single-process erasure server using 16 local drive directories accepted an 8 MiB
+non-uniform object, installed `current/part.1` on all 16 drives, served a GET
+whose bytes matched the uploaded payload, and reported
+`minio_api_requests_fast_get_hits_total=1`. This is a mechanism check only; it
+does not measure the Phase 1 performance delta because all drives are directories
+on the same local filesystem and the run does not compare cold-cache OFF vs ON
+arms.
 
 ---
 
