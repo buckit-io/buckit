@@ -807,7 +807,12 @@ reuse in one change.
   A/B benchmark.
 - [x] Fix and run the Docker cluster rig far enough to execute a container
   cold-TTFB A/B pilot on 4 nodes x 4 XFS loopback drives.
-- [ ] Run the §9 A/B benchmark playbook only after all correctness tests pass.
+- [x] Run the §9 A/B benchmark playbook on the container rig (`warp` saturated
+  throughput + cold-TTFB, OFF vs ON) after all correctness tests pass. With the
+  rig corrected to a single 16-drive pool and 2 MiB (non-inlined) objects, the ON
+  arm is provably single-trip (serves with `xl.meta` deleted) and cold server-side
+  TTFB drops ~18% vs OFF; saturated throughput is flat. Direction matches §6;
+  absolute magnitude still requires §9.2's bare-metal host. See results below.
 
 Local smoke result (2026-06-04): with `BUCKIT_FAST_GET=1`, a disposable
 single-process erasure server using 16 local drive directories accepted an 8 MiB
@@ -818,22 +823,90 @@ does not measure the Phase 1 performance delta because all drives are directorie
 on the same local filesystem and the run does not compare cold-cache OFF vs ON
 arms.
 
-Docker cluster A/B pilot (2026-06-04): after wiring the cluster image to install
-the current Linux Buckit binary and start it through systemd, a 4-node x 4-drive
-loopback-XFS cluster loaded 64 x 1 MiB objects with `BUCKIT_FAST_GET=1`, then
-restarted against the same Docker volumes for OFF and ON arms. For 32 distinct
-cold GETs with page cache dropped in all containers before each request:
+Docker cluster A/B results (2026-06-04): getting a *valid* measurement out of the
+4-node x 4-drive loopback-XFS rig (`testing/cluster`, `--memory 512M
+--drive-size 2G`) required correcting **two rig defects** that each silently
+neutered the experiment. Both are worth recording because they are easy traps:
 
-| Arm | Samples | p50 TTFB | p95 TTFB | Average TTFB |
-|---|---:|---:|---:|---:|
-| `BUCKIT_FAST_GET=0` | 32 | 5.365 ms | 6.374 ms | 5.430 ms |
-| `BUCKIT_FAST_GET=1` | 32 | 5.303 ms | 6.250 ms | 5.388 ms |
+> **Trap 1 — multi-pool routing reads `xl.meta` before the fast path.** As shipped,
+> `cluster.sh` emitted one endpoint arg per node, so the deployment came up as
+> **four independent server pools** (`totalSets:[1,1,1,1]`). On a multi-pool GET,
+> `erasureServerPools.GetObjectNInfo` calls `getLatestObjectInfoWithIdx` first —
+> which runs `GetObjectInfo` (an `xl.meta` read) across *every* pool to find the
+> owner — and only then dispatches to the set-level shadow fast path. So with
+> `FAST_GET=1` the server still read `xl.meta` on every GET; the run was *not*
+> single-trip. The fast path bypasses `xl.meta` only on the `z.SinglePool()`
+> branch (`erasure-server-pool.go`). Fix: `cluster.sh` now emits a **single pool
+> spanning all nodes** (`http://node{1...4}:9000/data/drive{0...3}`,
+> `totalSets:[1]`, one 16-drive EC:4 set), so GET goes straight to the set.
+>
+> **Trap 2 — inline cutoff gates eligibility.** A shard is inlined into `xl.meta`
+> when `ShardFileSize(ActualSize) <= 128 KiB`. With 12 data shards (EC:4 over 16
+> drives) an object must exceed ~1.5 MiB to have a standalone `DataDir/part.1`;
+> below that it is inlined, `writeSingleTripShadow` skips it (`fi.InlineData()`
+> guard), and every GET falls back. (A first 64 KiB run on the broken 4-pool/EC:2
+> layout hit exactly this: `fast_get_hits_total=0` vs `fallbacks≈57 k`.) The runs
+> below use **2 MiB objects** (~174 KiB shard, comfortably above the cutoff;
+> `xl.meta` stays at 382 B with a separate data shard + shadow, verified on disk).
 
-The ON arm reported `minio_api_requests_fast_get_hits_total=32`, so the fast
-path was exercised. Treat this as a rig/mechanism check only: loopback storage on
-Docker Desktop is too fast and too cache-heavy to model HDD seek collapse, and
-`warp` was not available in this environment for the saturated throughput
-measurement.
+With both fixed, the dataset (2,000 x 2 MiB, distinct keys) was loaded once under
+`BUCKIT_FAST_GET=1` so shadows exist on every drive, then the same volumes were
+restarted for the OFF and ON arms. (`api requests_max` was raised to 10000 — the
+512 MiB nodes auto-tune a ~75 req/s limit that throttles the single-set load.)
+
+**Single-trip invariant — direct proof.** For one 2 MiB object, `xl.meta` and the
+canonical `DataDir/part.1` were deleted on **all 16 drives**, leaving only
+`current/part.1`. Under `FAST_GET=1` a pre-signed GET still returned **HTTP 200
+with byte-exact md5** — served entirely from the shadow with no `xl.meta` on disk.
+The identical test on the old 4-pool layout returned **404** (pool resolution
+needs `xl.meta`). This is the decisive confirmation that the ON arm reads no
+`xl.meta` in single-pool mode.
+
+**Measurement A — saturated throughput** (`warp get --list-existing`, 2,000
+objects, 48 concurrent, 30 s, read-only on identical data):
+
+| Arm | Throughput | obj/s | req p50 | req p90 | req p99 | TTFB median | Fast-path counters |
+|---|---:|---:|---:|---:|---:|---:|---|
+| `FAST_GET=0` | 147.46 MiB/s | 73.7 | 543.3 ms | 1074.1 ms | 1716.9 ms | 75 ms | n/a (path disabled) |
+| `FAST_GET=1` | 149.86 MiB/s | 74.9 | 570.8 ms | 1011.7 ms | 1558.5 ms | 70 ms | 2375 hits / 14 fallbacks (99.4%) |
+
+**Measurement B — cold single-stream TTFB** (40 distinct objects, page cache
+dropped on all four nodes before each batch, single connection, 3 runs each arm).
+Both instruments were captured **in one pass per run on the identical requests**:
+a `mc admin trace --verbose` stream recorded the server-side `TTFB` field on each
+`s3.GetObject` `[RESPONSE]` (request-receipt to first body byte) while `curl
+-w '%{time_starttransfer}'` issued and timed the same GETs client-side. The OFF
+and ON arms were run back-to-back in the same settled session. Per-run median TTFB:
+
+| Arm | trace R1/R2/R3 | trace median | curl R1/R2/R3 | curl median | Fast-path counters |
+|---|---|---:|---|---:|---|
+| `FAST_GET=0` | 7.25 / 6.39 / 7.06 ms | **7.06 ms** | 8.80 / 7.82 / 8.47 ms | **8.47 ms** | n/a (path disabled) |
+| `FAST_GET=1` | 6.16 / 5.25 / 5.23 ms | **5.25 ms** | 7.55 / 6.51 / 6.67 ms | **6.67 ms** | hits == GET count, ~0 fallbacks |
+
+Because trace and curl are paired per request, the expected invariant `curl ≥
+trace` holds in **every** run (curl median ~1.3–1.4 ms above trace — the loopback
+TCP-connect/send cost the server-side timer never sees). Read the OFF-vs-ON delta
+within an instrument; the absolute numbers carry `mc admin trace`'s per-request
+observation overhead (both arms equally, so the delta is unaffected).
+
+**Reading the result.** With a genuine single-trip ON arm, the metadata-collapse
+signal appears in both instruments: cold TTFB drops from ~7.1 ms to ~5.3 ms on the
+server-side trace (**~26%**) and from ~8.5 ms to ~6.7 ms on the client-side curl
+cross-check (**~21%**). Saturated throughput is essentially flat (+1.6%), which is expected at 2 MiB on a
+cache-backed medium: transfer dominates first-byte cost and there is no physical
+seek for the saved open to eliminate, so bandwidth is unchanged. The win is a
+per-request *latency* effect (one fewer open), exactly where the design predicts
+it.
+
+Caveat unchanged: loopback-XFS on Docker Desktop has no real seek latency, so the
+saved open costs only syscall/RPC overhead (~1.5 ms here), not an 8–10 ms HDD
+seek. The **direction** now matches design §6/§9.10 (cold-TTFB reduction with
+hits ≫ fallbacks and a within-noise throughput control); the **absolute
+magnitude** still requires the same binary on a Linux host with real, separate
+spinning disks (§9.2), where the eliminated open is a seek and the cold-TTFB delta
+should widen well past the ~26% seen here. Raw artifacts: `warp` archives
+`/private/tmp/warp-singletrip-2m-{load-on,off,on}.csv.zst` and the paired
+curl+trace cold-TTFB captures `/tmp/st-both-{curl,trace}-{off,on}.txt`.
 
 ---
 

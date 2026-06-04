@@ -134,6 +134,18 @@ bitrot block layout after accounting for the header offset. Existing bitrot
 verification and erasure decode should not need semantic changes, but the reader
 must know that shard offsets are relative to the payload start, not file offset 0.
 
+The header should be **variable-length with a self-describing payload** (a
+length-prefixed, version-tagged frame followed by tagged/keyed fields, e.g.
+TLV or msgpack), not a fixed-size positional record, so fields can be
+added/removed across releases without lockstep: the reader takes the payload
+length from the frame and the shard data begins immediately after, preserving
+the single trip. Because `current` is a rebuildable cache of `xl.meta`, an
+unrecognized format version or any decode failure simply falls back to the
+canonical path and the shadow is lazily rewritten — so the schema can evolve with
+no in-place migration. (The Phase 1 prototype uses a fixed 1024-byte header with a
+positional payload for simplicity; that is an implementation shortcut, not the
+intended on-disk contract.)
+
 ### 2.2 Delete-marker current
 
 Latest can be a delete marker. A plain GET must return not found when the quorum
