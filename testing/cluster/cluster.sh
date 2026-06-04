@@ -118,12 +118,19 @@ generate_compose() {
 	local total_nodes="$3"
 	local compose_file="$4"
 
-	# Build the server endpoint string for all nodes
-	local endpoints=""
-	for i in $(seq 1 "$total_nodes"); do
-		endpoints+="http://node${i}:9000/data/drive{0...$((DRIVES - 1))} "
-	done
-	endpoints="${endpoints% }"
+	# Build the server endpoint string as a SINGLE server pool spanning every
+	# node, i.e. one erasure set across all drives. This makes SinglePool()==true
+	# so GET dispatches straight to the set and the single-trip fast path can
+	# actually bypass xl.meta. Emitting one arg per node instead would create one
+	# pool per node, and multi-pool GET resolves the owning pool via an xl.meta
+	# read (getLatestObjectInfoWithIdx) before the fast path ever runs — defeating
+	# the whole experiment.
+	local endpoints
+	if [ "$total_nodes" -gt 1 ]; then
+		endpoints="http://node{1...${total_nodes}}:9000/data/drive{0...$((DRIVES - 1))}"
+	else
+		endpoints="http://node1:9000/data/drive{0...$((DRIVES - 1))}"
+	fi
 
 	# Start or append compose file
 	if [ "$start_node" -eq 1 ]; then

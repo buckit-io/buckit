@@ -17,7 +17,7 @@ services:
       - DRIVE_SIZE=1G
       - MINIO_ROOT_USER=buckitadmin
       - MINIO_ROOT_PASSWORD=buckitadmin
-      - BUCKIT_ENDPOINTS=http://node1:9000/data/drive{0...3} http://node2:9000/data/drive{0...3} http://node3:9000/data/drive{0...3} http://node4:9000/data/drive{0...3}
+      - BUCKIT_ENDPOINTS=http://node{1...4}:9000/data/drive{0...3}
       - BUCKIT_FAST_GET=0
       - SSH_ROOT_PASSWORD=buckitadmin
     volumes:
@@ -48,7 +48,7 @@ services:
       - DRIVE_SIZE=1G
       - MINIO_ROOT_USER=buckitadmin
       - MINIO_ROOT_PASSWORD=buckitadmin
-      - BUCKIT_ENDPOINTS=http://node1:9000/data/drive{0...3} http://node2:9000/data/drive{0...3} http://node3:9000/data/drive{0...3} http://node4:9000/data/drive{0...3}
+      - BUCKIT_ENDPOINTS=http://node{1...4}:9000/data/drive{0...3}
       - BUCKIT_FAST_GET=0
       - SSH_ROOT_PASSWORD=buckitadmin
     volumes:
@@ -79,7 +79,7 @@ services:
       - DRIVE_SIZE=1G
       - MINIO_ROOT_USER=buckitadmin
       - MINIO_ROOT_PASSWORD=buckitadmin
-      - BUCKIT_ENDPOINTS=http://node1:9000/data/drive{0...3} http://node2:9000/data/drive{0...3} http://node3:9000/data/drive{0...3} http://node4:9000/data/drive{0...3}
+      - BUCKIT_ENDPOINTS=http://node{1...4}:9000/data/drive{0...3}
       - BUCKIT_FAST_GET=0
       - SSH_ROOT_PASSWORD=buckitadmin
     volumes:
@@ -110,7 +110,7 @@ services:
       - DRIVE_SIZE=1G
       - MINIO_ROOT_USER=buckitadmin
       - MINIO_ROOT_PASSWORD=buckitadmin
-      - BUCKIT_ENDPOINTS=http://node1:9000/data/drive{0...3} http://node2:9000/data/drive{0...3} http://node3:9000/data/drive{0...3} http://node4:9000/data/drive{0...3}
+      - BUCKIT_ENDPOINTS=http://node{1...4}:9000/data/drive{0...3}
       - BUCKIT_FAST_GET=0
       - SSH_ROOT_PASSWORD=buckitadmin
     volumes:
