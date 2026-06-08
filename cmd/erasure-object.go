@@ -204,7 +204,6 @@ func (er erasureObjects) GetObjectNInfo(ctx context.Context, bucket, object stri
 	if !opts.NoAuditLog {
 		auditObjectErasureSet(ctx, "GetObject", object, &er)
 	}
-
 	var unlockOnDefer bool
 	nsUnlocker := func() {}
 	defer func() {
@@ -236,7 +235,7 @@ func (er erasureObjects) GetObjectNInfo(ctx context.Context, bucket, object stri
 		nsUnlocker = func() { lock.RUnlock(lkctx) }
 	}
 
-	if fastGetRequestEligible(h, rs, opts) {
+	if fastGetRequestEligible(bucket, h, rs, opts) {
 		gr, ok, err := er.tryFastGet(ctx, bucket, object, rs, h, opts, nsUnlocker)
 		if err != nil {
 			if ok {
@@ -250,8 +249,10 @@ func (er erasureObjects) GetObjectNInfo(ctx context.Context, bucket, object stri
 			return gr, nil
 		}
 		fastGetFallbacks.Add(1)
+		if globalFastGetNoFallback {
+			return nil, toObjectErr(errFastGetNoFallback, bucket, object)
+		}
 	}
-
 	fi, metaArr, onlineDisks, err := er.getObjectFileInfo(ctx, bucket, object, opts, true)
 	if err != nil {
 		return nil, toObjectErr(err, bucket, object)
@@ -402,7 +403,6 @@ func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, obje
 			// Prefer local disks
 			prefer[index] = disk.Hostname() == ""
 		}
-
 		written, err := erasure.Decode(ctx, writer, readers, partOffset, partLength, partSize, prefer)
 		// Note: we should not be defer'ing the following closeBitrotReaders() call as
 		// we are inside a for loop i.e if we use defer, we would accumulate a lot of open files by the time

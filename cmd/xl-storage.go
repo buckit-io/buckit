@@ -37,15 +37,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dustin/go-humanize"
-	"github.com/google/uuid"
-	jsoniter "github.com/json-iterator/go"
-	"github.com/klauspost/filepathx"
-	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/bucket/lifecycle"
 	"github.com/buckit-io/buckit/internal/bucket/replication"
 	"github.com/buckit-io/buckit/internal/cachevalue"
 	"github.com/buckit-io/buckit/internal/config/storageclass"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/dustin/go-humanize"
+	"github.com/google/uuid"
+	jsoniter "github.com/json-iterator/go"
+	"github.com/klauspost/filepathx"
 
 	"github.com/buckit-io/buckit/internal/disk"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
@@ -2085,7 +2085,8 @@ func (s *xlStorage) ReadFileStream(ctx context.Context, volume, path string, off
 			return nil, err
 		}
 	}
-	return &sendFileReader{Reader: io.LimitReader(file, length), Closer: file}, nil
+	rc := &sendFileReader{Reader: io.LimitReader(file, length), Closer: file}
+	return rc, nil
 }
 
 // CreateFile - creates the file.

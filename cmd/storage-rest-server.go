@@ -38,13 +38,13 @@ import (
 	"github.com/buckit-io/buckit/internal/grid"
 	"github.com/tinylib/msgp/msgp"
 
-	jwtreq "github.com/golang-jwt/jwt/v4/request"
-	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/config"
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	xjwt "github.com/buckit-io/buckit/internal/jwt"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/madmin-go/v3"
+	jwtreq "github.com/golang-jwt/jwt/v4/request"
 	"github.com/minio/mux"
 	xnet "github.com/minio/pkg/v3/net"
 )

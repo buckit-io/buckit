@@ -24,9 +24,45 @@ import (
 	"io"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/dustin/go-humanize"
 )
+
+func TestParallelReaderPreferReadersDoesNotDeadlock(t *testing.T) {
+	readers := make([]io.ReaderAt, 6)
+	for i := range readers {
+		readers[i] = bytes.NewReader([]byte{byte(i)})
+	}
+	p := &parallelReader{
+		readers:       readers,
+		orgReaders:    append([]io.ReaderAt(nil), readers...),
+		dataBlocks:    4,
+		shardSize:     1,
+		shardFileSize: 1,
+		buf:           make([][]byte, len(readers)),
+		readerToBuf:   []int{0, 1, 2, 3, 4, 5},
+	}
+
+	// Three local readers are preferred in a 4+2 layout. The fourth read must
+	// remain mapped to its original output buffer after the preferred swaps.
+	p.preferReaders([]bool{false, true, true, true, false, false})
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := p.Read(nil)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("parallelReader.Read deadlocked after preferred reader reordering")
+	}
+}
 
 func (a badDisk) ReadFile(ctx context.Context, volume string, path string, offset int64, buf []byte, verifier *BitrotVerifier) (n int64, err error) {
 	return 0, errFaultyDisk

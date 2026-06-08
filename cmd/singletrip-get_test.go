@@ -23,12 +23,160 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/buckit-io/buckit/internal/config/storageclass"
 )
+
+func unsetFastGetEnvForTest(t *testing.T) {
+	t.Helper()
+
+	keys := []string{
+		envBuckitFastGet,
+		envBuckitFastGetEager,
+		envBuckitFastGetEagerSelect,
+		envBuckitFastGetSpread,
+		envBuckitFastGetHedge,
+		envBuckitFastGetNoFallback,
+	}
+	old := make(map[string]string, len(keys))
+	present := make(map[string]bool, len(keys))
+	for _, key := range keys {
+		if value, ok := os.LookupEnv(key); ok {
+			old[key] = value
+			present[key] = true
+		}
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() {
+		for _, key := range keys {
+			if present[key] {
+				if err := os.Setenv(key, old[key]); err != nil {
+					t.Error(err)
+				}
+			} else if err := os.Unsetenv(key); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+}
+
+func TestReadFastGetRuntimeConfigDefaultsToEagerStable(t *testing.T) {
+	unsetFastGetEnvForTest(t)
+	t.Setenv(envBuckitFastGet, "1")
+
+	cfg := readFastGetRuntimeConfig()
+	if !cfg.enabled || !cfg.eager || !cfg.spreadSelection {
+		t.Fatalf("default fast-get config = %+v, want enabled eager spread", cfg)
+	}
+	if cfg.eagerSelected || cfg.hedgeShards || cfg.noFallback {
+		t.Fatalf("default fast-get diagnostics = %+v, want eager-selected/hedge/no-fallback disabled", cfg)
+	}
+}
+
+func TestReadFastGetRuntimeConfigHonorsExplicitOverrides(t *testing.T) {
+	unsetFastGetEnvForTest(t)
+	t.Setenv(envBuckitFastGet, "1")
+	t.Setenv(envBuckitFastGetEager, "0")
+	t.Setenv(envBuckitFastGetSpread, "0")
+	t.Setenv(envBuckitFastGetHedge, "1")
+
+	cfg := readFastGetRuntimeConfig()
+	if !cfg.enabled {
+		t.Fatalf("enabled = false, want true")
+	}
+	if cfg.eager || cfg.spreadSelection {
+		t.Fatalf("explicit disabled fast-get config = %+v, want eager/spread disabled", cfg)
+	}
+	if !cfg.hedgeShards {
+		t.Fatalf("hedgeShards = false, want true")
+	}
+}
+
+// singleTripSlowReaderAt delays each ReadAt — mimics a slow/remote shard read,
+// the ingredient missing from the all-local unit tests.
+type singleTripSlowReaderAt struct {
+	inner io.ReaderAt
+	delay time.Duration
+}
+
+func (s singleTripSlowReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	time.Sleep(s.delay)
+	return s.inner.ReadAt(p, off)
+}
+
+// TestSingleTripDecodeMixedReadersReconstructNoHang reproduces the rig hang at the
+// decode layer: the fast path hands erasure.Decode a mix of instant buffer-backed
+// readers (eager-prefetched local shards) and one slow reader (remote shard), with
+// a data shard withheld so parity reconstruction is required. Looped to trigger the
+// timing-dependent parallelReader deadlock. A watchdog fails fast if Decode hangs.
+func TestSingleTripDecodeMixedReadersReconstructNoHang(t *testing.T) {
+	ctx := context.Background()
+	const dataBlocks, parityBlocks = 4, 2
+	const blockSize = int64(1 << 20)
+	erasure, err := NewErasure(ctx, dataBlocks, parityBlocks, blockSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := makeSingleTripTestData(640*1024, 33) // single-block, like the rig 640 KiB
+	shards, err := erasure.EncodeData(ctx, payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shardSize := erasure.ShardSize()
+	encoded := make([][]byte, len(shards))
+	for i := range shards {
+		encoded[i] = buildTestSingleTripBitrotPayload(t, shards[i], shardSize)
+	}
+
+	for iter := 0; iter < 200; iter++ {
+		// Fresh readers each iteration (the streaming readers are forward-only).
+		// Withhold data shard 0 AND the 2nd parity, leaving exactly M=4 usable shards:
+		// 3 instant (data 1..3) + 1 slow (1st parity). parallelReader must read all 4
+		// (3 instant local + 1 slow remote) and reconstruct data shard 0 from parity —
+		// exactly the rig's "prefer-local + 1 remote + reconstruction" mix.
+		readers := make([]io.ReaderAt, len(shards))
+		prefer := make([]bool, len(shards))
+		for i := range shards {
+			switch i {
+			case 0, dataBlocks + 1:
+				readers[i] = nil // withheld
+			case dataBlocks: // 1st parity: the slow "remote" reader
+				br := newSingleTripStreamingBitrotReader(io.NopCloser(bytes.NewReader(encoded[i])), DefaultBitrotAlgorithm, shardSize)
+				readers[i] = singleTripSlowReaderAt{inner: br, delay: 20 * time.Millisecond}
+				prefer[i] = false
+			default: // data 1..3: instant buffer-backed (eager-prefetched local)
+				readers[i] = newSingleTripStreamingBitrotReader(io.NopCloser(bytes.NewReader(encoded[i])), DefaultBitrotAlgorithm, shardSize)
+				prefer[i] = true
+			}
+		}
+
+		done := make(chan error, 1)
+		var out bytes.Buffer
+		go func() {
+			_, derr := erasure.Decode(ctx, &out, readers, 0, int64(len(payload)), int64(len(payload)), prefer)
+			done <- derr
+		}()
+		select {
+		case derr := <-done:
+			if derr != nil {
+				t.Fatalf("iter %d: decode error: %v", iter, derr)
+			}
+			if !bytes.Equal(out.Bytes(), payload) {
+				t.Fatalf("iter %d: decoded bytes mismatch", iter)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatalf("iter %d: DECODE HANG reproduced (parallelReader deadlock)", iter)
+		}
+	}
+}
 
 type singleTripCountingDisk struct {
 	StorageAPI
@@ -108,11 +256,7 @@ func TestSingleTripFastGetEndToEnd(t *testing.T) {
 	}
 	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 1, 0, "fast")
 	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
-	for i, disk := range countingDisks {
-		if got := disk.readFileStreamCalls.Load(); got != 1 {
-			t.Fatalf("disk %d ReadFileStream calls = %d, want 1", i, got)
-		}
-	}
+	assertSingleTripQuorumOpens(t, xl, countingDisks, "fast")
 
 	resetSingleTripReadFileStreamCounts(countingDisks)
 	rangeLen := smallFileThreshold*3 + 123
@@ -122,9 +266,70 @@ func TestSingleTripFastGetEndToEnd(t *testing.T) {
 		t.Fatalf("fast range bytes differ: got %d bytes, want %d", len(fastRange), rangeLen)
 	}
 	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 1, 0, "range")
-	for i, disk := range countingDisks {
-		if got := disk.readFileStreamCalls.Load(); got != 1 {
-			t.Fatalf("range disk %d ReadFileStream calls = %d, want 1", i, got)
+	assertSingleTripQuorumOpens(t, xl, countingDisks, "range")
+}
+
+// assertSingleTripQuorumOpens verifies the fast path opened exactly the read quorum
+// of shadow streams (prefer-local) — not all M+N — so a healthy GET reads the
+// minimum number of shards.
+func assertSingleTripQuorumOpens(t *testing.T, xl *erasureObjects, disks []*singleTripCountingDisk, label string) {
+	t.Helper()
+	dataCount := xl.setDriveCount - xl.defaultParityCount
+	want := dataCount
+	if dataCount == xl.defaultParityCount {
+		want = dataCount + 1
+	}
+	total := 0
+	for i, d := range disks {
+		got := int(d.readFileStreamCalls.Load())
+		if got > 1 {
+			t.Fatalf("%s: disk %d ReadFileStream calls = %d, want 0 or 1", label, i, got)
+		}
+		total += got
+	}
+	if total != want {
+		t.Fatalf("%s: total ReadFileStream calls = %d, want %d", label, total, want)
+	}
+}
+
+func TestSingleTripFastOpenRemoteSelectionIsStable(t *testing.T) {
+	oldSpread := globalFastGetSpreadSelection
+	globalFastGetSpreadSelection = false
+	t.Cleanup(func() {
+		globalFastGetSpreadSelection = oldSpread
+	})
+
+	disks := make([]StorageAPI, 3) // nil disks are treated as non-local candidates.
+	first := selectSingleTripFastOpenDisks(disks, 1, "bucket", "object")
+	if len(first) != 1 {
+		t.Fatalf("selection length = %d, want 1", len(first))
+	}
+	for i := 0; i < 9; i++ {
+		sel := selectSingleTripFastOpenDisks(disks, 1, "bucket", "object")
+		if !slices.Equal(sel, first) {
+			t.Fatalf("selection %d = %v, want stable %v", i, sel, first)
+		}
+	}
+}
+
+func TestSingleTripFastOpenSpreadSelectionIsStable(t *testing.T) {
+	first := selectSingleTripSpreadDisks(6, 4, "bucket", "object")
+	if len(first) != 4 {
+		t.Fatalf("selection length = %d, want 4", len(first))
+	}
+	local := 0
+	for _, disk := range first {
+		if disk%2 == 0 { // EC:2 interleaved order: local, remote, local, remote...
+			local++
+		}
+	}
+	if local != 2 {
+		t.Fatalf("selection %v has %d local slots, want 2", first, local)
+	}
+	for i := 0; i < 6; i++ {
+		sel := selectSingleTripSpreadDisks(6, 4, "bucket", "object")
+		if !slices.Equal(sel, first) {
+			t.Fatalf("selection %d = %v, want stable %v", i, sel, first)
 		}
 	}
 }
@@ -318,6 +523,51 @@ func TestSingleTripFastGetMidStreamCorruptionErrors(t *testing.T) {
 		t.Fatal("fast GET returned complete data despite corrupted direct shadow")
 	}
 	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 1, 0, "corruption")
+}
+
+func TestSingleTripFastGetFallsBackWhenQuorumShadowMissing(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	z, cleanup := prepareSingleTripErasureObject(t, ctx)
+	defer cleanup()
+	withSingleTripEnabled(t, true)
+
+	xl := z.serverPools[0].sets[0]
+	bucket := "bucket"
+	object := "object"
+	// Multi-block, above the inline cutoff so a standalone shadow exists.
+	data := makeSingleTripTestData(3*blockSizeV2+12345, 77)
+	if err := z.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := z.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The fast path now opens exactly the read quorum of shadows (prefer-local), with
+	// no spare. Removing the shadow on a disk that is in that quorum (disk 0, opened
+	// first) means the fast path can't reach quorum and must fall back to the
+	// canonical path — which still returns the correct bytes from xl.meta +
+	// DataDir/part.1. (In-decode reconstruction of a *missing* shard was the cost of
+	// dropping to exactly-quorum reads; reconstruction from parity that happens to be
+	// among the opened quorum is still exercised by the end-to-end path.)
+	deleteSingleTripShadowOnDisk(t, xl, bucket, object, 0)
+
+	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
+	got, _ := readSingleTripTestObject(t, xl, bucket, object)
+	if !bytes.Equal(got, data) {
+		t.Fatal("fallback GET returned wrong bytes")
+	}
+	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 0, 1, "fallback")
+}
+
+func deleteSingleTripShadowOnDisk(t *testing.T, xl *erasureObjects, bucket, object string, diskIdx int) {
+	t.Helper()
+	disk := xl.getDisks()[diskIdx]
+	if err := disk.Delete(t.Context(), bucket, pathJoin(object, singleTripCurrentDir), DeleteOptions{Recursive: true}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 type singleTripGetObjectNInfo interface {

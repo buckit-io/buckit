@@ -146,14 +146,17 @@ func TestFastGetRequestEligible(t *testing.T) {
 	globalFastGetEnabled = true
 	t.Cleanup(func() { globalFastGetEnabled = old })
 
-	if !fastGetRequestEligible(nil, nil, ObjectOptions{}) {
+	if !fastGetRequestEligible("bucket", nil, nil, ObjectOptions{}) {
 		t.Fatal("plain latest request should be eligible")
 	}
-	if fastGetRequestEligible(nil, &HTTPRangeSpec{Start: 1, End: -1}, ObjectOptions{}) {
+	if fastGetRequestEligible("bucket", nil, &HTTPRangeSpec{Start: 1, End: -1}, ObjectOptions{}) {
 		t.Fatal("non-zero range should be ineligible")
 	}
-	if fastGetRequestEligible(nil, nil, ObjectOptions{VersionID: "v1"}) {
+	if fastGetRequestEligible("bucket", nil, nil, ObjectOptions{VersionID: "v1"}) {
 		t.Fatal("versioned request should be ineligible")
+	}
+	if fastGetRequestEligible(minioMetaBucket, nil, nil, ObjectOptions{}) {
+		t.Fatal("internal metadata bucket request should be ineligible")
 	}
 }
 
@@ -244,7 +247,7 @@ func TestSingleTripPickFastInfoPrefersNewestCompleteGroup(t *testing.T) {
 		{header: newHeader, rc: io.NopCloser(bytes.NewReader(nil))},
 		{header: withSingleTripErasureIndex(newHeader, 2), rc: io.NopCloser(bytes.NewReader(nil))},
 	}
-	info, ok := pickSingleTripFastInfo(reads)
+	info, _, ok := pickSingleTripFastInfo(reads)
 	if !ok {
 		t.Fatal("expected a complete fast group")
 	}
