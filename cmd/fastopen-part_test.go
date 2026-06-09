@@ -19,7 +19,12 @@ package cmd
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"io"
+	"net/url"
+	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -313,7 +318,7 @@ func testFastOpenPartFileInfo(bucket, object string) FileInfo {
 	}
 }
 
-func writeFastOpenPartObject(t *testing.T, disk *xlStorageDiskIDCheck, fi FileInfo, body []byte) {
+func writeFastOpenPartObject(t *testing.T, disk StorageAPI, fi FileInfo, body []byte) {
 	t.Helper()
 
 	if err := disk.WriteMetadata(t.Context(), "", fi.Volume, fi.Name, fi); err != nil {
@@ -327,7 +332,7 @@ func writeFastOpenPartObject(t *testing.T, disk *xlStorageDiskIDCheck, fi FileIn
 	}
 }
 
-func readFastOpenPart(t *testing.T, disk *xlStorageDiskIDCheck, bucket, object string, req FastOpenPartRequest) (FastOpenFramePrelude, CoalescedMetadataFrame, []byte) {
+func readFastOpenPart(t *testing.T, disk StorageAPI, bucket, object string, req FastOpenPartRequest) (FastOpenFramePrelude, CoalescedMetadataFrame, []byte) {
 	t.Helper()
 
 	rc, err := disk.FastOpenPart(t.Context(), bucket, object, req)
@@ -345,4 +350,178 @@ func readFastOpenPart(t *testing.T, disk *xlStorageDiskIDCheck, bucket, object s
 		t.Fatal(err)
 	}
 	return prelude, frame, body
+}
+
+func TestStorageRESTClientFastOpenPart(t *testing.T) {
+	restClient := newStorageRESTHTTPServerClient(t)
+	bucket := "foo"
+	object := "fastopen/object"
+	fi := testFastOpenPartFileInfo(bucket, object)
+	body := []byte("remote-fastopen-shard-body")
+	writeFastOpenPartObject(t, restClient, fi, body)
+
+	_, frame, gotBody := readFastOpenPart(t, restClient, bucket, object, FastOpenPartRequest{
+		Version:    fastOpenFrameVersion,
+		PartNumber: 1,
+		Length:     -1,
+	})
+	if frame.Status != FastOpenStatusOK || frame.BodyMode != FastOpenBodyShard {
+		t.Fatalf("remote frame status/mode = %d/%d, want OK/shard", frame.Status, frame.BodyMode)
+	}
+	if frame.BodyLen != int64(len(body)) || !bytes.Equal(gotBody, body) {
+		t.Fatalf("remote body len/body = %d/%q, want %d/%q", frame.BodyLen, gotBody, len(body), body)
+	}
+
+	_, frame, gotBody = readFastOpenPart(t, restClient, bucket, object+"-missing", FastOpenPartRequest{
+		Version:    fastOpenFrameVersion,
+		PartNumber: 1,
+		Length:     -1,
+	})
+	if frame.Status != FastOpenStatusNotFound || frame.BodyMode != FastOpenBodyMetadataOnly || len(gotBody) != 0 {
+		t.Fatalf("remote not-found frame/body = %#v/%q", frame, gotBody)
+	}
+
+	rc, err := restClient.FastOpenPart(t.Context(), bucket, object, FastOpenPartRequest{
+		Version:    fastOpenFrameVersion + 1,
+		PartNumber: 1,
+		Length:     -1,
+	})
+	if err == nil {
+		rc.Close()
+		t.Fatal("FastOpenPart with bad protocol version succeeded")
+	}
+	if !errors.Is(err, errFastOpenFrameBadVersion) {
+		t.Fatalf("FastOpenPart bad version error = %v, want %v", err, errFastOpenFrameBadVersion)
+	}
+}
+
+func TestStorageRESTClientFastOpenPartMalformedParams(t *testing.T) {
+	restClient := newStorageRESTHTTPServerClient(t)
+	values := make(url.Values)
+	values.Set(storageRESTVolume, "foo")
+	values.Set(storageRESTFilePath, "fastopen/object")
+	values.Set(storageRESTFastOpenVersion, "not-a-version")
+	values.Set(storageRESTVersionID, "")
+	values.Set(storageRESTPartNumber, "1")
+	values.Set(storageRESTOffset, "0")
+	values.Set(storageRESTLength, "-1")
+	values.Set(storageRESTFastOpenFlags, "0")
+
+	respBody, err := restClient.callGet(t.Context(), storageRESTMethodFastOpenPart, values, nil, -1)
+	if err == nil {
+		respBody.Close()
+		t.Fatal("malformed FastOpenPart params succeeded")
+	}
+	if err.Error() != strconv.ErrSyntax.Error() {
+		t.Fatalf("malformed FastOpenPart params error = %v, want %v", err, strconv.ErrSyntax)
+	}
+}
+
+func TestStorageRESTClientFastOpenPartCloseCancelsRemoteWork(t *testing.T) {
+	restClient := newStorageRESTHTTPServerClient(t)
+	orig := globalLocalSetDrives[0][0][0]
+	disk := &cancelAwareFastOpenDisk{
+		StorageAPI: orig,
+		closed:     make(chan struct{}),
+	}
+	globalLocalSetDrives[0][0][0] = disk
+	t.Cleanup(func() {
+		globalLocalSetDrives[0][0][0] = orig
+	})
+
+	rc, err := restClient.FastOpenPart(t.Context(), "foo", "fastopen/cancel", FastOpenPartRequest{
+		Version:    fastOpenFrameVersion,
+		PartNumber: 1,
+		Length:     -1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = readFastOpenFrame(rc); err != nil {
+		rc.Close()
+		t.Fatal(err)
+	}
+	if err = rc.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-disk.closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("remote FastOpenPart stream was not closed after client Close")
+	}
+}
+
+func TestFastOpenRemoteReadCloserCloseCancels(t *testing.T) {
+	body := &trackingReadCloser{Reader: bytes.NewReader([]byte("body"))}
+	var canceled atomic.Bool
+	rc := &fastOpenRemoteReadCloser{
+		ReadCloser: body,
+		cancel: func() {
+			canceled.Store(true)
+		},
+	}
+	if err := rc.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !canceled.Load() {
+		t.Fatal("Close did not cancel the remote stream context")
+	}
+	if !body.closed.Load() {
+		t.Fatal("Close did not close the response body")
+	}
+}
+
+type trackingReadCloser struct {
+	io.Reader
+	closed atomic.Bool
+}
+
+func (rc *trackingReadCloser) Close() error {
+	rc.closed.Store(true)
+	return nil
+}
+
+type cancelAwareFastOpenDisk struct {
+	StorageAPI
+	closed chan struct{}
+}
+
+func (d *cancelAwareFastOpenDisk) FastOpenPart(ctx context.Context, volume, path string, req FastOpenPartRequest) (io.ReadCloser, error) {
+	body := bytes.Repeat([]byte("x"), 256<<10)
+	frame, err := encodeFastOpenFrame(CoalescedMetadataFrame{
+		Status:   FastOpenStatusOK,
+		BodyMode: FastOpenBodyShard,
+		BodyLen:  int64(len(body)),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &cancelAwareFastOpenStream{
+		ctx:     ctx,
+		initial: bytes.NewReader(append(frame, body...)),
+		closed:  d.closed,
+	}, nil
+}
+
+type cancelAwareFastOpenStream struct {
+	ctx     context.Context
+	initial *bytes.Reader
+	closed  chan struct{}
+	done    atomic.Bool
+}
+
+func (s *cancelAwareFastOpenStream) Read(p []byte) (int, error) {
+	if s.initial.Len() > 0 {
+		return s.initial.Read(p)
+	}
+	<-s.ctx.Done()
+	return 0, s.ctx.Err()
+}
+
+func (s *cancelAwareFastOpenStream) Close() error {
+	if s.done.CompareAndSwap(false, true) {
+		close(s.closed)
+	}
+	return nil
 }

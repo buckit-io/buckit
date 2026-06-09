@@ -187,6 +187,13 @@ func (d *naughtyDisk) ReadFileStream(ctx context.Context, volume, path string, o
 	return d.disk.ReadFileStream(ctx, volume, path, offset, length)
 }
 
+func (d *naughtyDisk) FastOpenPart(ctx context.Context, volume, path string, req FastOpenPartRequest) (io.ReadCloser, error) {
+	if err := d.calcError(); err != nil {
+		return nil, err
+	}
+	return d.disk.FastOpenPart(ctx, volume, path, req)
+}
+
 func (d *naughtyDisk) CreateFile(ctx context.Context, origvolume, volume, path string, size int64, reader io.Reader) error {
 	if err := d.calcError(); err != nil {
 		return err
