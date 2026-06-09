@@ -40,6 +40,11 @@ make check-gen
 make install-race
 ```
 
+## Local Collaboration Notes
+
+- Do not run the full `CGO_ENABLED=0 go test -tags kqueue,dev ./cmd` package test automatically. Ask the user to run it, or ask for explicit approval first.
+- Treat external/Claude review feedback as advisory. Verify suggested changes against canonical code paths and real storage formats before applying them.
+
 ## Architecture
 
 ### Entry Point & Package Structure
