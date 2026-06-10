@@ -20,18 +20,26 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/xml"
+	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/buckit-io/buckit/internal/bucket/lifecycle"
+	"github.com/buckit-io/buckit/internal/bucket/replication"
 	"github.com/buckit-io/buckit/internal/config/storageclass"
 	"github.com/buckit-io/buckit/internal/crypto"
 	"github.com/buckit-io/buckit/internal/etag"
 	"github.com/buckit-io/buckit/internal/hash"
 	xhttp "github.com/buckit-io/buckit/internal/http"
+	"github.com/buckit-io/madmin-go/v3"
 )
 
 func TestFastOpenGETEndToEnd(t *testing.T) {
@@ -57,8 +65,9 @@ func TestFastOpenGETEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	userDefined := map[string]string{
-		"content-type":  "application/fastopen-test",
-		"cache-control": "max-age=120",
+		"content-type":         "application/fastopen-test",
+		"cache-control":        "max-age=120",
+		xhttp.AmzObjectTagging: "tag1=value1&tag2=value2",
 	}
 	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{
 		UserDefined: userDefined,
@@ -77,6 +86,9 @@ func TestFastOpenGETEndToEnd(t *testing.T) {
 		t.Fatalf("fastopen bytes differ from baseline: got %d bytes, want %d", len(fast), len(baseline))
 	}
 	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+	if fastInfo.UserTags != baselineInfo.UserTags {
+		t.Fatalf("tag parity differs\nfast: %#v\nwant: %#v", fastInfo, baselineInfo)
+	}
 	assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 
 	resetFastOpenGETOpenCounts(countingDisks)
@@ -86,6 +98,495 @@ func TestFastOpenGETEndToEnd(t *testing.T) {
 		t.Fatalf("range bytes differ: got %d bytes, want %d", len(gotRange), rangeLen)
 	}
 	assertFastOpenGETOpens(t, xl, countingDisks, 0)
+}
+
+func TestFastOpenGETGoldenVersionedDeleteAndZero(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	obj, fsDirs, err := prepareErasure16(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer obj.Shutdown(t.Context())
+	defer removeRoots(fsDirs)
+
+	z := obj.(*erasureServerPools)
+	sets := z.serverPools[0]
+	xl := sets.sets[0]
+	withSingleTripEnabled(t, false)
+
+	bucket := "bucket"
+	versionedObject := "versioned-object"
+	zeroObject := "zero-object"
+	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{VersioningEnabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	v1Data := makeSingleTripTestData(smallFileThreshold*16+12345, 11)
+	v1, err := xl.PutObject(ctx, bucket, versionedObject, mustGetPutObjReader(t, bytes.NewReader(v1Data), int64(len(v1Data)), "", ""), ObjectOptions{Versioned: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2Data := makeSingleTripTestData(smallFileThreshold*16, 13)
+	v2, err := xl.PutObject(ctx, bucket, versionedObject, mustGetPutObjReader(t, bytes.NewReader(v2Data), int64(len(v2Data)), "", ""), ObjectOptions{Versioned: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleteMarker, err := xl.DeleteObject(ctx, bucket, versionedObject, ObjectOptions{Versioned: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = xl.PutObject(ctx, bucket, zeroObject, mustGetPutObjReader(t, bytes.NewReader(nil), 0, "", ""), ObjectOptions{Versioned: true}); err != nil {
+		t.Fatal(err)
+	}
+
+	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+	for _, test := range []struct {
+		name      string
+		object    string
+		opts      ObjectOptions
+		wantBytes []byte
+		wantErr   func(error) bool
+	}{
+		{
+			name:      "explicit-v1",
+			object:    versionedObject,
+			opts:      ObjectOptions{Versioned: true, VersionID: v1.VersionID},
+			wantBytes: v1Data,
+		},
+		{
+			name:      "explicit-v2",
+			object:    versionedObject,
+			opts:      ObjectOptions{Versioned: true, VersionID: v2.VersionID},
+			wantBytes: v2Data,
+		},
+		{
+			name:    "latest-delete-marker",
+			object:  versionedObject,
+			opts:    ObjectOptions{Versioned: true},
+			wantErr: isErrObjectNotFound,
+		},
+		{
+			name:    "explicit-delete-marker",
+			object:  versionedObject,
+			opts:    ObjectOptions{Versioned: true, VersionID: deleteMarker.VersionID},
+			wantErr: isErrMethodNotAllowed,
+		},
+		{
+			name:      "zero-byte",
+			object:    zeroObject,
+			opts:      ObjectOptions{Versioned: true},
+			wantBytes: nil,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			resetFastOpenGETOpenCounts(countingDisks)
+			baseline, baselineInfo, baselineErr := readFastOpenTestObjectOptions(t, xl, bucket, test.object, nil, http.Header{}, test.opts)
+
+			globalFastGetEnabled = true
+			fastGetHits.Store(0)
+			fastGetFallbacks.Store(0)
+			fastOpts := test.opts
+			fastOpts.FastGetObjInfo = true
+			fast, fastInfo, fastErr := readFastOpenTestObjectOptions(t, xl, bucket, test.object, nil, http.Header{}, fastOpts)
+			globalFastGetEnabled = false
+
+			if test.wantErr != nil {
+				if !test.wantErr(baselineErr) || !test.wantErr(fastErr) {
+					t.Fatalf("errors = baseline:%T %v fast:%T %v", baselineErr, baselineErr, fastErr, fastErr)
+				}
+			} else if baselineErr != nil || fastErr != nil {
+				t.Fatalf("errors = baseline:%v fast:%v", baselineErr, fastErr)
+			}
+			if !bytes.Equal(baseline, fast) || !bytes.Equal(fast, test.wantBytes) {
+				t.Fatalf("bytes differ: baseline=%d fast=%d want=%d", len(baseline), len(fast), len(test.wantBytes))
+			}
+			assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+			if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
+				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", fastGetHits.Load(), fastGetFallbacks.Load())
+			}
+			assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
+		})
+	}
+}
+
+func TestFastOpenGETMultipartFallsBack(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	obj, fsDirs, err := prepareErasure16(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer obj.Shutdown(t.Context())
+	defer removeRoots(fsDirs)
+
+	z := obj.(*erasureServerPools)
+	sets := z.serverPools[0]
+	xl := sets.sets[0]
+	withSingleTripEnabled(t, false)
+
+	bucket := "bucket"
+	object := "multipart-object"
+	part1 := makeSingleTripTestData(5*1024*1024+123, 19)
+	part2 := makeSingleTripTestData(1024*1024+77, 29)
+	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	upload, err := xl.NewMultipartUpload(ctx, bucket, object, ObjectOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p1, err := xl.PutObjectPart(ctx, bucket, object, upload.UploadID, 1, mustGetPutObjReader(t, bytes.NewReader(part1), int64(len(part1)), "", ""), ObjectOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p2, err := xl.PutObjectPart(ctx, bucket, object, upload.UploadID, 2, mustGetPutObjReader(t, bytes.NewReader(part2), int64(len(part2)), "", ""), ObjectOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = xl.CompleteMultipartUpload(ctx, bucket, object, upload.UploadID, []CompletePart{
+		{PartNumber: 1, ETag: p1.ETag},
+		{PartNumber: 2, ETag: p2.ETag},
+	}, ObjectOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	baseline, baselineInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
+	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+
+	globalFastGetEnabled = true
+	fastGetHits.Store(0)
+	fastGetFallbacks.Store(0)
+	fast, fastInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
+	globalFastGetEnabled = false
+	if !bytes.Equal(fast, baseline) || !bytes.Equal(fast, append(append([]byte(nil), part1...), part2...)) {
+		t.Fatalf("multipart bytes differ: fast=%d baseline=%d", len(fast), len(baseline))
+	}
+	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+	if fastGetHits.Load() != 0 || fastGetFallbacks.Load() == 0 {
+		t.Fatalf("fast counters hits=%d fallbacks=%d, want 0/>0", fastGetHits.Load(), fastGetFallbacks.Load())
+	}
+	assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
+}
+
+func TestFastOpenGETHandlerChecksumAndLifecycleHeaders(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	obj, fsDirs, err := prepareErasure16(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer obj.Shutdown(t.Context())
+	defer removeRoots(fsDirs)
+
+	z := obj.(*erasureServerPools)
+	sets := z.serverPools[0]
+	xl := sets.sets[0]
+	withSingleTripEnabled(t, false)
+
+	bucket := "bucket"
+	object := "headers-object"
+	data := makeSingleTripTestData(smallFileThreshold*16, 61)
+	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{VersioningEnabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{
+		Versioned:    true,
+		WantChecksum: hash.NewChecksumFromData(hash.ChecksumCRC32, data),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	router, accessKey, secretKey := initFastOpenGETAPIRouter(t, ctx, obj)
+	lifecycleConfig := []byte(`<LifecycleConfiguration><Rule><ID>expire-fastopen</ID><Status>Enabled</Status><Filter></Filter><Expiration><Days>1</Days></Expiration></Rule></LifecycleConfiguration>`)
+	if _, err = globalBucketMetadataSys.Update(ctx, bucket, bucketLifecycleConfig, lifecycleConfig); err != nil {
+		t.Fatal(err)
+	}
+	lc, err := globalLifecycleSys.Get(bucket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lifecycleInfo, err := xl.GetObjectInfo(ctx, bucket, object, ObjectOptions{Versioned: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lifecycleRecorder := httptest.NewRecorder()
+	lifecycleOpts := lifecycleInfo.ToLifecycleOpts()
+	lc.SetPredictionHeaders(lifecycleRecorder, lifecycleOpts)
+	if len(fastOpenHeaderValues(lifecycleRecorder.Header(), xhttp.AmzExpiration)) == 0 {
+		t.Fatalf("lifecycle fixture produced no expiration header: opts=%#v rules=%d filtered=%d event=%#v", lifecycleOpts, len(lc.Rules), len(lc.FilterRules(lifecycleOpts)), lc.Eval(lifecycleOpts))
+	}
+	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+	headers := map[string]string{xhttp.AmzChecksumMode: "ENABLED"}
+
+	globalFastGetEnabled = false
+	baselineRec, baselineBody := doFastOpenGETHandlerRequest(t, router, bucket, object, accessKey, secretKey, headers)
+
+	resetFastOpenGETOpenCounts(countingDisks)
+	globalFastGetEnabled = true
+	fastGetHits.Store(0)
+	fastGetFallbacks.Store(0)
+	fastRec, fastBody := doFastOpenGETHandlerRequest(t, router, bucket, object, accessKey, secretKey, headers)
+	globalFastGetEnabled = false
+
+	if !bytes.Equal(fastBody, baselineBody) || !bytes.Equal(fastBody, data) {
+		t.Fatalf("handler bytes differ: baseline=%d fast=%d want=%d", len(baselineBody), len(fastBody), len(data))
+	}
+	for _, header := range []string{xhttp.AmzChecksumCRC32, xhttp.AmzChecksumType, xhttp.AmzExpiration} {
+		if len(fastOpenHeaderValues(baselineRec.Header(), header)) == 0 {
+			t.Fatalf("baseline missing %s header", header)
+		}
+		if got, want := fastOpenHeaderValues(fastRec.Header(), header), fastOpenHeaderValues(baselineRec.Header(), header); !equalStringSlices(got, want) {
+			t.Fatalf("%s header differs: fast=%v baseline=%v", header, got, want)
+		}
+	}
+	if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
+		t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", fastGetHits.Load(), fastGetFallbacks.Load())
+	}
+	assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
+}
+
+func TestFastOpenGETRemoteTierWithBackend(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	obj, fsDirs, err := prepareErasure16(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer obj.Shutdown(t.Context())
+	defer removeRoots(fsDirs)
+
+	z := obj.(*erasureServerPools)
+	sets := z.serverPools[0]
+	xl := sets.sets[0]
+	withSingleTripEnabled(t, false)
+
+	bucket := "bucket"
+	object := "transitioned-object"
+	data := makeSingleTripTestData(smallFileThreshold*16+333, 67)
+	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := xl.GetObjectInfo(ctx, bucket, object, ObjectOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := newFastOpenTestWarmBackend()
+	installFastOpenTestWarmBackend(t, "WARM-TIER", backend)
+	if err = xl.TransitionObject(ctx, bucket, object, ObjectOptions{
+		MTime: info.ModTime,
+		Transition: TransitionOptions{
+			Tier: "WARM-TIER",
+			ETag: info.ETag,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	baseline, baselineInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
+	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+
+	globalFastGetEnabled = true
+	fastGetHits.Store(0)
+	fastGetFallbacks.Store(0)
+	fast, fastInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
+	globalFastGetEnabled = false
+
+	if !bytes.Equal(fast, baseline) || !bytes.Equal(fast, data) {
+		t.Fatalf("transitioned bytes differ: baseline=%d fast=%d want=%d", len(baseline), len(fast), len(data))
+	}
+	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+	if fastInfo.TransitionedObject.Status != lifecycle.TransitionComplete || fastInfo.TransitionedObject.Tier != "WARM-TIER" {
+		t.Fatalf("transition info = %#v", fastInfo.TransitionedObject)
+	}
+	if backend.gets.Load() != 2 {
+		t.Fatalf("warm backend GETs = %d, want 2", backend.gets.Load())
+	}
+	if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
+		t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", fastGetHits.Load(), fastGetFallbacks.Load())
+	}
+	assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
+}
+
+func TestFastOpenGETReplicationConfiguredMetadata(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	obj, fsDirs, err := prepareErasure16(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer obj.Shutdown(t.Context())
+	defer removeRoots(fsDirs)
+
+	z := obj.(*erasureServerPools)
+	sets := z.serverPools[0]
+	xl := sets.sets[0]
+	withSingleTripEnabled(t, false)
+
+	bucket := "bucket"
+	object := "replicated-object"
+	purgeObject := "purged-object"
+	data := makeSingleTripTestData(smallFileThreshold*16, 71)
+	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{VersioningEnabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	arn := "arn:minio:replication:::target"
+	installFastOpenReplicationConfig(t, ctx, bucket, arn)
+	dsc := ReplicateDecision{}
+	dsc.Set(newReplicateTargetDecision(arn, true, false))
+
+	putOpts := ObjectOptions{
+		Versioned: true,
+		UserDefined: map[string]string{
+			ReservedMetadataPrefixLower + ReplicationStatus: dsc.PendingStatus(),
+		},
+	}
+	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), putOpts); err != nil {
+		t.Fatal(err)
+	}
+
+	purgeVersion, err := xl.PutObject(ctx, bucket, purgeObject, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{Versioned: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleteOpts := ObjectOptions{Versioned: true, VersionID: purgeVersion.VersionID}
+	deleteOpts.SetDeleteReplicationState(dsc, purgeVersion.VersionID)
+	if _, err = xl.DeleteObject(ctx, bucket, purgeObject, deleteOpts); err != nil {
+		t.Fatal(err)
+	}
+
+	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+	for _, test := range []struct {
+		name    string
+		object  string
+		opts    ObjectOptions
+		wantErr func(error) bool
+		verify  func(t *testing.T, info ObjectInfo)
+	}{
+		{
+			name:   "replication-status",
+			object: object,
+			opts:   ObjectOptions{Versioned: true},
+			verify: func(t *testing.T, info ObjectInfo) {
+				t.Helper()
+				if info.ReplicationStatus != replication.Pending {
+					t.Fatalf("replication status = %q, want %q", info.ReplicationStatus, replication.Pending)
+				}
+				if info.ReplicationStatusInternal == "" {
+					t.Fatal("missing internal replication status")
+				}
+			},
+		},
+		{
+			name:    "version-purge",
+			object:  purgeObject,
+			opts:    ObjectOptions{Versioned: true, VersionID: purgeVersion.VersionID},
+			wantErr: isErrMethodNotAllowed,
+			verify: func(t *testing.T, info ObjectInfo) {
+				t.Helper()
+				if info.VersionPurgeStatus != replication.VersionPurgePending {
+					t.Fatalf("version purge status = %q, want %q", info.VersionPurgeStatus, replication.VersionPurgePending)
+				}
+				if info.VersionPurgeStatusInternal == "" {
+					t.Fatal("missing internal version purge status")
+				}
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			resetFastOpenGETOpenCounts(countingDisks)
+			baseline, baselineInfo, baselineErr := readFastOpenTestObjectOptions(t, xl, bucket, test.object, nil, http.Header{}, test.opts)
+
+			globalFastGetEnabled = true
+			fastGetHits.Store(0)
+			fastGetFallbacks.Store(0)
+			fastOpts := test.opts
+			fastOpts.FastGetObjInfo = true
+			fast, fastInfo, fastErr := readFastOpenTestObjectOptions(t, xl, bucket, test.object, nil, http.Header{}, fastOpts)
+			globalFastGetEnabled = false
+
+			if test.wantErr != nil {
+				if !test.wantErr(baselineErr) || !test.wantErr(fastErr) {
+					t.Fatalf("errors = baseline:%T %v fast:%T %v", baselineErr, baselineErr, fastErr, fastErr)
+				}
+			} else if baselineErr != nil || fastErr != nil {
+				t.Fatalf("errors = baseline:%v fast:%v", baselineErr, fastErr)
+			}
+			if test.wantErr == nil && (!bytes.Equal(fast, baseline) || !bytes.Equal(fast, data)) {
+				t.Fatalf("bytes differ: baseline=%d fast=%d want=%d", len(baseline), len(fast), len(data))
+			}
+			assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+			test.verify(t, fastInfo)
+			if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
+				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", fastGetHits.Load(), fastGetFallbacks.Load())
+			}
+			assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
+		})
+	}
+}
+
+func TestFastOpenGETScopeGates(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	obj, fsDirs, err := prepareErasure16(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer obj.Shutdown(t.Context())
+	defer removeRoots(fsDirs)
+
+	z := obj.(*erasureServerPools)
+	sets := z.serverPools[0]
+	xl := sets.sets[0]
+	withSingleTripEnabled(t, false)
+
+	bucket := "bucket"
+	object := "scope-object"
+	data := makeSingleTripTestData(smallFileThreshold*16, 17)
+	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+	globalFastGetEnabled = true
+	for _, test := range []struct {
+		name string
+		rs   *HTTPRangeSpec
+		h    http.Header
+		opts ObjectOptions
+	}{
+		{name: "fastget-objinfo-unset", opts: ObjectOptions{}},
+		{name: "range", rs: &HTTPRangeSpec{Start: 0, End: 15}, opts: ObjectOptions{FastGetObjInfo: true}},
+		{name: "part-number", opts: ObjectOptions{FastGetObjInfo: true, PartNumber: 1}},
+		{name: "sse-c", h: http.Header{xhttp.AmzServerSideEncryptionCustomerAlgorithm: []string{xhttp.AmzEncryptionAES}}, opts: ObjectOptions{FastGetObjInfo: true}},
+		{name: "replication", opts: ObjectOptions{FastGetObjInfo: true, ReplicationRequest: true}},
+		{name: "proxy", opts: ObjectOptions{FastGetObjInfo: true, ProxyRequest: true}},
+		{name: "proxy-header-set", opts: ObjectOptions{FastGetObjInfo: true, ProxyHeaderSet: true}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			resetFastOpenGETOpenCounts(countingDisks)
+			gr, err := xl.GetObjectNInfo(t.Context(), bucket, object, test.rs, test.h, test.opts)
+			if gr != nil {
+				gr.Close()
+			}
+			if test.name != "sse-c" && err != nil {
+				t.Fatalf("GetObjectNInfo error = %v", err)
+			}
+			assertFastOpenGETOpens(t, xl, countingDisks, 0)
+		})
+	}
 }
 
 func TestFastOpenGETInlineEndToEnd(t *testing.T) {
@@ -206,6 +707,158 @@ func TestFastOpenGETTransformedFullObjectEndToEnd(t *testing.T) {
 	}
 }
 
+func TestFastOpenGETAdditionalGoldenMetadata(t *testing.T) {
+	tests := []struct {
+		name       string
+		init       func(t *testing.T)
+		opts       ObjectOptions
+		putObject  func(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte)
+		verifyInfo func(t *testing.T, info ObjectInfo)
+	}{
+		{
+			name: "version-suspended-null",
+			opts: ObjectOptions{VersionSuspended: true},
+			putObject: func(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte) {
+				t.Helper()
+				if _, err := xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{VersionSuspended: true}); err != nil {
+					t.Fatal(err)
+				}
+			},
+			verifyInfo: func(t *testing.T, info ObjectInfo) {
+				t.Helper()
+				if info.VersionID != nullVersionID || !info.IsLatest {
+					t.Fatalf("version-suspended info = version %q latest=%v, want %q/latest", info.VersionID, info.IsLatest, nullVersionID)
+				}
+			},
+		},
+		{
+			name: "restored-on-disk",
+			putObject: func(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte) {
+				t.Helper()
+				if _, err := xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
+					t.Fatal(err)
+				}
+				restoreExpiry := UTCNow().Add(24 * time.Hour)
+				mutateFastOpenObjectFileInfo(t, xl, bucket, object, func(fi *FileInfo) {
+					fi.TransitionStatus = lifecycle.TransitionComplete
+					fi.TransitionedObjName = "remote-object"
+					fi.TransitionTier = "WARM-TIER"
+					fi.TransitionVersionID = "remote-version"
+					if fi.Metadata == nil {
+						fi.Metadata = make(map[string]string)
+					}
+					fi.Metadata[xhttp.AmzRestore] = completedRestoreObj(restoreExpiry).String()
+				})
+			},
+			verifyInfo: func(t *testing.T, info ObjectInfo) {
+				t.Helper()
+				if info.IsRemote() {
+					t.Fatal("restored object still reports remote")
+				}
+				if info.TransitionedObject.Status != lifecycle.TransitionComplete || info.TransitionedObject.Tier != "WARM-TIER" {
+					t.Fatalf("transition info = %#v", info.TransitionedObject)
+				}
+				if info.RestoreOngoing || info.RestoreExpires.IsZero() {
+					t.Fatalf("restore info = ongoing:%v expires:%v", info.RestoreOngoing, info.RestoreExpires)
+				}
+			},
+		},
+		{
+			name: "object-lock-metadata",
+			putObject: func(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte) {
+				t.Helper()
+				retainUntil := UTCNow().Add(24 * time.Hour).Format(time.RFC3339)
+				metadata := map[string]string{
+					strings.ToLower(xhttp.AmzObjectLockMode):            "GOVERNANCE",
+					strings.ToLower(xhttp.AmzObjectLockRetainUntilDate): retainUntil,
+					strings.ToLower(xhttp.AmzObjectLockLegalHold):       "ON",
+				}
+				if _, err := xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{UserDefined: metadata}); err != nil {
+					t.Fatal(err)
+				}
+			},
+			verifyInfo: func(t *testing.T, info ObjectInfo) {
+				t.Helper()
+				if info.UserDefined[strings.ToLower(xhttp.AmzObjectLockMode)] != "GOVERNANCE" ||
+					info.UserDefined[strings.ToLower(xhttp.AmzObjectLockLegalHold)] != "ON" ||
+					info.UserDefined[strings.ToLower(xhttp.AmzObjectLockRetainUntilDate)] == "" {
+					t.Fatalf("object-lock metadata = %#v", info.UserDefined)
+				}
+			},
+		},
+		{
+			name: "sse-kms",
+			init: func(t *testing.T) {
+				enableEncryption(t)
+			},
+			putObject: putKMSFastOpenTestObject,
+			verifyInfo: func(t *testing.T, info ObjectInfo) {
+				t.Helper()
+				if !crypto.S3KMS.IsEncrypted(info.UserDefined) {
+					t.Fatalf("object is not SSE-KMS encrypted: %#v", info.UserDefined)
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			obj, fsDirs, err := prepareErasure16(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer obj.Shutdown(t.Context())
+			defer removeRoots(fsDirs)
+
+			z := obj.(*erasureServerPools)
+			sets := z.serverPools[0]
+			xl := sets.sets[0]
+			withSingleTripEnabled(t, false)
+			if test.init != nil {
+				test.init(t)
+			}
+
+			bucket := "bucket"
+			object := "additional-golden-" + test.name
+			data := makeSingleTripTestData(smallFileThreshold*16+12345, 61)
+			if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			test.putObject(t, ctx, xl, bucket, object, data)
+
+			baseline, baselineInfo, baselineErr := readFastOpenTestObjectOptions(t, xl, bucket, object, nil, http.Header{}, test.opts)
+			if baselineErr != nil {
+				t.Fatal(baselineErr)
+			}
+			test.verifyInfo(t, baselineInfo)
+			countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+
+			globalFastGetEnabled = true
+			fastGetHits.Store(0)
+			fastGetFallbacks.Store(0)
+			fastOpts := test.opts
+			fastOpts.FastGetObjInfo = true
+			fast, fastInfo, fastErr := readFastOpenTestObjectOptions(t, xl, bucket, object, nil, http.Header{}, fastOpts)
+			globalFastGetEnabled = false
+			if fastErr != nil {
+				t.Fatal(fastErr)
+			}
+			if !bytes.Equal(fast, baseline) {
+				t.Fatalf("%s bytes differ from baseline: got %d bytes, want %d", test.name, len(fast), len(baseline))
+			}
+			assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+			test.verifyInfo(t, fastInfo)
+			if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
+				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", fastGetHits.Load(), fastGetFallbacks.Load())
+			}
+			assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
+		})
+	}
+}
+
 func putCompressedFastOpenTestObject(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte) {
 	t.Helper()
 
@@ -265,6 +918,64 @@ func putEncryptedFastOpenTestObject(t *testing.T, ctx context.Context, xl *erasu
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func putKMSFastOpenTestObject(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte) {
+	t.Helper()
+
+	metadata := make(map[string]string)
+	req := &http.Request{
+		Header: http.Header{
+			xhttp.AmzServerSideEncryption:      []string{xhttp.AmzEncryptionKMS},
+			xhttp.AmzServerSideEncryptionKmsID: []string{"my-minio-key"},
+		},
+		ContentLength: int64(len(data)),
+	}
+	rawReader, err := hash.NewReader(ctx, bytes.NewReader(data), int64(len(data)), "", "", int64(len(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	encReader, objectEncryptionKey, err := EncryptRequest(rawReader, req, bucket, object, metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encInfo := ObjectInfo{Size: int64(len(data))}
+	wantSize := encInfo.EncryptedSize()
+	encryptedReader, err := hash.NewReader(ctx, etag.Wrap(encReader, rawReader), wantSize, "", "", int64(len(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pReader, err := NewPutObjReader(rawReader).WithEncryption(encryptedReader, &objectEncryptionKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = xl.PutObject(ctx, bucket, object, pReader, ObjectOptions{
+		UserDefined: metadata,
+		EncryptFn:   metadataEncrypter(objectEncryptionKey),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mutateFastOpenObjectFileInfo(t *testing.T, xl *erasureObjects, bucket, object string, mutate func(*FileInfo)) {
+	t.Helper()
+
+	disks := xl.getDisks()
+	metaArr, errs := readAllXL(t.Context(), disks, bucket, object, false, false)
+	for i, err := range errs {
+		if err != nil || disks[i] == nil {
+			continue
+		}
+		fi := metaArr[i]
+		if !fi.IsValid() {
+			continue
+		}
+		mutate(&fi)
+		if err = disks[i].WriteMetadata(t.Context(), "", bucket, object, fi); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -528,6 +1239,199 @@ func TestFastOpenGETLazyReplacementOnConcurrentMidStreamCorrupt(t *testing.T) {
 	assertFastOpenGETNonZeroOffsetCount(t, countingDisks, 2)
 }
 
+func TestFastOpenGETLazyReplacementHardening(t *testing.T) {
+	tests := []struct {
+		name          string
+		size          int
+		corruptBlock  int64
+		corruptDisks  []int
+		wantErr       func(error) bool
+		wantNonZero   int
+		wantOpenLimit func(xl *erasureObjects, disks []*fastOpenCountingDisk) int
+	}{
+		{
+			name:         "non-block-aligned-object",
+			size:         int(3*blockSizeV2 + 12345),
+			corruptBlock: 1,
+			corruptDisks: []int{0},
+			wantNonZero:  1,
+		},
+		{
+			name:         "multi-block-continuation",
+			size:         int(4*blockSizeV2 + 12345),
+			corruptBlock: 1,
+			corruptDisks: []int{0},
+			wantNonZero:  1,
+			wantOpenLimit: func(xl *erasureObjects, disks []*fastOpenCountingDisk) int {
+				return xl.fastOpenInitialOpenCount() + 2
+			},
+		},
+		{
+			name:         "post-commit-exhaustion",
+			size:         int(3 * blockSizeV2),
+			corruptBlock: 1,
+			corruptDisks: []int{0, 1, 2, 3, 4, 5, 6, 7, 8},
+			wantErr:      isErrReadQuorum,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			obj, fsDirs, err := prepareErasure16(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer obj.Shutdown(t.Context())
+			defer removeRoots(fsDirs)
+
+			z := obj.(*erasureServerPools)
+			sets := z.serverPools[0]
+			xl := sets.sets[0]
+			withSingleTripEnabled(t, false)
+			withFastOpenSpreadSelection(t, false)
+
+			bucket := "bucket"
+			object := "lazy-hardening-" + test.name
+			data := makeSingleTripTestData(test.size, 53)
+			if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
+				t.Fatal(err)
+			}
+
+			baseline, baselineInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
+			corruptAt := fastOpenTestEncodedShardOffset(t, xl, bucket, object, test.corruptBlock)
+			countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+			for _, diskIndex := range test.corruptDisks {
+				countingDisks[diskIndex].corruptBody = true
+				countingDisks[diskIndex].corruptBodyAt = corruptAt
+				countingDisks[diskIndex].corruptBodyAtSet = true
+			}
+
+			globalFastGetEnabled = true
+			fast, fastInfo, fastErr := readFastOpenTestObjectOptions(t, xl, bucket, object, nil, http.Header{}, ObjectOptions{FastGetObjInfo: true})
+			if test.wantErr != nil {
+				if !test.wantErr(fastErr) {
+					t.Fatalf("error = %T %v, want expected error, offsets=%v", fastErr, fastErr, fastOpenGETOpenOffsets(countingDisks))
+				}
+				return
+			}
+			if fastErr != nil {
+				t.Fatal(fastErr)
+			}
+			if !bytes.Equal(fast, baseline) {
+				t.Fatalf("%s bytes differ from baseline: got %d bytes, want %d, first diff at %d, offsets=%v", test.name, len(fast), len(baseline), firstByteDiff(fast, baseline), fastOpenGETOpenOffsets(countingDisks))
+			}
+			assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+			assertFastOpenGETNonZeroOffsetCount(t, countingDisks, test.wantNonZero)
+			if test.wantOpenLimit != nil {
+				assertFastOpenGETOpensLessThan(t, countingDisks, test.wantOpenLimit(xl, countingDisks))
+			}
+		})
+	}
+}
+
+func TestFastOpenLazyReplacementRejectsMismatchedFrame(t *testing.T) {
+	fi := testFastOpenFileInfo()
+	pool := newFastOpenReplacementPool(t.Context(), nil, nil, fi.Volume, fi.Name, fi.VersionID, fi, HighwayHash256S)
+	newFrame := func(t *testing.T) CoalescedMetadataFrame {
+		t.Helper()
+		meta, err := fileInfoToFastOpenGETMeta(fi)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return CoalescedMetadataFrame{
+			Status:   FastOpenStatusOK,
+			Meta:     meta,
+			BodyMode: FastOpenBodyShard,
+			BodyLen:  pool.bodyLen,
+		}
+	}
+	if err := pool.validateFrame(fi.Erasure.Index-1, 0, newFrame(t)); err != nil {
+		t.Fatalf("valid frame rejected: %v", err)
+	}
+
+	for _, test := range []struct {
+		name   string
+		mutate func(*CoalescedMetadataFrame)
+	}{
+		{
+			name: "wrong-version",
+			mutate: func(frame *CoalescedMetadataFrame) {
+				frame.Meta.VersionID = "other-version"
+			},
+		},
+		{
+			name: "wrong-index",
+			mutate: func(frame *CoalescedMetadataFrame) {
+				frame.Meta.Erasure.Index++
+			},
+		},
+		{
+			name: "wrong-modtime",
+			mutate: func(frame *CoalescedMetadataFrame) {
+				frame.Meta.ModTimeUnixNano++
+			},
+		},
+		{
+			name: "wrong-body-length",
+			mutate: func(frame *CoalescedMetadataFrame) {
+				frame.BodyLen--
+			},
+		},
+		{
+			name: "wrong-distribution",
+			mutate: func(frame *CoalescedMetadataFrame) {
+				frame.Meta.Erasure.Distribution[0], frame.Meta.Erasure.Distribution[1] = frame.Meta.Erasure.Distribution[1], frame.Meta.Erasure.Distribution[0]
+			},
+		},
+		{
+			name: "wrong-bitrot-algorithm",
+			mutate: func(frame *CoalescedMetadataFrame) {
+				frame.Meta.Erasure.Bitrot.PartNumber = 1
+				frame.Meta.Erasure.Bitrot.Algorithm = 4
+				frame.Meta.Erasure.Bitrot.Hash = []byte("legacy-hash")
+			},
+		},
+		{
+			name: "not-ok-status",
+			mutate: func(frame *CoalescedMetadataFrame) {
+				frame.Status = FastOpenStatusUnsupported
+			},
+		},
+		{
+			name: "not-shard-body",
+			mutate: func(frame *CoalescedMetadataFrame) {
+				frame.BodyMode = FastOpenBodyMetadataOnly
+			},
+		},
+		{
+			name: "wrong-size",
+			mutate: func(frame *CoalescedMetadataFrame) {
+				frame.Meta.Size++
+			},
+		},
+		{
+			name: "wrong-part-size",
+			mutate: func(frame *CoalescedMetadataFrame) {
+				frame.Meta.Part.Size++
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			bad := newFrame(t)
+			test.mutate(&bad)
+			if err := pool.validateFrame(fi.Erasure.Index-1, 0, bad); !errors.Is(err, errFileCorrupt) {
+				t.Fatalf("validateFrame error = %v, want %v", err, errFileCorrupt)
+			}
+		})
+	}
+}
+
 func fastOpenTestEncodedShardOffset(t *testing.T, xl *erasureObjects, bucket, object string, block int64) int64 {
 	t.Helper()
 
@@ -606,17 +1510,27 @@ func (d *fastOpenCountingDisk) FastOpenPart(ctx context.Context, volume, path st
 func readFastOpenTestObject(t *testing.T, obj singleTripGetObjectNInfo, bucket, object string, rs *HTTPRangeSpec) ([]byte, ObjectInfo) {
 	t.Helper()
 
-	gr, err := obj.GetObjectNInfo(t.Context(), bucket, object, rs, http.Header{}, ObjectOptions{FastGetObjInfo: true})
+	out, info, err := readFastOpenTestObjectOptions(t, obj, bucket, object, rs, http.Header{}, ObjectOptions{FastGetObjInfo: true})
 	if err != nil {
 		t.Fatal(err)
+	}
+	return out, info
+}
+
+func readFastOpenTestObjectOptions(t *testing.T, obj singleTripGetObjectNInfo, bucket, object string, rs *HTTPRangeSpec, h http.Header, opts ObjectOptions) ([]byte, ObjectInfo, error) {
+	t.Helper()
+
+	gr, err := obj.GetObjectNInfo(t.Context(), bucket, object, rs, h, opts)
+	if gr == nil {
+		return nil, ObjectInfo{}, err
 	}
 	defer gr.Close()
 
 	var out bytes.Buffer
-	if _, err = io.Copy(&out, gr); err != nil {
-		t.Fatal(err)
+	if err == nil {
+		_, err = io.Copy(&out, gr)
 	}
-	return out.Bytes(), gr.ObjInfo
+	return out.Bytes(), gr.ObjInfo, err
 }
 
 func wrapFastOpenCountingDisks(t *testing.T, sets *erasureSets, xl *erasureObjects) []*fastOpenCountingDisk {
@@ -667,6 +1581,174 @@ func fastOpenGETOpenOffsets(disks []*fastOpenCountingDisk) [][]int64 {
 		disk.mu.Unlock()
 	}
 	return out
+}
+
+func initFastOpenGETAPIRouter(t *testing.T, ctx context.Context, obj ObjectLayer) (http.Handler, string, string) {
+	t.Helper()
+
+	oldObjectLayer := newObjectLayerFn()
+	setObjectLayer(obj)
+	t.Cleanup(func() {
+		setObjectLayer(oldObjectLayer)
+	})
+
+	initConfigSubsystem(ctx, obj)
+	globalIAMSys.Init(ctx, obj, globalEtcdClient, 2*time.Second)
+	if err := newTestConfig(globalMinioDefaultRegion, obj); err != nil {
+		t.Fatal(err)
+	}
+
+	router := initTestAPIEndPoints(obj, []string{"GetObject"})
+	return router, globalActiveCred.AccessKey, globalActiveCred.SecretKey
+}
+
+func doFastOpenGETHandlerRequest(t *testing.T, router http.Handler, bucket, object, accessKey, secretKey string, headers map[string]string) (*httptest.ResponseRecorder, []byte) {
+	t.Helper()
+
+	req, err := newTestSignedRequestV4(http.MethodGet, getGetObjectURL("", bucket, object), 0, nil, accessKey, secretKey, headers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	body, err := io.ReadAll(rec.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET status = %d, body=%s", rec.Code, string(body))
+	}
+	return rec, body
+}
+
+func equalStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func fastOpenHeaderValues(h http.Header, key string) []string {
+	if values := h.Values(key); len(values) > 0 {
+		return values
+	}
+	return h[key]
+}
+
+type fastOpenTestWarmBackend struct {
+	mu      sync.Mutex
+	objects map[string][]byte
+	gets    atomic.Int64
+}
+
+func newFastOpenTestWarmBackend() *fastOpenTestWarmBackend {
+	return &fastOpenTestWarmBackend{objects: make(map[string][]byte)}
+}
+
+func (b *fastOpenTestWarmBackend) Put(ctx context.Context, object string, r io.Reader, length int64) (remoteVersionID, error) {
+	return b.PutWithMeta(ctx, object, r, length, nil)
+}
+
+func (b *fastOpenTestWarmBackend) PutWithMeta(ctx context.Context, object string, r io.Reader, length int64, meta map[string]string) (remoteVersionID, error) {
+	data, err := io.ReadAll(io.LimitReader(r, length))
+	if err != nil {
+		return "", err
+	}
+	if int64(len(data)) != length {
+		return "", io.ErrUnexpectedEOF
+	}
+	b.mu.Lock()
+	b.objects[object] = append([]byte(nil), data...)
+	b.mu.Unlock()
+	return remoteVersionID("v-" + object), nil
+}
+
+func (b *fastOpenTestWarmBackend) Get(ctx context.Context, object string, rv remoteVersionID, opts WarmBackendGetOpts) (io.ReadCloser, error) {
+	b.gets.Add(1)
+	b.mu.Lock()
+	data, ok := b.objects[object]
+	if ok {
+		data = append([]byte(nil), data...)
+	}
+	b.mu.Unlock()
+	if !ok {
+		return nil, ObjectNotFound{Object: object}
+	}
+	start := opts.startOffset
+	if start < 0 || start > int64(len(data)) {
+		return nil, InvalidRange{}
+	}
+	end := int64(len(data))
+	if opts.length > 0 && start+opts.length < end {
+		end = start + opts.length
+	}
+	return io.NopCloser(bytes.NewReader(data[start:end])), nil
+}
+
+func (b *fastOpenTestWarmBackend) Remove(ctx context.Context, object string, rv remoteVersionID) error {
+	b.mu.Lock()
+	delete(b.objects, object)
+	b.mu.Unlock()
+	return nil
+}
+
+func (b *fastOpenTestWarmBackend) InUse(ctx context.Context) (bool, error) {
+	return false, nil
+}
+
+func installFastOpenTestWarmBackend(t *testing.T, tier string, backend WarmBackend) {
+	t.Helper()
+
+	globalTierConfigMgr.Lock()
+	oldDriver := globalTierConfigMgr.drivercache[tier]
+	oldTier, oldTierOK := globalTierConfigMgr.Tiers[tier]
+	globalTierConfigMgr.drivercache[tier] = backend
+	globalTierConfigMgr.Tiers[tier] = madmin.TierConfig{Name: tier}
+	globalTierConfigMgr.Unlock()
+	t.Cleanup(func() {
+		globalTierConfigMgr.Lock()
+		if oldDriver == nil {
+			delete(globalTierConfigMgr.drivercache, tier)
+		} else {
+			globalTierConfigMgr.drivercache[tier] = oldDriver
+		}
+		if oldTierOK {
+			globalTierConfigMgr.Tiers[tier] = oldTier
+		} else {
+			delete(globalTierConfigMgr.Tiers, tier)
+		}
+		globalTierConfigMgr.Unlock()
+	})
+}
+
+func installFastOpenReplicationConfig(t *testing.T, ctx context.Context, bucket, arn string) {
+	t.Helper()
+
+	cfg := replication.Config{
+		Rules: []replication.Rule{
+			{
+				ID:                      "fastopen-replication",
+				Status:                  replication.Enabled,
+				Priority:                1,
+				DeleteMarkerReplication: replication.DeleteMarkerReplication{Status: replication.Enabled},
+				DeleteReplication:       replication.DeleteReplication{Status: replication.Enabled},
+				Destination:             replication.Destination{ARN: arn},
+				Filter:                  replication.Filter{},
+			},
+		},
+	}
+	data, err := xml.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = globalBucketMetadataSys.Update(ctx, bucket, bucketReplicationConfig, data); err != nil {
+		t.Fatal(err)
+	}
 }
 
 type fastOpenTestReadCloser struct {
