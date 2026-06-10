@@ -235,6 +235,24 @@ func (er erasureObjects) GetObjectNInfo(ctx context.Context, bucket, object stri
 		nsUnlocker = func() { lock.RUnlock(lkctx) }
 	}
 
+	if fastOpenGETRequestEligible(bucket, h, rs, opts) {
+		gr, ok, err := er.tryFastOpenGET(ctx, bucket, object, rs, h, opts, nsUnlocker)
+		if err != nil {
+			if ok {
+				fastGetHits.Add(1)
+			}
+			return gr, err
+		}
+		if ok {
+			unlockOnDefer = false
+			fastGetHits.Add(1)
+			return gr, nil
+		}
+		fastGetFallbacks.Add(1)
+		if globalFastGetNoFallback {
+			return nil, toObjectErr(errFastGetNoFallback, bucket, object)
+		}
+	}
 	if fastGetRequestEligible(bucket, h, rs, opts) {
 		gr, ok, err := er.tryFastGet(ctx, bucket, object, rs, h, opts, nsUnlocker)
 		if err != nil {
