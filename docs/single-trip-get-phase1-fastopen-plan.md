@@ -134,7 +134,14 @@ Request semantics:
 - `Version` is the request protocol version.
 - `VersionID == ""` means latest visible version.
 - Phase 1 uses `PartNumber == 1` for shard-backed body streams.
-- Phase 1 uses full-object reads only: `Offset == 0`, `Length == -1`.
+- Initial Phase 1 body reads use `Offset == 0`, `Length == -1`.
+- For shard-backed replacement reads, `Offset` and `Length` are encoded
+  part-file byte coordinates for the body bytes after the frame, not object
+  byte coordinates. `Offset` may be nonzero to open a new forward-only body
+  stream at an encoded shard-body offset. `Length == -1` means to EOF; a bounded
+  length may be used as an optimization.
+- Replacement offsets are only for erasure-decode replacement. They do not make
+  range GET or `partNumber` in scope.
 - Range, `partNumber`, multipart, and SSE-C requests are rejected before
   FastOpen by the landing node.
 - Future phases may add direct/current-path flags, but Phase 1 is coalesced
@@ -358,7 +365,16 @@ Add local `xlStorage` support for `FastOpenPart`:
    - inline: inline body;
    - transitioned and not restored: transitioned metadata-only;
    - local shard-backed: open selected `DataDir/part.1` and stream shard bytes.
-5. Return errors before any body bytes when metadata cannot be read or the
+5. For shard-backed replacement requests with nonzero `Offset`, return the same
+   compact frame followed by this disk's encoded shard bytes starting at the
+   requested encoded part-file byte offset. The returned body is still a
+   forward-only stream. `BodyLen` is the number of body bytes following the
+   frame for this offset read: either the remaining encoded body length or the
+   requested bounded length.
+6. Reject unsupported offsets before body bytes. Offset support is required only
+   for encoded shard-body replacement streams, not inline objects, metadata-only
+   statuses, range GET, multipart, or `partNumber`.
+7. Return errors before any body bytes when metadata cannot be read or the
    version cannot be selected.
 
 Add remote storage transport support through the existing storage REST/grid
@@ -424,7 +440,99 @@ quorum and the first decode attempt can start from offset 0. If the initial
 selected set fails during frame processing or block-0 decode before any client
 body byte is written, FastOpen opens all remaining online disks and restarts
 selection/decode from offset 0. After the first client body byte is written,
-FastOpen follows existing stream/decode error behavior.
+FastOpen follows existing stream/decode error behavior, including same-offset
+erasure replacement where possible.
+
+### Mid-Stream Replacement
+
+FastOpen must preserve canonical GET availability for post-commit shard
+failures. A single disk stream that becomes missing, corrupt, or unreadable
+after response bytes have started must not fail the customer GET if the erasure
+set still has enough healthy shards to reconstruct the object.
+
+Canonical GET achieves this because each bitrot reader is an `io.ReaderAt` that
+opens its underlying `ReadFileStream` lazily. When the erasure decoder first
+needs a spare shard at shard offset `N`, the reader opens that disk's part stream
+directly at the encoded bitrot offset for `N`, then reads forward from there.
+
+FastOpen should use the same model:
+
+1. Initial selected readers are normal FastOpen streams opened at body offset 0.
+2. Spare readers are lazy replacement readers. They do not need an opened body
+   stream before decode starts. A spare may reuse frame metadata if that disk was
+   already contacted as validation context, or it may fetch frame and body
+   together on first use. A replacement offset-read frame is always decoded and
+   validated; cached frame metadata never bypasses validation.
+3. A lazy replacement reader holds only the information needed to open and
+   validate a later replacement read: disk, disk index, object identity, version
+   ID, selected object metadata identity, selected erasure layout, bitrot
+   algorithm, and body-length expectations.
+4. On first `ReadAt(buf, shardOffset)`, a lazy replacement reader computes the
+   encoded body offset:
+
+   ```
+   bodyOffset = (shardOffset / shardSize) * hashSize + shardOffset
+   ```
+
+   It then calls `FastOpenPart` for the same object/version/part with
+   `Offset == bodyOffset` and a bounded or to-EOF `Length`, validates the
+   returned frame against the already selected object version and erasure
+   layout, and reads forward from the returned body stream.
+5. Replacement validation is a hard gate. A frame is rejected before reading its
+   body if any required property differs from the winning object selection:
+   version identity (`VersionID`, or canonical null-version identity using
+   `ModTime`/ETag), the same winning-version filters used by initial FastOpen
+   selection (`IsValid`, selected `ModTime` or ETag, and `Erasure.Equal` over
+   `DataBlocks`, `ParityBlocks`, `BlockSize`, and `Distribution`), per-disk
+   `Erasure.Index`, slot availability at `Erasure.Index - 1`, part
+   number/size/actual size, body mode, body length expectations, and bitrot
+   algorithm. `Erasure.Equal` is not sufficient by itself because it does not
+   validate the per-disk shard index.
+6. The replacement stream is still forward-only after open. It is not a random
+   access handle. The random-start behavior is provided by opening a new
+   `FastOpenPart` body stream at the requested encoded offset.
+7. If the erasure decoder later asks the same replacement reader for the next
+   contiguous shard offset, the reader continues on the same stream. If it asks
+   for a backward or non-contiguous offset, the reader returns `errUnexpected`.
+   The reader initializes its internal current offset to the requested
+   `shardOffset`, not to zero.
+8. If an active body stream fails, it is closed and retired for the rest of that
+   GET, matching canonical decode behavior. FastOpen does not reopen the same
+   failed disk as a later lazy replacement for the same request.
+9. If the replacement frame is missing, stale, unsupported, corrupt, or belongs
+   to a different selected version/layout, that reader fails and the existing
+   erasure decoder may try another spare. If decode quorum cannot be reached,
+   the GET returns the same class of read error as canonical GET.
+
+The extra frame validation is required because FastOpen lazy replacement re-runs
+`FastOpenPart`, which reads `xl.meta` again and may observe a different selected
+version or disk state. Canonical GET does not have this extra validation step
+because it builds each spare's file path and layout from the already quorum'd
+metadata before decode.
+
+The block-0 prefix remains useful after lazy replacement exists. Its purpose is
+pre-commit validation: FastOpen should prove that the selected metadata and body
+streams can decode the first object block before `GetObjectReader` is returned
+and client-visible bytes can be sent. Lazy replacement handles failures after
+commit; block-0 prefix keeps first-block failure inside the pre-commit retry
+window. Lazy replacement could also handle a block-0 spare open with
+`bodyOffset == 0`, but the pre-commit path can afford to close streams, reopen
+or revalidate the whole online set, and fail before committing any response
+bytes. Post-commit recovery cannot restart the response and therefore uses
+same-offset lazy replacement.
+
+Lazy replacement happens below decryption and decompression, so SSE-S3/SSE-KMS
+and compressed objects use the same shard-layer replacement behavior as plain
+objects. Altered parity and non-STANDARD storage class are handled through the
+selected object's actual erasure layout. Inline, metadata-only, and transitioned
+objects do not use offset replacement: inline bodies fit in the pre-commit
+decode window, and metadata-only/transitioned responses have no local shard body
+stream to replace.
+
+An engaged lazy replacement stream follows the same cancellation and cleanup
+rules as any other `FastOpenPart` stream. It is closed/canceled on decode end,
+client disconnect, or GET teardown. A lazy spare that is never engaged holds no
+body stream and has nothing to close.
 
 The initial open count is intentionally the maximum configured read quorum only,
 with no hedge. If a disk is reachable and reports online but consistently times
@@ -503,11 +611,17 @@ degraded.
   online disks.
 - Initial selected stream fails during block-0 decode before response commit,
   replacement restarts from offset 0 and succeeds when quorum is available.
+- Post-commit selected stream fails at a later erasure block and a lazy
+  replacement reader opens a spare shard at the same encoded body offset; GET
+  succeeds when decode quorum is still available.
+- Lazy replacement frame mismatch or unsupported status is rejected and another
+  spare can be tried.
 - Replacement set reaches quorum and response succeeds.
 - All online disks cannot reach quorum and error matches existing GET.
 - Client disconnect cancels remote reads.
 - Unused selected streams are canceled and not drained.
-- Post-first-byte stream failure follows existing decode/read error behavior.
+- Post-first-byte stream failure with insufficient replacement quorum follows
+  existing decode/read error behavior.
 - Inline object follows the same decode behavior as shard-backed objects.
 
 ### Regression
@@ -591,15 +705,22 @@ degraded.
 - [ ] If the initial selected set fails, times out, or cannot form quorum before
   the first client byte, open all remaining online disks and restart
   selection/decode from offset 0.
+- [ ] Add lazy replacement readers for spare disks so mid-stream shard failures
+  can open a new `FastOpenPart` body stream at the failed encoded shard-body
+  offset and continue decode when quorum is still available.
+- [ ] Extend disk-local and remote `FastOpenPart` to support encoded shard-body
+  offset reads for replacement streams while keeping returned bodies
+  forward-only.
 - [ ] Apply per-disk `NotFound` and `VersionNotFound` through canonical quorum
   logic rather than returning immediate 404.
 - [ ] After first client byte, preserve canonical stream/decode error behavior
-  and do not switch semantic paths.
+  and do not switch semantic paths; use erasure replacement before surfacing a
+  read/decode failure.
 - [ ] Treat missing FastOpen capability as deployment incompatibility for this
   version; rolling-upgrade compatibility is out of scope.
 - [ ] Add failure tests for stale metadata, missing body, corrupt body with
-  bitrot detection, replacement success, replacement failure, client disconnect,
-  and unused-stream cancellation.
+  bitrot detection, block-0 replacement, mid-stream replacement, replacement
+  failure, client disconnect, and unused-stream cancellation.
 
 ### Milestone 6: Golden Equivalence And Scope Gates
 
@@ -615,6 +736,11 @@ degraded.
 - [ ] Verify out-of-scope requests continue through the current non-FastGet path:
   HEAD, SSE-C, range, `partNumber`, multipart body paths, and multi-pool pool
   selection.
+- [ ] Add lazy-replacement hardening cases not required for the M5 commit:
+  non-block-aligned object with mid-stream replacement, multi-block continuation
+  after replacement engagement, post-commit replacement exhaustion returning the
+  canonical read-quorum error class, and stale/mismatched replacement candidate
+  rejection before body bytes are used.
 
 ### Milestone 7: Observability And Cleanup
 

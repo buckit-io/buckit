@@ -36,7 +36,7 @@ func (s *xlStorage) FastOpenPart(ctx context.Context, volume, object string, req
 	if req.Version != fastOpenFrameVersion {
 		return nil, errFastOpenFrameBadVersion
 	}
-	if req.PartNumber != 1 || req.Offset != 0 || req.Length != -1 {
+	if req.PartNumber != 1 || req.Offset < 0 || req.Length < -1 {
 		return fastOpenFrameOnly(FastOpenStatusUnsupported)
 	}
 
@@ -82,16 +82,28 @@ func (s *xlStorage) FastOpenPart(ctx context.Context, volume, object string, req
 
 	switch {
 	case fi.Deleted:
+		if req.Offset != 0 {
+			return fastOpenFrameOnly(FastOpenStatusUnsupported)
+		}
 		frame.Status = FastOpenStatusDeleteMarker
 		return fastOpenFrameWithBody(frame, nil, nil)
 	case fi.Size == 0:
+		if req.Offset != 0 {
+			return fastOpenFrameOnly(FastOpenStatusUnsupported)
+		}
 		return fastOpenFrameWithBody(frame, nil, nil)
 	case fi.IsRemote():
+		if req.Offset != 0 {
+			return fastOpenFrameOnly(FastOpenStatusUnsupported)
+		}
 		frame.BodyMode = FastOpenBodyTransitioned
 		return fastOpenFrameWithBody(frame, nil, nil)
 	case len(fi.Parts) != 1 || fi.Parts[0].Number != req.PartNumber:
 		return fastOpenFrameOnly(FastOpenStatusUnsupported)
 	case fi.InlineData():
+		if req.Offset != 0 {
+			return fastOpenFrameOnly(FastOpenStatusUnsupported)
+		}
 		if len(inlineData) == 0 {
 			return nil, errFileCorrupt
 		}
@@ -112,12 +124,19 @@ func (s *xlStorage) FastOpenPart(ctx context.Context, volume, object string, req
 		if len(stat) != 1 || stat[0].Dir {
 			return nil, errFileNotFound
 		}
-		body, err := s.ReadFileStream(ctx, volume, partPath, 0, -1)
+		if req.Offset > stat[0].Size {
+			return nil, errFileNotFound
+		}
+		bodyLen := stat[0].Size - req.Offset
+		if req.Length >= 0 && req.Length < bodyLen {
+			bodyLen = req.Length
+		}
+		body, err := s.ReadFileStream(ctx, volume, partPath, req.Offset, bodyLen)
 		if err != nil {
 			return nil, err
 		}
 		frame.BodyMode = FastOpenBodyShard
-		frame.BodyLen = stat[0].Size
+		frame.BodyLen = bodyLen
 		return fastOpenFrameWithBody(frame, body, body)
 	}
 }

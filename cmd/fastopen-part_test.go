@@ -55,6 +55,19 @@ func TestXLStorageFastOpenPartShard(t *testing.T) {
 	if frame.Meta.VersionID != fi.VersionID || frame.Meta.Part.Number != 1 {
 		t.Fatalf("meta = %#v, want version %q part 1", frame.Meta, fi.VersionID)
 	}
+
+	_, frame, gotBody = readFastOpenPart(t, disk, bucket, object, FastOpenPartRequest{
+		Version:    fastOpenFrameVersion,
+		PartNumber: 1,
+		Offset:     8,
+		Length:     -1,
+	})
+	if frame.Status != FastOpenStatusOK || frame.BodyMode != FastOpenBodyShard {
+		t.Fatalf("offset frame status/mode = %d/%d, want OK/shard", frame.Status, frame.BodyMode)
+	}
+	if frame.BodyLen != int64(len(body)-8) || !bytes.Equal(gotBody, body[8:]) {
+		t.Fatalf("offset body len/body = %d/%q, want %d/%q", frame.BodyLen, gotBody, len(body)-8, body[8:])
+	}
 }
 
 func TestXLStorageFastOpenPartExplicitVersion(t *testing.T) {
@@ -370,6 +383,19 @@ func TestStorageRESTClientFastOpenPart(t *testing.T) {
 	}
 	if frame.BodyLen != int64(len(body)) || !bytes.Equal(gotBody, body) {
 		t.Fatalf("remote body len/body = %d/%q, want %d/%q", frame.BodyLen, gotBody, len(body), body)
+	}
+
+	_, frame, gotBody = readFastOpenPart(t, restClient, bucket, object, FastOpenPartRequest{
+		Version:    fastOpenFrameVersion,
+		PartNumber: 1,
+		Offset:     7,
+		Length:     -1,
+	})
+	if frame.Status != FastOpenStatusOK || frame.BodyMode != FastOpenBodyShard {
+		t.Fatalf("remote offset frame status/mode = %d/%d, want OK/shard", frame.Status, frame.BodyMode)
+	}
+	if frame.BodyLen != int64(len(body)-7) || !bytes.Equal(gotBody, body[7:]) {
+		t.Fatalf("remote offset body len/body = %d/%q, want %d/%q", frame.BodyLen, gotBody, len(body)-7, body[7:])
 	}
 
 	_, frame, gotBody = readFastOpenPart(t, restClient, bucket, object+"-missing", FastOpenPartRequest{

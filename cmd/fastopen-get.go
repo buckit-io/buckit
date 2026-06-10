@@ -25,6 +25,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"sync"
 
 	"github.com/buckit-io/buckit/internal/crypto"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
@@ -43,6 +44,7 @@ type fastOpenGETRead struct {
 type fastOpenGETInfo struct {
 	fi      FileInfo
 	readers []io.ReaderAt
+	prefer  []bool
 }
 
 // fastOpenGETRequestEligible keeps FastOpen on the plain full-object GET path.
@@ -75,7 +77,7 @@ func fastOpenGETRequestEligible(bucket string, h http.Header, rs *HTTPRangeSpec,
 // object-level outcome, even when that outcome is an S3 error such as a delete
 // marker or quorum not found.
 func (er erasureObjects) tryFastOpenGET(ctx context.Context, bucket, object string, rs *HTTPRangeSpec, h http.Header, opts ObjectOptions, nsUnlocker func()) (*GetObjectReader, bool, error) {
-	info, ok, err := er.openFastOpenGETInfo(ctx, bucket, object, opts)
+	info, ok, err := er.openFastOpenGETInfo(ctx, bucket, object, opts, false)
 	if err != nil {
 		if ok {
 			return nil, true, toObjectErr(err, bucket, object)
@@ -125,59 +127,135 @@ func (er erasureObjects) tryFastOpenGET(ctx context.Context, bucket, object stri
 		closeBitrotReaders(info.readers)
 		return nil, true, err
 	}
+	if off != 0 {
+		closeBitrotReaders(info.readers)
+		return nil, false, nil
+	}
+
+	prefix, prefixLen, err := er.readFastOpenGETPrefix(ctx, bucket, object, off, length, info)
+	if err != nil {
+		closeBitrotReaders(info.readers)
+		info, ok, err = er.openFastOpenGETInfo(ctx, bucket, object, opts, true)
+		if err != nil {
+			if ok {
+				return nil, true, toObjectErr(err, bucket, object)
+			}
+			return nil, false, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		prefix, prefixLen, err = er.readFastOpenGETPrefix(ctx, bucket, object, off, length, info)
+		if err != nil {
+			closeBitrotReaders(info.readers)
+			return nil, true, toObjectErr(err, bucket, object)
+		}
+	}
+	if prefixLen == length {
+		closeBitrotReaders(info.readers)
+		gr, err := fn(bytes.NewReader(prefix), h, nsUnlocker)
+		return gr, true, err
+	}
 
 	pr, pw := xioutil.WaitPipe()
 	go func() {
-		pw.CloseWithError(er.getObjectWithFastOpenInfo(ctx, bucket, object, off, length, pw, info))
+		pw.CloseWithError(er.getObjectWithFastOpenInfo(ctx, bucket, object, off+prefixLen, length-prefixLen, pw, info))
 	}()
 
 	pipeCloser := func() {
 		pr.CloseWithError(nil)
 	}
-	gr, err := fn(pr, h, pipeCloser, nsUnlocker)
+	gr, err := fn(io.MultiReader(bytes.NewReader(prefix), pr), h, pipeCloser, nsUnlocker)
 	return gr, true, err
 }
 
-// openFastOpenGETInfo opens the initial read-quorum-sized disk set and consumes
-// only the FastOpen frame from each stream. Body streams are left positioned
-// immediately after their frame and are either selected for decode or closed.
-func (er erasureObjects) openFastOpenGETInfo(ctx context.Context, bucket, object string, opts ObjectOptions) (fastOpenGETInfo, bool, error) {
+// openFastOpenGETInfo consumes only the FastOpen frame from each opened stream.
+// Body streams are left positioned immediately after their frame and are either
+// selected for decode or closed. A normal call opens the first wave and then any
+// remaining online disks needed to recover from pre-commit FastOpen failures;
+// allOnline skips the first wave and opens every online disk from scratch.
+func (er erasureObjects) openFastOpenGETInfo(ctx context.Context, bucket, object string, opts ObjectOptions, allOnline bool) (fastOpenGETInfo, bool, error) {
 	disks := er.getDisks()
 	openCount := er.fastOpenInitialOpenCount()
 	selected := selectFastOpenGETDisks(disks, openCount, bucket, object)
-	if len(selected) < openCount {
-		// Without a complete first wave there is no useful FastOpen decision to
-		// make here; canonical GET can still fan out to all disks.
+	if allOnline {
+		selected = selectRemainingFastOpenGETDisks(disks, nil)
+	}
+	if len(selected) == 0 {
 		return fastOpenGETInfo{}, false, nil
 	}
 
+	reads := openFastOpenGETReads(ctx, disks, selected, bucket, object, opts.VersionID)
+
+	info, ok, err := er.pickFastOpenGETInfo(ctx, bucket, object, disks, reads, opts)
+	if ok {
+		if err != nil {
+			closeFastOpenGETReadsExcept(reads, nil)
+		}
+		return info, true, err
+	}
+
+	exhausted := allOnline
+	if err != nil && !allOnline {
+		remaining := selectRemainingFastOpenGETDisks(disks, selected)
+		if len(remaining) > 0 {
+			reads = append(reads, openFastOpenGETReads(ctx, disks, remaining, bucket, object, opts.VersionID)...)
+			info, ok, err = er.pickFastOpenGETInfo(ctx, bucket, object, disks, reads, opts)
+			if ok {
+				if err != nil {
+					closeFastOpenGETReadsExcept(reads, nil)
+				}
+				return info, true, err
+			}
+		}
+		exhausted = true
+	}
+
+	closeFastOpenGETReadsExcept(reads, nil)
+	if err != nil && exhausted {
+		return info, true, err
+	}
+	return info, false, nil
+}
+
+func openFastOpenGETReads(ctx context.Context, disks []StorageAPI, selected []int, bucket, object, versionID string) []fastOpenGETRead {
 	reads := make([]fastOpenGETRead, len(selected))
 	g := errgroup.WithNErrs(len(selected))
 	for gi, di := range selected {
 		gi, di := gi, di
 		disk := disks[di]
 		g.Go(func() error {
-			reads[gi] = openFastOpenGETRead(ctx, disk, di, bucket, object, opts.VersionID)
+			reads[gi] = openFastOpenGETRead(ctx, disk, di, bucket, object, versionID)
 			return reads[gi].err
 		}, gi)
 	}
 	g.Wait()
+	return reads
+}
 
-	info, ok, err := er.pickFastOpenGETInfo(ctx, bucket, object, disks, reads, opts)
-	if !ok || err != nil {
-		closeFastOpenGETReadsExcept(reads, nil)
-		if !ok {
-			return info, false, nil
-		}
-		return info, ok, err
+func selectRemainingFastOpenGETDisks(disks []StorageAPI, selected []int) []int {
+	seen := make(map[int]bool, len(selected))
+	for _, idx := range selected {
+		seen[idx] = true
 	}
-	return info, true, nil
+	remaining := make([]int, 0, len(disks)-len(seen))
+	for i, disk := range disks {
+		if seen[i] || disk == nil || !disk.IsOnline() {
+			continue
+		}
+		remaining = append(remaining, i)
+	}
+	return remaining
 }
 
 // openFastOpenGETRead owns a cancellable child context for exactly one disk
 // stream. Closing the returned rc cancels the remote/local FastOpenPart work in
 // addition to closing the body reader.
 func openFastOpenGETRead(ctx context.Context, disk StorageAPI, diskIndex int, bucket, object, versionID string) fastOpenGETRead {
+	return openFastOpenGETReadAt(ctx, disk, diskIndex, bucket, object, versionID, 0, -1)
+}
+
+func openFastOpenGETReadAt(ctx context.Context, disk StorageAPI, diskIndex int, bucket, object, versionID string, offset, length int64) fastOpenGETRead {
 	r := fastOpenGETRead{
 		disk:      disk,
 		diskIndex: diskIndex,
@@ -188,8 +266,8 @@ func openFastOpenGETRead(ctx context.Context, disk StorageAPI, diskIndex int, bu
 		Version:    fastOpenFrameVersion,
 		VersionID:  versionID,
 		PartNumber: 1,
-		Offset:     0,
-		Length:     -1,
+		Offset:     offset,
+		Length:     length,
 	})
 	if err != nil {
 		cancel()
@@ -298,26 +376,38 @@ func (er erasureObjects) pickFastOpenGETInfo(ctx context.Context, bucket, object
 		closeFastOpenGETReadsExcept(reads, nil)
 		return info, true, nil
 	}
-	readers, used, ok := buildFastOpenGETReaders(fi, reads, onlineMeta, onlineDisks)
+	readers, prefer, used, ok, err := buildFastOpenGETReaders(ctx, bucket, object, opts.VersionID, fi, reads, onlineMeta, onlineDisks, disks)
 	if !ok {
-		return fastOpenGETInfo{}, false, nil
+		return fastOpenGETInfo{}, false, err
 	}
 	closeFastOpenGETReadsExcept(reads, used)
 	info.readers = readers
+	info.prefer = prefer
 	return info, true, nil
 }
 
 // buildFastOpenGETReaders transfers ownership of selected body streams to the
 // returned ReaderAt slice. The used map tells the caller which opened streams
 // must stay live; every other opened stream can be closed immediately.
-func buildFastOpenGETReaders(fi FileInfo, reads []fastOpenGETRead, metaArr []FileInfo, onlineDisks []StorageAPI) ([]io.ReaderAt, map[int]bool, bool) {
+func buildFastOpenGETReaders(ctx context.Context, bucket, object, versionID string, fi FileInfo, reads []fastOpenGETRead, metaArr []FileInfo, onlineDisks []StorageAPI, disks []StorageAPI) ([]io.ReaderAt, []bool, map[int]bool, bool, error) {
 	readByDisk := make(map[int]int, len(reads))
 	for i := range reads {
 		readByDisk[reads[i].diskIndex] = i
 	}
 
+	checksumInfo := fi.Erasure.GetChecksumInfo(1)
+	if checksumInfo.Algorithm != HighwayHash256S {
+		// The stream reader below understands Buckit's streaming bitrot layout.
+		// Other algorithms/modes need canonical GET unless a matching FastOpen
+		// reader is added.
+		return nil, nil, nil, false, nil
+	}
+
 	readers := make([]io.ReaderAt, len(fi.Erasure.Distribution))
+	prefer := make([]bool, len(readers))
 	used := make(map[int]bool)
+	usedDisks := make(map[int]bool)
+	hasInline := false
 	for diskIndex := range metaArr {
 		if onlineDisks[diskIndex] == nil || !metaArr[diskIndex].IsValid() {
 			continue
@@ -330,12 +420,8 @@ func buildFastOpenGETReaders(fi FileInfo, reads []fastOpenGETRead, metaArr []Fil
 		if mode != FastOpenBodyShard && mode != FastOpenBodyInline {
 			continue
 		}
-		checksumInfo := metaArr[diskIndex].Erasure.GetChecksumInfo(1)
-		if checksumInfo.Algorithm != HighwayHash256S {
-			// The stream reader below understands Buckit's streaming bitrot
-			// layout. Other algorithms/modes need canonical GET unless a
-			// matching FastOpen reader is added.
-			return nil, nil, false
+		if mode == FastOpenBodyInline {
+			hasInline = true
 		}
 		// The stream and its compact metadata come from the same disk, so
 		// Erasure.Index identifies the shard position directly. Canonical GET
@@ -347,49 +433,102 @@ func buildFastOpenGETReaders(fi FileInfo, reads []fastOpenGETRead, metaArr []Fil
 			continue
 		}
 		readers[pos] = newFastOpenStreamingBitrotReader(reads[readIndex].rc, checksumInfo.Algorithm, fi.Erasure.ShardSize())
+		prefer[pos] = true
 		used[readIndex] = true
+		usedDisks[diskIndex] = true
 	}
-	if len(used) < fi.Erasure.DataBlocks {
-		return nil, nil, false
+
+	candidates := fastOpenReplacementCandidates(disks, usedDisks)
+	if !hasInline && len(used)+len(candidates) >= fi.Erasure.DataBlocks {
+		pool := newFastOpenReplacementPool(ctx, disks, usedDisks, bucket, object, versionID, fi, checksumInfo.Algorithm)
+		for pos := range readers {
+			if readers[pos] == nil {
+				readers[pos] = &fastOpenLazyReplacementReader{pool: pool, slot: pos}
+			}
+		}
 	}
-	return readers, used, true
+	if fastOpenReaderCount(readers) < fi.Erasure.DataBlocks {
+		return nil, nil, nil, false, errErasureReadQuorum
+	}
+	return readers, prefer, used, true, nil
+}
+
+func fastOpenReplacementCandidates(disks []StorageAPI, usedDisks map[int]bool) []int {
+	candidates := make([]int, 0, len(disks)-len(usedDisks))
+	for i, disk := range disks {
+		if usedDisks[i] || disk == nil || !disk.IsOnline() {
+			continue
+		}
+		candidates = append(candidates, i)
+	}
+	return candidates
+}
+
+func fastOpenReaderCount(readers []io.ReaderAt) int {
+	var n int
+	for _, reader := range readers {
+		if reader != nil {
+			n++
+		}
+	}
+	return n
+}
+
+// readFastOpenGETPrefix decodes the first object block into memory before the
+// GetObjectReader is returned. If this fails, no response bytes have been made
+// visible to the caller and the FastOpen path can reopen streams from offset 0.
+func (er erasureObjects) readFastOpenGETPrefix(ctx context.Context, bucket, object string, startOffset int64, length int64, info fastOpenGETInfo) ([]byte, int64, error) {
+	if length < 0 {
+		length = info.fi.Size - startOffset
+	}
+	if length == 0 {
+		return nil, 0, nil
+	}
+	prefixLen := min(length, info.fi.Erasure.BlockSize)
+	var prefix bytes.Buffer
+	_, err := er.decodeFastOpenGETRange(ctx, bucket, object, startOffset, prefixLen, &prefix, info)
+	if err != nil {
+		return nil, 0, err
+	}
+	return prefix.Bytes(), prefixLen, nil
 }
 
 // getObjectWithFastOpenInfo decodes already-open encoded shard streams through
-// the same erasure decoder used by canonical GET. The response body pipe is not
-// created until metadata/body quorum has been selected, so decode always starts
-// at object offset 0 for the selected FastOpen streams.
+// the same erasure decoder used by canonical GET. The selected streams may
+// already have consumed the block-0 prefix, so continuation starts at the next
+// erasure-block boundary.
 func (er erasureObjects) getObjectWithFastOpenInfo(ctx context.Context, bucket, object string, startOffset int64, length int64, writer io.Writer, info fastOpenGETInfo) error {
 	defer closeBitrotReaders(info.readers)
+	_, err := er.decodeFastOpenGETRange(ctx, bucket, object, startOffset, length, writer, info)
+	return err
+}
 
+func (er erasureObjects) decodeFastOpenGETRange(ctx context.Context, bucket, object string, startOffset int64, length int64, writer io.Writer, info fastOpenGETInfo) (int64, error) {
 	fi := info.fi
 	if length < 0 {
 		length = fi.Size - startOffset
 	}
 	if startOffset > fi.Size || startOffset+length > fi.Size {
-		return InvalidRange{startOffset, length, fi.Size}
+		return -1, InvalidRange{startOffset, length, fi.Size}
 	}
 	if length == 0 {
-		return nil
+		return 0, nil
 	}
 
 	partSize := fi.Parts[0].Size
 	erasure, err := NewErasure(ctx, fi.Erasure.DataBlocks, fi.Erasure.ParityBlocks, fi.Erasure.BlockSize)
 	if err != nil {
-		return toObjectErr(err, bucket, object)
+		return -1, toObjectErr(err, bucket, object)
 	}
 
-	// FastOpen readers are already selected and positioned by erasure index, so
-	// the decoder does not need the canonical prefer-local reordering hint.
-	prefer := make([]bool, len(info.readers))
-	written, err := erasure.Decode(ctx, writer, info.readers, startOffset, length, partSize, prefer)
+	written, err := erasure.Decode(ctx, writer, info.readers, startOffset, length, partSize, info.prefer)
 	if err != nil {
 		if written == length && (errors.Is(err, errFileNotFound) || errors.Is(err, errFileCorrupt)) {
-			return nil
+			return written, nil
 		}
-		return toObjectErr(err, bucket, object)
+		return written, toObjectErr(err, bucket, object)
 	}
-	return nil
+	return written, nil
 }
 
 // selectFastOpenGETDisks chooses the first wave only from disks that can be
@@ -466,6 +605,180 @@ func (c *fastOpenCancelReadCloser) Close() error {
 	return c.rc.Close()
 }
 
+type fastOpenReplacementPool struct {
+	ctx       context.Context
+	disks     []StorageAPI
+	slotDisk  []int
+	bucket    string
+	object    string
+	versionID string
+	fi        FileInfo
+	algo      BitrotAlgorithm
+	shardSize int64
+	hashSize  int64
+	bodyLen   int64
+
+	mu      sync.Mutex
+	engaged map[int]bool
+}
+
+func newFastOpenReplacementPool(ctx context.Context, disks []StorageAPI, engaged map[int]bool, bucket, object, versionID string, fi FileInfo, algo BitrotAlgorithm) *fastOpenReplacementPool {
+	engagedCopy := make(map[int]bool, len(engaged))
+	for idx := range engaged {
+		engagedCopy[idx] = true
+	}
+	slotDisk := make([]int, len(fi.Erasure.Distribution))
+	for i := range slotDisk {
+		slotDisk[i] = -1
+	}
+	// Distribution maps disk-array index to erasure index. Use it to open the
+	// one disk that can satisfy each lazy reader slot instead of probing
+	// unrelated spares and discovering their Index from frames.
+	for diskIndex, erasureIndex := range fi.Erasure.Distribution {
+		slot := erasureIndex - 1
+		if slot >= 0 && slot < len(slotDisk) && slotDisk[slot] == -1 {
+			slotDisk[slot] = diskIndex
+		}
+	}
+	shardSize := fi.Erasure.ShardSize()
+	return &fastOpenReplacementPool{
+		ctx:       ctx,
+		disks:     disks,
+		slotDisk:  slotDisk,
+		bucket:    bucket,
+		object:    object,
+		versionID: versionID,
+		fi:        fi,
+		algo:      algo,
+		shardSize: shardSize,
+		hashSize:  int64(algo.New().Size()),
+		bodyLen:   bitrotShardFileSize(fi.Erasure.ShardFileSize(fi.Parts[0].Size), shardSize, algo),
+		engaged:   engagedCopy,
+	}
+}
+
+func (p *fastOpenReplacementPool) open(slot int, shardOffset int64) (io.ReadCloser, error) {
+	bodyOffset := (shardOffset/p.shardSize)*p.hashSize + shardOffset
+	if bodyOffset < 0 || bodyOffset >= p.bodyLen {
+		return nil, errFileCorrupt
+	}
+	diskIndex, disk, ok := p.claimSlotDisk(slot)
+	if !ok {
+		return nil, errFileNotFound
+	}
+	read := openFastOpenGETReadAt(p.ctx, disk, diskIndex, p.bucket, p.object, p.versionID, bodyOffset, -1)
+	if read.err != nil {
+		p.releaseSlotDisk(diskIndex)
+		return nil, read.err
+	}
+	if err := p.validateFrame(slot, bodyOffset, read.frame); err != nil {
+		read.rc.Close()
+		p.releaseSlotDisk(diskIndex)
+		return nil, err
+	}
+	return read.rc, nil
+}
+
+func (p *fastOpenReplacementPool) claimSlotDisk(slot int) (int, StorageAPI, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if slot < 0 || slot >= len(p.slotDisk) {
+		return 0, nil, false
+	}
+	diskIndex := p.slotDisk[slot]
+	if diskIndex < 0 || diskIndex >= len(p.disks) || p.engaged[diskIndex] {
+		return 0, nil, false
+	}
+	disk := p.disks[diskIndex]
+	if disk == nil || !disk.IsOnline() {
+		return 0, nil, false
+	}
+	p.engaged[diskIndex] = true
+	return diskIndex, disk, true
+}
+
+func (p *fastOpenReplacementPool) releaseSlotDisk(diskIndex int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.engaged, diskIndex)
+}
+
+func (p *fastOpenReplacementPool) validateFrame(slot int, bodyOffset int64, frame CoalescedMetadataFrame) error {
+	if frame.Status != FastOpenStatusOK || frame.BodyMode != FastOpenBodyShard {
+		if frame.Status == FastOpenStatusNotFound || frame.Status == FastOpenStatusVersionNotFound {
+			return errFileNotFound
+		}
+		return errFileCorrupt
+	}
+	if frame.BodyLen != p.bodyLen-bodyOffset {
+		return errFileCorrupt
+	}
+	fi, err := fastOpenGETMetaToFileInfo(p.bucket, p.object, frame.Status, frame.Meta)
+	if err != nil {
+		return err
+	}
+	if !fi.IsValid() || fi.Size != p.fi.Size || fi.VersionID != p.fi.VersionID {
+		return errFileCorrupt
+	}
+	if len(fi.Parts) != 1 || len(p.fi.Parts) != 1 {
+		return errFileCorrupt
+	}
+	if fi.Parts[0].Number != p.fi.Parts[0].Number || fi.Parts[0].Size != p.fi.Parts[0].Size || fi.Parts[0].ActualSize != p.fi.Parts[0].ActualSize {
+		return errFileCorrupt
+	}
+	if !fi.Erasure.Equal(p.fi.Erasure) || fi.Erasure.Index != slot+1 {
+		return errFileCorrupt
+	}
+	if fi.Erasure.GetChecksumInfo(1).Algorithm != p.algo {
+		return errFileCorrupt
+	}
+	if p.fi.ModTime.IsZero() || p.fi.ModTime.Equal(timeSentinel) {
+		if p.fi.Metadata["etag"] == "" || fi.Metadata["etag"] != p.fi.Metadata["etag"] {
+			return errFileCorrupt
+		}
+	} else if !fi.ModTime.Equal(p.fi.ModTime) {
+		return errFileCorrupt
+	}
+	return nil
+}
+
+type fastOpenLazyReplacementReader struct {
+	pool   *fastOpenReplacementPool
+	slot   int
+	rc     io.ReadCloser
+	reader *fastOpenStreamingBitrotReader
+}
+
+func (r *fastOpenLazyReplacementReader) Close() error {
+	if r.reader != nil {
+		return r.reader.Close()
+	}
+	if r.rc != nil {
+		err := r.rc.Close()
+		r.rc = nil
+		return err
+	}
+	return nil
+}
+
+func (r *fastOpenLazyReplacementReader) ReadAt(buf []byte, offset int64) (int, error) {
+	if len(buf) == 0 {
+		return 0, nil
+	}
+	if offset%r.pool.shardSize != 0 {
+		return 0, errUnexpected
+	}
+	if r.reader == nil {
+		rc, err := r.pool.open(r.slot, offset)
+		if err != nil {
+			return 0, err
+		}
+		r.rc = rc
+		r.reader = newFastOpenStreamingBitrotReaderAt(rc, r.pool.algo, r.pool.shardSize, offset)
+	}
+	return r.reader.ReadAt(buf, offset)
+}
+
 type fastOpenStreamingBitrotReader struct {
 	rc         io.ReadCloser
 	h          hash.Hash
@@ -475,12 +788,17 @@ type fastOpenStreamingBitrotReader struct {
 }
 
 func newFastOpenStreamingBitrotReader(rc io.ReadCloser, algo BitrotAlgorithm, shardSize int64) *fastOpenStreamingBitrotReader {
+	return newFastOpenStreamingBitrotReaderAt(rc, algo, shardSize, 0)
+}
+
+func newFastOpenStreamingBitrotReaderAt(rc io.ReadCloser, algo BitrotAlgorithm, shardSize, currOffset int64) *fastOpenStreamingBitrotReader {
 	h := algo.New()
 	return &fastOpenStreamingBitrotReader{
-		rc:        rc,
-		h:         h,
-		shardSize: shardSize,
-		hashBytes: make([]byte, h.Size()),
+		rc:         rc,
+		h:          h,
+		shardSize:  shardSize,
+		currOffset: currOffset,
+		hashBytes:  make([]byte, h.Size()),
 	}
 }
 
@@ -497,9 +815,9 @@ func (r *fastOpenStreamingBitrotReader) ReadAt(buf []byte, offset int64) (int, e
 	if len(buf) == 0 {
 		return 0, nil
 	}
-	// FastOpen streams are already open and positioned after the metadata
-	// frame, so they can only be consumed sequentially from offset 0. A spare
-	// stream cannot be joined later at a non-zero stripe without reopening it.
+	// FastOpen body streams are forward-only after open. Initial streams start at
+	// shard offset 0; lazy replacement streams are reopened at the requested
+	// shard offset before reaching this reader.
 	if offset%r.shardSize != 0 || offset != r.currOffset {
 		return 0, errUnexpected
 	}
@@ -518,5 +836,7 @@ func (r *fastOpenStreamingBitrotReader) ReadAt(buf []byte, offset int64) (int, e
 	return len(buf), nil
 }
 
+var _ io.ReaderAt = (*fastOpenLazyReplacementReader)(nil)
+var _ io.Closer = (*fastOpenLazyReplacementReader)(nil)
 var _ io.ReaderAt = (*fastOpenStreamingBitrotReader)(nil)
 var _ io.Closer = (*fastOpenStreamingBitrotReader)(nil)
