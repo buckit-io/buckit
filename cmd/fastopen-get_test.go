@@ -267,6 +267,12 @@ func TestFastOpenGETMultipartFallsBack(t *testing.T) {
 	if fastGetHits.Load() != 0 || fastGetFallbacks.Load() == 0 {
 		t.Fatalf("fast counters hits=%d fallbacks=%d, want 0/>0", fastGetHits.Load(), fastGetFallbacks.Load())
 	}
+	if got := globalFastOpenMetrics.unsupported.Load(); got != 1 {
+		t.Fatalf("fastopen unsupported metric = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.streamCancels.Load(); got != 0 {
+		t.Fatalf("fastopen stream cancels = %d, want 0 for metadata-only fallback", got)
+	}
 	assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 }
 
@@ -1018,6 +1024,12 @@ func TestFastOpenGETNotFoundCountsAsHit(t *testing.T) {
 	if gr != nil {
 		t.Fatalf("reader = %#v, want nil", gr)
 	}
+	if got := globalFastOpenMetrics.finalErrors[fastOpenFinalErrorNotFound].Load(); got != 1 {
+		t.Fatalf("not-found final error metric = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.streamCancels.Load(); got != 0 {
+		t.Fatalf("fastopen stream cancels = %d, want 0 for metadata-only not-found", got)
+	}
 	assertSingleTripCounterDelta(t, 0, 0, 1, 0, "fastopen not-found")
 	assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 }
@@ -1059,6 +1071,12 @@ func TestFastOpenGETReplacementOnInitialOpenFailure(t *testing.T) {
 		t.Fatalf("replacement bytes differ from baseline: got %d bytes, want %d", len(fast), len(baseline))
 	}
 	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+	if got := globalFastOpenMetrics.replacementPath.Load(); got != 1 {
+		t.Fatalf("replacement path metric = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.failures[fastOpenFailureNoQuorum].Load(); got == 0 {
+		t.Fatal("no-quorum failure metric = 0, want nonzero")
+	}
 	assertFastOpenGETOpens(t, xl, countingDisks, len(countingDisks))
 }
 
@@ -1239,6 +1257,72 @@ func TestFastOpenGETLazyReplacementOnConcurrentMidStreamCorrupt(t *testing.T) {
 	assertFastOpenGETNonZeroOffsetCount(t, countingDisks, 2)
 }
 
+func TestFastOpenGETMetrics(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	obj, fsDirs, err := prepareErasure16(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer obj.Shutdown(t.Context())
+	defer removeRoots(fsDirs)
+
+	z := obj.(*erasureServerPools)
+	sets := z.serverPools[0]
+	xl := sets.sets[0]
+	withSingleTripEnabled(t, false)
+	withFastOpenSpreadSelection(t, false)
+
+	bucket := "bucket"
+	object := "metrics-object"
+	data := makeSingleTripTestData(int(3*blockSizeV2+12345), 79)
+	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	corruptAt := fastOpenTestEncodedShardOffset(t, xl, bucket, object, 1)
+	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+	countingDisks[0].corruptBody = true
+	countingDisks[0].corruptBodyAt = corruptAt
+	countingDisks[0].corruptBodyAtSet = true
+
+	globalFastGetEnabled = true
+	fast, _, fastErr := readFastOpenTestObjectOptions(t, xl, bucket, object, nil, http.Header{}, ObjectOptions{FastGetObjInfo: true})
+	if fastErr != nil {
+		t.Fatal(fastErr)
+	}
+	if !bytes.Equal(fast, data) {
+		t.Fatal("fastopen metrics object bytes differ")
+	}
+	if got := globalFastOpenMetrics.attempted.Load(); got != 1 {
+		t.Fatalf("attempted = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.hits.Load(); got != 1 {
+		t.Fatalf("hits = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.unsupported.Load(); got != 0 {
+		t.Fatalf("unsupported = %d, want 0", got)
+	}
+	if got := globalFastOpenMetrics.replacementOpen.Load(); got == 0 {
+		t.Fatal("replacement opens = 0, want nonzero")
+	}
+	if got := globalFastOpenMetrics.streamsOpened.Load(); got <= uint64(xl.fastOpenInitialOpenCount()) {
+		t.Fatalf("streams opened = %d, want more than initial open count", got)
+	}
+	streamsOpened := globalFastOpenMetrics.streamsOpened.Load()
+	streamCancels := globalFastOpenMetrics.streamCancels.Load()
+	if streamCancels == 0 {
+		t.Fatal("stream cancels = 0, want nonzero")
+	}
+	if streamCancels >= streamsOpened {
+		t.Fatalf("stream cancels = %d, streams opened = %d; cancels should count early closes only", streamCancels, streamsOpened)
+	}
+}
+
 func TestFastOpenGETLazyReplacementHardening(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -1246,6 +1330,8 @@ func TestFastOpenGETLazyReplacementHardening(t *testing.T) {
 		corruptBlock  int64
 		corruptDisks  []int
 		wantErr       func(error) bool
+		wantFinalErr  fastOpenFinalErrorCategory
+		wantFinalErrN uint64
 		wantNonZero   int
 		wantOpenLimit func(xl *erasureObjects, disks []*fastOpenCountingDisk) int
 	}{
@@ -1267,11 +1353,13 @@ func TestFastOpenGETLazyReplacementHardening(t *testing.T) {
 			},
 		},
 		{
-			name:         "post-commit-exhaustion",
-			size:         int(3 * blockSizeV2),
-			corruptBlock: 1,
-			corruptDisks: []int{0, 1, 2, 3, 4, 5, 6, 7, 8},
-			wantErr:      isErrReadQuorum,
+			name:          "post-commit-exhaustion",
+			size:          int(3 * blockSizeV2),
+			corruptBlock:  1,
+			corruptDisks:  []int{0, 1, 2, 3, 4, 5, 6, 7, 8},
+			wantErr:       isErrReadQuorum,
+			wantFinalErr:  fastOpenFinalErrorReadQuorum,
+			wantFinalErrN: 1,
 		},
 	}
 
@@ -1317,6 +1405,9 @@ func TestFastOpenGETLazyReplacementHardening(t *testing.T) {
 			if test.wantErr != nil {
 				if !test.wantErr(fastErr) {
 					t.Fatalf("error = %T %v, want expected error, offsets=%v", fastErr, fastErr, fastOpenGETOpenOffsets(countingDisks))
+				}
+				if got := globalFastOpenMetrics.finalErrors[test.wantFinalErr].Load(); got != test.wantFinalErrN {
+					t.Fatalf("final error metric[%s] = %d, want %d", test.wantFinalErr, got, test.wantFinalErrN)
 				}
 				return
 			}

@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"sync/atomic"
 
 	"github.com/buckit-io/buckit/internal/crypto"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
@@ -45,6 +46,114 @@ type fastOpenGETInfo struct {
 	fi      FileInfo
 	readers []io.ReaderAt
 	prefer  []bool
+}
+
+type fastOpenFailureReason uint8
+
+const (
+	fastOpenFailureNoQuorum fastOpenFailureReason = iota
+	fastOpenFailureUnsupported
+	fastOpenFailureCorrupt
+	fastOpenFailureOther
+	fastOpenFailureCount
+)
+
+func (r fastOpenFailureReason) String() string {
+	switch r {
+	case fastOpenFailureNoQuorum:
+		return "no_quorum"
+	case fastOpenFailureUnsupported:
+		return "unsupported"
+	case fastOpenFailureCorrupt:
+		return "corrupt"
+	default:
+		return "other"
+	}
+}
+
+type fastOpenFinalErrorCategory uint8
+
+const (
+	fastOpenFinalErrorNotFound fastOpenFinalErrorCategory = iota
+	fastOpenFinalErrorReadQuorum
+	fastOpenFinalErrorCorrupt
+	fastOpenFinalErrorOther
+	fastOpenFinalErrorCount
+)
+
+func (c fastOpenFinalErrorCategory) String() string {
+	switch c {
+	case fastOpenFinalErrorNotFound:
+		return "not_found"
+	case fastOpenFinalErrorReadQuorum:
+		return "read_quorum"
+	case fastOpenFinalErrorCorrupt:
+		return "corrupt"
+	default:
+		return "other"
+	}
+}
+
+type fastOpenMetrics struct {
+	attempted       atomic.Uint64
+	hits            atomic.Uint64
+	unsupported     atomic.Uint64
+	replacementPath atomic.Uint64
+	streamsOpened   atomic.Uint64
+	replacementOpen atomic.Uint64
+	streamCancels   atomic.Uint64
+	failures        [fastOpenFailureCount]atomic.Uint64
+	finalErrors     [fastOpenFinalErrorCount]atomic.Uint64
+}
+
+var globalFastOpenMetrics fastOpenMetrics
+
+func fastOpenRecordFailure(err error) {
+	switch {
+	case errors.Is(err, errErasureReadQuorum):
+		globalFastOpenMetrics.failures[fastOpenFailureNoQuorum].Add(1)
+	case errors.Is(err, errFileCorrupt), errors.Is(err, errFastOpenFrameBadCRC), errors.Is(err, errFastOpenFrameBadPayload), errors.Is(err, errFastOpenFrameBadBitrot):
+		globalFastOpenMetrics.failures[fastOpenFailureCorrupt].Add(1)
+	default:
+		globalFastOpenMetrics.failures[fastOpenFailureOther].Add(1)
+	}
+}
+
+func fastOpenRecordFinalError(ctx context.Context, err error) {
+	if errors.Is(err, io.ErrClosedPipe) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
+		return
+	}
+	switch {
+	case isErrObjectNotFound(err), isErrVersionNotFound(err), errors.Is(err, errFileNotFound), errors.Is(err, errFileVersionNotFound):
+		globalFastOpenMetrics.finalErrors[fastOpenFinalErrorNotFound].Add(1)
+	case isErrReadQuorum(err), errors.Is(err, errErasureReadQuorum):
+		globalFastOpenMetrics.finalErrors[fastOpenFinalErrorReadQuorum].Add(1)
+	case errors.Is(err, errFileCorrupt), errors.Is(err, errFastOpenFrameBadCRC), errors.Is(err, errFastOpenFrameBadPayload), errors.Is(err, errFastOpenFrameBadBitrot):
+		globalFastOpenMetrics.finalErrors[fastOpenFinalErrorCorrupt].Add(1)
+	default:
+		globalFastOpenMetrics.finalErrors[fastOpenFinalErrorOther].Add(1)
+	}
+}
+
+type fastOpenGETMetricsTracker struct {
+	replacementRecorded bool
+	failureRecorded     bool
+}
+
+func (t *fastOpenGETMetricsTracker) recordReplacement() {
+	if t == nil || t.replacementRecorded {
+		return
+	}
+	globalFastOpenMetrics.replacementPath.Add(1)
+	t.replacementRecorded = true
+}
+
+func (t *fastOpenGETMetricsTracker) recordFailure(err error) {
+	if t == nil || t.failureRecorded || err == nil {
+		return
+	}
+	fastOpenRecordFailure(err)
+	t.failureRecorded = true
 }
 
 // fastOpenGETRequestEligible keeps FastOpen on the plain full-object GET path.
@@ -77,7 +186,8 @@ func fastOpenGETRequestEligible(bucket string, h http.Header, rs *HTTPRangeSpec,
 // object-level outcome, even when that outcome is an S3 error such as a delete
 // marker or quorum not found.
 func (er erasureObjects) tryFastOpenGET(ctx context.Context, bucket, object string, rs *HTTPRangeSpec, h http.Header, opts ObjectOptions, nsUnlocker func()) (*GetObjectReader, bool, error) {
-	info, ok, err := er.openFastOpenGETInfo(ctx, bucket, object, opts, false)
+	var metrics fastOpenGETMetricsTracker
+	info, ok, err := er.openFastOpenGETInfo(ctx, bucket, object, opts, false, &metrics)
 	if err != nil {
 		if ok {
 			return nil, true, toObjectErr(err, bucket, object)
@@ -135,7 +245,9 @@ func (er erasureObjects) tryFastOpenGET(ctx context.Context, bucket, object stri
 	prefix, prefixLen, err := er.readFastOpenGETPrefix(ctx, bucket, object, off, length, info)
 	if err != nil {
 		closeBitrotReaders(info.readers)
-		info, ok, err = er.openFastOpenGETInfo(ctx, bucket, object, opts, true)
+		metrics.recordReplacement()
+		metrics.recordFailure(err)
+		info, ok, err = er.openFastOpenGETInfo(ctx, bucket, object, opts, true, &metrics)
 		if err != nil {
 			if ok {
 				return nil, true, toObjectErr(err, bucket, object)
@@ -159,7 +271,11 @@ func (er erasureObjects) tryFastOpenGET(ctx context.Context, bucket, object stri
 
 	pr, pw := xioutil.WaitPipe()
 	go func() {
-		pw.CloseWithError(er.getObjectWithFastOpenInfo(ctx, bucket, object, off+prefixLen, length-prefixLen, pw, info))
+		err := er.getObjectWithFastOpenInfo(ctx, bucket, object, off+prefixLen, length-prefixLen, pw, info)
+		if err != nil {
+			fastOpenRecordFinalError(ctx, err)
+		}
+		pw.CloseWithError(err)
 	}()
 
 	pipeCloser := func() {
@@ -174,7 +290,7 @@ func (er erasureObjects) tryFastOpenGET(ctx context.Context, bucket, object stri
 // selected for decode or closed. A normal call opens the first wave and then any
 // remaining online disks needed to recover from pre-commit FastOpen failures;
 // allOnline skips the first wave and opens every online disk from scratch.
-func (er erasureObjects) openFastOpenGETInfo(ctx context.Context, bucket, object string, opts ObjectOptions, allOnline bool) (fastOpenGETInfo, bool, error) {
+func (er erasureObjects) openFastOpenGETInfo(ctx context.Context, bucket, object string, opts ObjectOptions, allOnline bool, metrics *fastOpenGETMetricsTracker) (fastOpenGETInfo, bool, error) {
 	disks := er.getDisks()
 	openCount := er.fastOpenInitialOpenCount()
 	selected := selectFastOpenGETDisks(disks, openCount, bucket, object)
@@ -199,6 +315,8 @@ func (er erasureObjects) openFastOpenGETInfo(ctx context.Context, bucket, object
 	if err != nil && !allOnline {
 		remaining := selectRemainingFastOpenGETDisks(disks, selected)
 		if len(remaining) > 0 {
+			metrics.recordReplacement()
+			metrics.recordFailure(err)
 			reads = append(reads, openFastOpenGETReads(ctx, disks, remaining, bucket, object, opts.VersionID)...)
 			info, ok, err = er.pickFastOpenGETInfo(ctx, bucket, object, disks, reads, opts)
 			if ok {
@@ -213,6 +331,7 @@ func (er erasureObjects) openFastOpenGETInfo(ctx context.Context, bucket, object
 
 	closeFastOpenGETReadsExcept(reads, nil)
 	if err != nil && exhausted {
+		metrics.recordFailure(err)
 		return info, true, err
 	}
 	return info, false, nil
@@ -274,13 +393,19 @@ func openFastOpenGETReadAt(ctx context.Context, disk StorageAPI, diskIndex int, 
 		r.err = err
 		return r
 	}
-	rc = &fastOpenCancelReadCloser{rc: rc, cancel: cancel}
+	globalFastOpenMetrics.streamsOpened.Add(1)
+	if offset > 0 {
+		globalFastOpenMetrics.replacementOpen.Add(1)
+	}
 	_, frame, err := readFastOpenFrame(rc)
 	if err != nil {
+		cancel()
+		globalFastOpenMetrics.streamCancels.Add(1)
 		rc.Close()
 		r.err = err
 		return r
 	}
+	rc = &fastOpenCancelReadCloser{rc: rc, cancel: cancel}
 	r.rc = rc
 	r.frame = frame
 	r.err = nil
@@ -432,7 +557,7 @@ func buildFastOpenGETReaders(ctx context.Context, bucket, object, versionID stri
 		if pos < 0 || pos >= len(readers) || readers[pos] != nil {
 			continue
 		}
-		readers[pos] = newFastOpenStreamingBitrotReader(reads[readIndex].rc, checksumInfo.Algorithm, fi.Erasure.ShardSize())
+		readers[pos] = newFastOpenStreamingBitrotReader(reads[readIndex].rc, checksumInfo.Algorithm, fi.Erasure.ShardSize(), fi.Erasure.ShardFileSize(fi.Parts[0].Size))
 		prefer[pos] = true
 		used[readIndex] = true
 		usedDisks[diskIndex] = true
@@ -589,6 +714,9 @@ func closeFastOpenGETReadsExcept(reads []fastOpenGETRead, used map[int]bool) {
 		if reads[i].rc == nil || used[i] {
 			continue
 		}
+		if reads[i].frame.BodyMode == FastOpenBodyShard || reads[i].frame.BodyMode == FastOpenBodyInline {
+			globalFastOpenMetrics.streamCancels.Add(1)
+		}
 		reads[i].rc.Close()
 	}
 }
@@ -672,6 +800,7 @@ func (p *fastOpenReplacementPool) open(slot int, shardOffset int64) (io.ReadClos
 		return nil, read.err
 	}
 	if err := p.validateFrame(slot, bodyOffset, read.frame); err != nil {
+		globalFastOpenMetrics.streamCancels.Add(1)
 		read.rc.Close()
 		p.releaseSlotDisk(diskIndex)
 		return nil, err
@@ -774,7 +903,7 @@ func (r *fastOpenLazyReplacementReader) ReadAt(buf []byte, offset int64) (int, e
 			return 0, err
 		}
 		r.rc = rc
-		r.reader = newFastOpenStreamingBitrotReaderAt(rc, r.pool.algo, r.pool.shardSize, offset)
+		r.reader = newFastOpenStreamingBitrotReaderAt(rc, r.pool.algo, r.pool.shardSize, r.pool.fi.Erasure.ShardFileSize(r.pool.fi.Parts[0].Size), offset)
 	}
 	return r.reader.ReadAt(buf, offset)
 }
@@ -783,20 +912,22 @@ type fastOpenStreamingBitrotReader struct {
 	rc         io.ReadCloser
 	h          hash.Hash
 	shardSize  int64
+	shardFile  int64
 	currOffset int64
 	hashBytes  []byte
 }
 
-func newFastOpenStreamingBitrotReader(rc io.ReadCloser, algo BitrotAlgorithm, shardSize int64) *fastOpenStreamingBitrotReader {
-	return newFastOpenStreamingBitrotReaderAt(rc, algo, shardSize, 0)
+func newFastOpenStreamingBitrotReader(rc io.ReadCloser, algo BitrotAlgorithm, shardSize, shardFile int64) *fastOpenStreamingBitrotReader {
+	return newFastOpenStreamingBitrotReaderAt(rc, algo, shardSize, shardFile, 0)
 }
 
-func newFastOpenStreamingBitrotReaderAt(rc io.ReadCloser, algo BitrotAlgorithm, shardSize, currOffset int64) *fastOpenStreamingBitrotReader {
+func newFastOpenStreamingBitrotReaderAt(rc io.ReadCloser, algo BitrotAlgorithm, shardSize, shardFile, currOffset int64) *fastOpenStreamingBitrotReader {
 	h := algo.New()
 	return &fastOpenStreamingBitrotReader{
 		rc:         rc,
 		h:          h,
 		shardSize:  shardSize,
+		shardFile:  shardFile,
 		currOffset: currOffset,
 		hashBytes:  make([]byte, h.Size()),
 	}
@@ -805,6 +936,9 @@ func newFastOpenStreamingBitrotReaderAt(rc io.ReadCloser, algo BitrotAlgorithm, 
 func (r *fastOpenStreamingBitrotReader) Close() error {
 	if r.rc == nil {
 		return nil
+	}
+	if r.currOffset < r.shardFile {
+		globalFastOpenMetrics.streamCancels.Add(1)
 	}
 	err := r.rc.Close()
 	r.rc = nil

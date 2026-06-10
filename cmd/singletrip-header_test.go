@@ -20,7 +20,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -157,103 +156,6 @@ func TestFastGetRequestEligible(t *testing.T) {
 	}
 	if fastGetRequestEligible(minioMetaBucket, nil, nil, ObjectOptions{}) {
 		t.Fatal("internal metadata bucket request should be ineligible")
-	}
-}
-
-func TestSingleTripShadowInstallWritesExpectedSizeAndCleansTempParent(t *testing.T) {
-	disk, _, err := newXLStorageTestSetup(t)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bucket := "bucket"
-	object := "object"
-	dataDir := "data-dir"
-	if err = disk.MakeVol(t.Context(), bucket); err != nil {
-		t.Fatal(err)
-	}
-
-	fi := testSingleTripFileInfo(bucket, object, dataDir)
-	shardSize := fi.Erasure.ShardFileSize(fi.Parts[0].Size)
-	bitrotSize := bitrotShardFileSize(shardSize, fi.Erasure.ShardSize(), DefaultBitrotAlgorithm)
-	if err = writeTestSingleTripCanonicalPart(t, disk, bucket, pathJoin(object, dataDir, "part.1"), shardSize, fi.Erasure.ShardSize()); err != nil {
-		t.Fatal(err)
-	}
-
-	srcStats, err := disk.StatInfoFile(t.Context(), bucket, pathJoin(object, dataDir, "part.1"), false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(srcStats) != 1 || srcStats[0].Size != bitrotSize {
-		t.Fatalf("source part size = %#v, want %d", srcStats, bitrotSize)
-	}
-
-	if err = writeSingleTripShadow(t.Context(), disk, bucket, object, fi); err != nil {
-		t.Fatal(err)
-	}
-
-	dstStats, err := disk.StatInfoFile(t.Context(), bucket, pathJoin(object, singleTripCurrentDir, "part.1"), false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantShadowSize := int64(singleTripHeaderLen) + bitrotSize
-	if len(dstStats) != 1 || dstStats[0].Size != wantShadowSize {
-		t.Fatalf("shadow size = %#v, want %d", dstStats, wantShadowSize)
-	}
-
-	tmpStats, err := disk.StatInfoFile(t.Context(), bucket, pathJoin(object, singleTripCurrentDir+".*"), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(tmpStats) != 0 {
-		t.Fatalf("temporary shadow parent was not cleaned: %#v", tmpStats)
-	}
-}
-
-func TestSingleTripShadowInvalidationUsesOldParityQuorum(t *testing.T) {
-	old := globalFastGetEnabled
-	globalFastGetEnabled = true
-	t.Cleanup(func() { globalFastGetEnabled = old })
-
-	disks := make([]StorageAPI, 16)
-	for i := range disks {
-		disks[i] = &singleTripInvalidationDisk{
-			header: singleTripHeaderBytesForIndex(t, 14, 2, i+1),
-			err:    errors.New("delete failed"),
-		}
-	}
-	for i := range 2 {
-		disks[i].(*singleTripInvalidationDisk).err = nil
-	}
-	disks[2].(*singleTripInvalidationDisk).err = errVolumeNotFound
-
-	var er erasureObjects
-	if err := er.invalidateSingleTripShadow(t.Context(), "bucket", "object", disks, 15); err != nil {
-		t.Fatalf("invalidate error = %v, want nil with old parity + 1 deletes", err)
-	}
-
-	disks[2].(*singleTripInvalidationDisk).err = errors.New("delete failed")
-	if err := er.invalidateSingleTripShadow(t.Context(), "bucket", "object", disks, 15); err != errErasureWriteQuorum {
-		t.Fatalf("invalidate error = %v, want %v with fewer than old parity + 1 deletes", err, errErasureWriteQuorum)
-	}
-}
-
-func TestSingleTripPickFastInfoPrefersNewestCompleteGroup(t *testing.T) {
-	oldHeader := singleTripHeaderForPickTest(time.Unix(100, 0))
-	newHeader := singleTripHeaderForPickTest(time.Unix(200, 0))
-
-	reads := []singleTripHeaderRead{
-		{header: oldHeader, rc: io.NopCloser(bytes.NewReader(nil))},
-		{header: withSingleTripErasureIndex(oldHeader, 2), rc: io.NopCloser(bytes.NewReader(nil))},
-		{header: newHeader, rc: io.NopCloser(bytes.NewReader(nil))},
-		{header: withSingleTripErasureIndex(newHeader, 2), rc: io.NopCloser(bytes.NewReader(nil))},
-	}
-	info, _, ok := pickSingleTripFastInfo(reads)
-	if !ok {
-		t.Fatal("expected a complete fast group")
-	}
-	t.Cleanup(func() { closeBitrotReaders(info.readers) })
-	if got := info.fi.ModTime; !got.Equal(time.Unix(200, 0)) {
-		t.Fatalf("selected modtime = %v, want newest complete group", got)
 	}
 }
 

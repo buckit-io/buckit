@@ -236,18 +236,24 @@ func (er erasureObjects) GetObjectNInfo(ctx context.Context, bucket, object stri
 	}
 
 	if fastOpenGETRequestEligible(bucket, h, rs, opts) {
+		globalFastOpenMetrics.attempted.Add(1)
 		gr, ok, err := er.tryFastOpenGET(ctx, bucket, object, rs, h, opts, nsUnlocker)
 		if err != nil {
 			if ok {
+				globalFastOpenMetrics.hits.Add(1)
+				fastOpenRecordFinalError(ctx, err)
 				fastGetHits.Add(1)
 			}
 			return gr, err
 		}
 		if ok {
 			unlockOnDefer = false
+			globalFastOpenMetrics.hits.Add(1)
 			fastGetHits.Add(1)
 			return gr, nil
 		}
+		globalFastOpenMetrics.unsupported.Add(1)
+		globalFastOpenMetrics.failures[fastOpenFailureUnsupported].Add(1)
 		fastGetFallbacks.Add(1)
 		if globalFastGetNoFallback {
 			return nil, toObjectErr(errFastGetNoFallback, bucket, object)

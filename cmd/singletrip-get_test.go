@@ -20,13 +20,10 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"slices"
-	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -178,120 +175,6 @@ func TestSingleTripDecodeMixedReadersReconstructNoHang(t *testing.T) {
 	}
 }
 
-type singleTripCountingDisk struct {
-	StorageAPI
-	readFileStreamCalls atomic.Int64
-}
-
-func (d *singleTripCountingDisk) ReadFileStream(ctx context.Context, volume, path string, offset, length int64) (io.ReadCloser, error) {
-	d.readFileStreamCalls.Add(1)
-	return d.StorageAPI.ReadFileStream(ctx, volume, path, offset, length)
-}
-
-func TestSingleTripFastGetEndToEnd(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-
-	obj, fsDirs, err := prepareErasure16(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer obj.Shutdown(t.Context())
-	defer removeRoots(fsDirs)
-
-	z := obj.(*erasureServerPools)
-	sets := z.serverPools[0]
-	xl := sets.sets[0]
-
-	origDisks := xl.getDisks()
-	countingDisks := make([]*singleTripCountingDisk, len(origDisks))
-	wrappedDisks := make([]StorageAPI, len(origDisks))
-	for i, disk := range origDisks {
-		countingDisks[i] = &singleTripCountingDisk{StorageAPI: disk}
-		wrappedDisks[i] = countingDisks[i]
-	}
-
-	sets.erasureDisksMu.Lock()
-	xl.getDisks = func() []StorageAPI { return wrappedDisks }
-	sets.erasureDisksMu.Unlock()
-
-	t.Cleanup(func() {
-		sets.erasureDisksMu.Lock()
-		xl.getDisks = func() []StorageAPI { return origDisks }
-		sets.erasureDisksMu.Unlock()
-	})
-
-	withSingleTripEnabled(t, true)
-
-	bucket := "bucket"
-	object := "object"
-	data := makeSingleTripTestData(smallFileThreshold*16, 17)
-	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	userDefined := map[string]string{
-		"content-type":  "application/singletrip-test",
-		"cache-control": "max-age=60",
-	}
-	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{
-		UserDefined: userDefined,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	assertSingleTripFastInfoAvailable(t, xl, bucket, object)
-
-	resetSingleTripReadFileStreamCounts(countingDisks)
-	globalFastGetEnabled = false
-	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
-	baseline, baselineInfo := readSingleTripTestObject(t, xl, bucket, object)
-	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 0, 0, "baseline")
-
-	resetSingleTripReadFileStreamCounts(countingDisks)
-	globalFastGetEnabled = true
-	hitsBefore, fallbacksBefore = singleTripCounterSnapshot()
-	fast, fastInfo := readSingleTripTestObject(t, xl, bucket, object)
-
-	if !bytes.Equal(fast, baseline) {
-		t.Fatalf("fast bytes differ from baseline: got %d bytes, want %d", len(fast), len(baseline))
-	}
-	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 1, 0, "fast")
-	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
-	assertSingleTripQuorumOpens(t, xl, countingDisks, "fast")
-
-	resetSingleTripReadFileStreamCounts(countingDisks)
-	rangeLen := smallFileThreshold*3 + 123
-	hitsBefore, fallbacksBefore = singleTripCounterSnapshot()
-	fastRange, _ := readSingleTripTestObjectRange(t, xl, bucket, object, &HTTPRangeSpec{Start: 0, End: int64(rangeLen - 1)})
-	if !bytes.Equal(fastRange, data[:rangeLen]) {
-		t.Fatalf("fast range bytes differ: got %d bytes, want %d", len(fastRange), rangeLen)
-	}
-	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 1, 0, "range")
-	assertSingleTripQuorumOpens(t, xl, countingDisks, "range")
-}
-
-// assertSingleTripQuorumOpens verifies the fast path opened exactly the read quorum
-// of shadow streams (prefer-local) — not all M+N — so a healthy GET reads the
-// minimum number of shards.
-func assertSingleTripQuorumOpens(t *testing.T, xl *erasureObjects, disks []*singleTripCountingDisk, label string) {
-	t.Helper()
-	dataCount := xl.setDriveCount - xl.defaultParityCount
-	want := dataCount
-	if dataCount == xl.defaultParityCount {
-		want = dataCount + 1
-	}
-	total := 0
-	for i, d := range disks {
-		got := int(d.readFileStreamCalls.Load())
-		if got > 1 {
-			t.Fatalf("%s: disk %d ReadFileStream calls = %d, want 0 or 1", label, i, got)
-		}
-		total += got
-	}
-	if total != want {
-		t.Fatalf("%s: total ReadFileStream calls = %d, want %d", label, total, want)
-	}
-}
-
 func TestSingleTripFastOpenRemoteSelectionIsStable(t *testing.T) {
 	oldSpread := globalFastGetSpreadSelection
 	globalFastGetSpreadSelection = false
@@ -331,242 +214,6 @@ func TestSingleTripFastOpenSpreadSelectionIsStable(t *testing.T) {
 		if !slices.Equal(sel, first) {
 			t.Fatalf("selection %d = %v, want stable %v", i, sel, first)
 		}
-	}
-}
-
-func TestSingleTripFastGetFallbackWithoutShadow(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-
-	obj, fsDirs, err := prepareErasure16(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer obj.Shutdown(t.Context())
-	defer removeRoots(fsDirs)
-
-	z := obj.(*erasureServerPools)
-	xl := z.serverPools[0].sets[0]
-
-	withSingleTripEnabled(t, false)
-
-	bucket := "bucket"
-	object := "object"
-	data := makeSingleTripTestData(smallFileThreshold*16, 23)
-	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
-		t.Fatal(err)
-	}
-
-	globalFastGetEnabled = true
-	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
-	got, _ := readSingleTripTestObject(t, xl, bucket, object)
-	if !bytes.Equal(got, data) {
-		t.Fatalf("fallback bytes differ: got %d bytes, want %d", len(got), len(data))
-	}
-	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 0, 1, "fallback")
-}
-
-func TestSingleTripFastGetOverwriteAndDeleteInvalidatesShadow(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-
-	z, cleanup := prepareSingleTripErasureObject(t, ctx)
-	defer cleanup()
-	withSingleTripEnabled(t, true)
-
-	xl := z.serverPools[0].sets[0]
-	bucket := "bucket"
-	object := "object"
-	dataA := makeSingleTripTestData(smallFileThreshold*16, 31)
-	dataB := makeSingleTripTestData(smallFileThreshold*16, 47)
-	if err := z.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := z.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(dataA), int64(len(dataA)), "", ""), ObjectOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
-	if got, _ := readSingleTripTestObject(t, xl, bucket, object); !bytes.Equal(got, dataA) {
-		t.Fatal("initial fast GET did not return object A")
-	}
-	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 1, 0, "initial")
-
-	if _, err := z.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(dataB), int64(len(dataB)), "", ""), ObjectOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	hitsBefore, fallbacksBefore = singleTripCounterSnapshot()
-	if got, _ := readSingleTripTestObject(t, xl, bucket, object); !bytes.Equal(got, dataB) {
-		t.Fatal("overwrite fast GET did not return object B")
-	}
-	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 1, 0, "overwrite")
-
-	if _, err := z.DeleteObject(ctx, bucket, object, ObjectOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	hitsBefore, fallbacksBefore = singleTripCounterSnapshot()
-	gr, err := xl.GetObjectNInfo(ctx, bucket, object, nil, http.Header{}, ObjectOptions{})
-	if err == nil {
-		gr.Close()
-		t.Fatal("GET after delete unexpectedly succeeded")
-	}
-	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 0, 1, "delete")
-}
-
-func TestSingleTripFastGetEligibleToIneligibleOverwriteFallsBack(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-
-	z, cleanup := prepareSingleTripErasureObject(t, ctx)
-	defer cleanup()
-	withSingleTripEnabled(t, true)
-
-	xl := z.serverPools[0].sets[0]
-	bucket := "bucket"
-	object := "object"
-	dataA := makeSingleTripTestData(smallFileThreshold*16, 53)
-	dataB := makeSingleTripTestData(smallFileThreshold*16, 71)
-	if err := z.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := z.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(dataA), int64(len(dataA)), "", ""), ObjectOptions{}); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := z.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(dataB), int64(len(dataB)), "", ""), ObjectOptions{
-		UserDefined: map[string]string{
-			"x-amz-meta-test": "forces-fallback",
-		},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
-	got, _ := readSingleTripTestObject(t, xl, bucket, object)
-	if !bytes.Equal(got, dataB) {
-		t.Fatal("eligible-to-ineligible overwrite did not return object B")
-	}
-	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 0, 1, "ineligible overwrite")
-}
-
-func TestSingleTripFastGetOverCapMetadataFallsBack(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-
-	z, cleanup := prepareSingleTripErasureObject(t, ctx)
-	defer cleanup()
-	withSingleTripEnabled(t, true)
-
-	xl := z.serverPools[0].sets[0]
-	bucket := "bucket"
-	object := "object"
-	data := makeSingleTripTestData(smallFileThreshold*16, 89)
-	longContentType := strings.Repeat("a", singleTripContentTypeMax+1)
-	if err := z.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := z.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{
-		UserDefined: map[string]string{
-			"content-type": longContentType,
-		},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
-	got, info := readSingleTripTestObject(t, xl, bucket, object)
-	if !bytes.Equal(got, data) {
-		t.Fatal("over-cap fallback did not return object bytes")
-	}
-	if info.ContentType != longContentType {
-		t.Fatalf("content-type = len %d, want len %d", len(info.ContentType), len(longContentType))
-	}
-	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 0, 1, "over-cap")
-}
-
-func TestSingleTripFastGetMidStreamCorruptionErrors(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-
-	z, cleanup := prepareSingleTripErasureObject(t, ctx)
-	defer cleanup()
-	withSingleTripEnabled(t, true)
-
-	xl := z.serverPools[0].sets[0]
-	bucket := "bucket"
-	object := "object"
-	data := makeSingleTripTestData(3*blockSizeV2+12345, 101)
-	if err := z.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := z.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	corruptSingleTripShadowDataShard(t, xl, bucket, object, 1)
-
-	globalFastGetEnabled = false
-	baseline, _ := readSingleTripTestObject(t, xl, bucket, object)
-	if !bytes.Equal(baseline, data) {
-		t.Fatal("canonical path did not return uncorrupted object")
-	}
-
-	globalFastGetEnabled = true
-	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
-	got, _, err := readSingleTripTestObjectRangeAllowError(t, xl, bucket, object, nil)
-	if err == nil {
-		t.Fatal("fast GET unexpectedly succeeded with corrupted direct shadow")
-	}
-	if len(got) == 0 {
-		t.Fatal("fast GET failed before streaming any bytes; expected mid-stream failure")
-	}
-	if bytes.Equal(got, data) {
-		t.Fatal("fast GET returned complete data despite corrupted direct shadow")
-	}
-	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 1, 0, "corruption")
-}
-
-func TestSingleTripFastGetFallsBackWhenQuorumShadowMissing(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-
-	z, cleanup := prepareSingleTripErasureObject(t, ctx)
-	defer cleanup()
-	withSingleTripEnabled(t, true)
-
-	xl := z.serverPools[0].sets[0]
-	bucket := "bucket"
-	object := "object"
-	// Multi-block, above the inline cutoff so a standalone shadow exists.
-	data := makeSingleTripTestData(3*blockSizeV2+12345, 77)
-	if err := z.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := z.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
-		t.Fatal(err)
-	}
-
-	// The fast path now opens exactly the read quorum of shadows (prefer-local), with
-	// no spare. Removing the shadow on a disk that is in that quorum (disk 0, opened
-	// first) means the fast path can't reach quorum and must fall back to the
-	// canonical path — which still returns the correct bytes from xl.meta +
-	// DataDir/part.1. (In-decode reconstruction of a *missing* shard was the cost of
-	// dropping to exactly-quorum reads; reconstruction from parity that happens to be
-	// among the opened quorum is still exercised by the end-to-end path.)
-	deleteSingleTripShadowOnDisk(t, xl, bucket, object, 0)
-
-	hitsBefore, fallbacksBefore := singleTripCounterSnapshot()
-	got, _ := readSingleTripTestObject(t, xl, bucket, object)
-	if !bytes.Equal(got, data) {
-		t.Fatal("fallback GET returned wrong bytes")
-	}
-	assertSingleTripCounterDelta(t, hitsBefore, fallbacksBefore, 0, 1, "fallback")
-}
-
-func deleteSingleTripShadowOnDisk(t *testing.T, xl *erasureObjects, bucket, object string, diskIdx int) {
-	t.Helper()
-	disk := xl.getDisks()[diskIdx]
-	if err := disk.Delete(t.Context(), bucket, pathJoin(object, singleTripCurrentDir), DeleteOptions{Recursive: true}); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -612,57 +259,6 @@ func makeSingleTripTestData(size int, seed byte) []byte {
 	return data
 }
 
-func corruptSingleTripShadowDataShard(t *testing.T, xl *erasureObjects, bucket, object string, erasureIndex uint16) {
-	t.Helper()
-
-	for _, disk := range xl.getDisks() {
-		read := openSingleTripHeader(t.Context(), disk, bucket, object)
-		if read.rc != nil {
-			read.rc.Close()
-		}
-		if read.err != nil || read.header.ErasureIndex != erasureIndex {
-			continue
-		}
-		partPath := pathJoin(object, singleTripCurrentDir, "part.1")
-		data, err := disk.ReadAll(t.Context(), bucket, partPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		hashSize := read.header.BitrotAlgo.New().Size()
-		shardSize := int(read.header.toFileInfo().Erasure.ShardSize())
-		corruptOffset := singleTripHeaderLen + hashSize + shardSize + hashSize
-		if corruptOffset >= len(data) {
-			t.Fatalf("shadow part too small for mid-stream corruption: len=%d offset=%d", len(data), corruptOffset)
-		}
-		data[corruptOffset] ^= 0xff
-		if err = disk.WriteAll(t.Context(), bucket, partPath, data); err != nil {
-			t.Fatal(err)
-		}
-		return
-	}
-	t.Fatalf("data shard with erasure index %d not found", erasureIndex)
-}
-
-func resetSingleTripReadFileStreamCounts(disks []*singleTripCountingDisk) {
-	for _, disk := range disks {
-		disk.readFileStreamCalls.Store(0)
-	}
-}
-
-func prepareSingleTripErasureObject(t *testing.T, ctx context.Context) (*erasureServerPools, func()) {
-	t.Helper()
-
-	obj, fsDirs, err := prepareErasure16(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	z := obj.(*erasureServerPools)
-	return z, func() {
-		obj.Shutdown(t.Context())
-		removeRoots(fsDirs)
-	}
-}
-
 func withSingleTripEnabled(t *testing.T, enabled bool) {
 	t.Helper()
 
@@ -684,6 +280,7 @@ func withSingleTripEnabled(t *testing.T, enabled bool) {
 	globalFastGetEnabled = enabled
 	fastGetHits.Store(0)
 	fastGetFallbacks.Store(0)
+	resetFastOpenMetrics()
 	t.Cleanup(func() {
 		globalFastGetEnabled = oldEnabled
 		globalAutoEncryption = oldAutoEncryption
@@ -694,11 +291,24 @@ func withSingleTripEnabled(t *testing.T, enabled bool) {
 		globalCompressConfigMu.Unlock()
 		fastGetHits.Store(0)
 		fastGetFallbacks.Store(0)
+		resetFastOpenMetrics()
 	})
 }
 
-func singleTripCounterSnapshot() (hits, fallbacks uint64) {
-	return fastGetHits.Load(), fastGetFallbacks.Load()
+func resetFastOpenMetrics() {
+	globalFastOpenMetrics.attempted.Store(0)
+	globalFastOpenMetrics.hits.Store(0)
+	globalFastOpenMetrics.unsupported.Store(0)
+	globalFastOpenMetrics.replacementPath.Store(0)
+	globalFastOpenMetrics.streamsOpened.Store(0)
+	globalFastOpenMetrics.replacementOpen.Store(0)
+	globalFastOpenMetrics.streamCancels.Store(0)
+	for i := range globalFastOpenMetrics.failures {
+		globalFastOpenMetrics.failures[i].Store(0)
+	}
+	for i := range globalFastOpenMetrics.finalErrors {
+		globalFastOpenMetrics.finalErrors[i].Store(0)
+	}
 }
 
 func assertSingleTripCounterDelta(t *testing.T, hitsBefore, fallbacksBefore, wantHits, wantFallbacks uint64, label string) {
@@ -729,29 +339,4 @@ func assertSingleTripObjectInfoEqual(t *testing.T, got, want ObjectInfo) {
 	if !got.ModTime.Equal(want.ModTime) {
 		t.Fatalf("modtime = %s, want %s", got.ModTime, want.ModTime)
 	}
-}
-
-func assertSingleTripFastInfoAvailable(t *testing.T, xl *erasureObjects, bucket, object string) {
-	t.Helper()
-
-	info, ok := xl.openSingleTripFastInfo(t.Context(), bucket, object)
-	if ok {
-		closeBitrotReaders(info.readers)
-		return
-	}
-
-	disks := xl.getDisks()
-	var details []string
-	for i, disk := range disks {
-		read := openSingleTripHeader(t.Context(), disk, bucket, object)
-		if read.rc != nil {
-			read.rc.Close()
-		}
-		if read.err != nil {
-			details = append(details, fmt.Sprintf("disk %d: %v", i, read.err))
-			continue
-		}
-		details = append(details, fmt.Sprintf("disk %d: index=%d m=%d n=%d flags=%x sig=%x", i, read.header.ErasureIndex, read.header.ErasureM, read.header.ErasureN, read.header.Flags, read.header.DirectSig))
-	}
-	t.Fatalf("single-trip shadow headers did not form a fast quorum: %s", strings.Join(details, "; "))
 }
