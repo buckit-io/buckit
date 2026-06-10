@@ -56,11 +56,11 @@ func TestFastOpenGETEndToEnd(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 
 	bucket := "bucket"
 	object := "object"
-	data := makeSingleTripTestData(smallFileThreshold*16, 23)
+	data := makeFastOpenTestData(smallFileThreshold*16, 23)
 	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestFastOpenGETEndToEnd(t *testing.T) {
 	if !bytes.Equal(fast, baseline) {
 		t.Fatalf("fastopen bytes differ from baseline: got %d bytes, want %d", len(fast), len(baseline))
 	}
-	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 	if fastInfo.UserTags != baselineInfo.UserTags {
 		t.Fatalf("tag parity differs\nfast: %#v\nwant: %#v", fastInfo, baselineInfo)
 	}
@@ -114,7 +114,7 @@ func TestFastOpenGETGoldenVersionedDeleteAndZero(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 
 	bucket := "bucket"
 	versionedObject := "versioned-object"
@@ -122,12 +122,12 @@ func TestFastOpenGETGoldenVersionedDeleteAndZero(t *testing.T) {
 	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{VersioningEnabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	v1Data := makeSingleTripTestData(smallFileThreshold*16+12345, 11)
+	v1Data := makeFastOpenTestData(smallFileThreshold*16+12345, 11)
 	v1, err := xl.PutObject(ctx, bucket, versionedObject, mustGetPutObjReader(t, bytes.NewReader(v1Data), int64(len(v1Data)), "", ""), ObjectOptions{Versioned: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	v2Data := makeSingleTripTestData(smallFileThreshold*16, 13)
+	v2Data := makeFastOpenTestData(smallFileThreshold*16, 13)
 	v2, err := xl.PutObject(ctx, bucket, versionedObject, mustGetPutObjReader(t, bytes.NewReader(v2Data), int64(len(v2Data)), "", ""), ObjectOptions{Versioned: true})
 	if err != nil {
 		t.Fatal(err)
@@ -201,7 +201,7 @@ func TestFastOpenGETGoldenVersionedDeleteAndZero(t *testing.T) {
 			if !bytes.Equal(baseline, fast) || !bytes.Equal(fast, test.wantBytes) {
 				t.Fatalf("bytes differ: baseline=%d fast=%d want=%d", len(baseline), len(fast), len(test.wantBytes))
 			}
-			assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+			assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 			if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
 				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", fastGetHits.Load(), fastGetFallbacks.Load())
 			}
@@ -224,12 +224,12 @@ func TestFastOpenGETMultipartFallsBack(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 
 	bucket := "bucket"
 	object := "multipart-object"
-	part1 := makeSingleTripTestData(5*1024*1024+123, 19)
-	part2 := makeSingleTripTestData(1024*1024+77, 29)
+	part1 := makeFastOpenTestData(5*1024*1024+123, 19)
+	part2 := makeFastOpenTestData(1024*1024+77, 29)
 	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestFastOpenGETMultipartFallsBack(t *testing.T) {
 	if !bytes.Equal(fast, baseline) || !bytes.Equal(fast, append(append([]byte(nil), part1...), part2...)) {
 		t.Fatalf("multipart bytes differ: fast=%d baseline=%d", len(fast), len(baseline))
 	}
-	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 	if fastGetHits.Load() != 0 || fastGetFallbacks.Load() == 0 {
 		t.Fatalf("fast counters hits=%d fallbacks=%d, want 0/>0", fastGetHits.Load(), fastGetFallbacks.Load())
 	}
@@ -290,11 +290,11 @@ func TestFastOpenGETHandlerChecksumAndLifecycleHeaders(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 
 	bucket := "bucket"
 	object := "headers-object"
-	data := makeSingleTripTestData(smallFileThreshold*16, 61)
+	data := makeFastOpenTestData(smallFileThreshold*16, 61)
 	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{VersioningEnabled: true}); err != nil {
 		t.Fatal(err)
 	}
@@ -368,11 +368,11 @@ func TestFastOpenGETRemoteTierWithBackend(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 
 	bucket := "bucket"
 	object := "transitioned-object"
-	data := makeSingleTripTestData(smallFileThreshold*16+333, 67)
+	data := makeFastOpenTestData(smallFileThreshold*16+333, 67)
 	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -408,7 +408,7 @@ func TestFastOpenGETRemoteTierWithBackend(t *testing.T) {
 	if !bytes.Equal(fast, baseline) || !bytes.Equal(fast, data) {
 		t.Fatalf("transitioned bytes differ: baseline=%d fast=%d want=%d", len(baseline), len(fast), len(data))
 	}
-	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 	if fastInfo.TransitionedObject.Status != lifecycle.TransitionComplete || fastInfo.TransitionedObject.Tier != "WARM-TIER" {
 		t.Fatalf("transition info = %#v", fastInfo.TransitionedObject)
 	}
@@ -435,12 +435,12 @@ func TestFastOpenGETReplicationConfiguredMetadata(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 
 	bucket := "bucket"
 	object := "replicated-object"
 	purgeObject := "purged-object"
-	data := makeSingleTripTestData(smallFileThreshold*16, 71)
+	data := makeFastOpenTestData(smallFileThreshold*16, 71)
 	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{VersioningEnabled: true}); err != nil {
 		t.Fatal(err)
 	}
@@ -529,7 +529,7 @@ func TestFastOpenGETReplicationConfiguredMetadata(t *testing.T) {
 			if test.wantErr == nil && (!bytes.Equal(fast, baseline) || !bytes.Equal(fast, data)) {
 				t.Fatalf("bytes differ: baseline=%d fast=%d want=%d", len(baseline), len(fast), len(data))
 			}
-			assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+			assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 			test.verify(t, fastInfo)
 			if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
 				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", fastGetHits.Load(), fastGetFallbacks.Load())
@@ -553,11 +553,11 @@ func TestFastOpenGETScopeGates(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 
 	bucket := "bucket"
 	object := "scope-object"
-	data := makeSingleTripTestData(smallFileThreshold*16, 17)
+	data := makeFastOpenTestData(smallFileThreshold*16, 17)
 	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -609,7 +609,7 @@ func TestFastOpenGETInlineEndToEnd(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 
 	bucket := "bucket"
 	object := "inline-object"
@@ -629,7 +629,7 @@ func TestFastOpenGETInlineEndToEnd(t *testing.T) {
 	if !bytes.Equal(fast, baseline) {
 		t.Fatalf("fastopen inline bytes differ from baseline: got %q, want %q", fast, baseline)
 	}
-	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 	assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 }
 
@@ -684,7 +684,7 @@ func TestFastOpenGETTransformedFullObjectEndToEnd(t *testing.T) {
 			z := obj.(*erasureServerPools)
 			sets := z.serverPools[0]
 			xl := sets.sets[0]
-			withSingleTripEnabled(t, false)
+			withFastOpenEnabled(t, false)
 			if test.init != nil {
 				test.init(t)
 			}
@@ -706,7 +706,7 @@ func TestFastOpenGETTransformedFullObjectEndToEnd(t *testing.T) {
 			if !bytes.Equal(fast, baseline) {
 				t.Fatalf("fastopen %s bytes differ from baseline: got %d bytes, want %d", test.name, len(fast), len(baseline))
 			}
-			assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+			assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 			test.verifyInfo(t, fastInfo)
 			assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 		})
@@ -822,14 +822,14 @@ func TestFastOpenGETAdditionalGoldenMetadata(t *testing.T) {
 			z := obj.(*erasureServerPools)
 			sets := z.serverPools[0]
 			xl := sets.sets[0]
-			withSingleTripEnabled(t, false)
+			withFastOpenEnabled(t, false)
 			if test.init != nil {
 				test.init(t)
 			}
 
 			bucket := "bucket"
 			object := "additional-golden-" + test.name
-			data := makeSingleTripTestData(smallFileThreshold*16+12345, 61)
+			data := makeFastOpenTestData(smallFileThreshold*16+12345, 61)
 			if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 				t.Fatal(err)
 			}
@@ -855,7 +855,7 @@ func TestFastOpenGETAdditionalGoldenMetadata(t *testing.T) {
 			if !bytes.Equal(fast, baseline) {
 				t.Fatalf("%s bytes differ from baseline: got %d bytes, want %d", test.name, len(fast), len(baseline))
 			}
-			assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+			assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 			test.verifyInfo(t, fastInfo)
 			if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
 				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", fastGetHits.Load(), fastGetFallbacks.Load())
@@ -999,7 +999,7 @@ func TestFastOpenGETNotFoundCountsAsHit(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 
 	bucket := "bucket"
 	object := "missing-object"
@@ -1030,7 +1030,7 @@ func TestFastOpenGETNotFoundCountsAsHit(t *testing.T) {
 	if got := globalFastOpenMetrics.streamCancels.Load(); got != 0 {
 		t.Fatalf("fastopen stream cancels = %d, want 0 for metadata-only not-found", got)
 	}
-	assertSingleTripCounterDelta(t, 0, 0, 1, 0, "fastopen not-found")
+	assertFastOpenCounterDelta(t, 0, 0, 1, 0, "fastopen not-found")
 	assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 }
 
@@ -1048,12 +1048,12 @@ func TestFastOpenGETReplacementOnInitialOpenFailure(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 	withFastOpenSpreadSelection(t, false)
 
 	bucket := "bucket"
 	object := "replacement-object"
-	data := makeSingleTripTestData(smallFileThreshold*16, 31)
+	data := makeFastOpenTestData(smallFileThreshold*16, 31)
 	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -1070,7 +1070,7 @@ func TestFastOpenGETReplacementOnInitialOpenFailure(t *testing.T) {
 	if !bytes.Equal(fast, baseline) {
 		t.Fatalf("replacement bytes differ from baseline: got %d bytes, want %d", len(fast), len(baseline))
 	}
-	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 	if got := globalFastOpenMetrics.replacementPath.Load(); got != 1 {
 		t.Fatalf("replacement path metric = %d, want 1", got)
 	}
@@ -1094,7 +1094,7 @@ func TestFastOpenGETReplacementOnAlteredParity(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 	withFastOpenSpreadSelection(t, false)
 	oldStorageClass := globalStorageClass
 	globalStorageClass.Update(storageclass.Config{
@@ -1107,7 +1107,7 @@ func TestFastOpenGETReplacementOnAlteredParity(t *testing.T) {
 
 	bucket := "bucket"
 	object := "altered-parity-object"
-	data := makeSingleTripTestData(smallFileThreshold*16, 41)
+	data := makeFastOpenTestData(smallFileThreshold*16, 41)
 	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -1125,7 +1125,7 @@ func TestFastOpenGETReplacementOnAlteredParity(t *testing.T) {
 	if !bytes.Equal(fast, baseline) {
 		t.Fatalf("altered-parity replacement bytes differ from baseline: got %d bytes, want %d", len(fast), len(baseline))
 	}
-	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 	assertFastOpenGETOpens(t, xl, countingDisks, len(countingDisks))
 }
 
@@ -1143,12 +1143,12 @@ func TestFastOpenGETReplacementOnBlockZeroCorrupt(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 	withFastOpenSpreadSelection(t, false)
 
 	bucket := "bucket"
 	object := "corrupt-replacement-object"
-	data := makeSingleTripTestData(smallFileThreshold*16, 37)
+	data := makeFastOpenTestData(smallFileThreshold*16, 37)
 	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -1165,7 +1165,7 @@ func TestFastOpenGETReplacementOnBlockZeroCorrupt(t *testing.T) {
 	if !bytes.Equal(fast, baseline) {
 		t.Fatalf("block-zero replacement bytes differ from baseline: got %d bytes, want %d, first diff at %d, offsets=%v", len(fast), len(baseline), firstByteDiff(fast, baseline), fastOpenGETOpenOffsets(countingDisks))
 	}
-	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 	assertFastOpenGETOpensLessThan(t, countingDisks, xl.fastOpenInitialOpenCount()+len(countingDisks))
 }
 
@@ -1183,12 +1183,12 @@ func TestFastOpenGETLazyReplacementOnMidStreamCorrupt(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 	withFastOpenSpreadSelection(t, false)
 
 	bucket := "bucket"
 	object := "midstream-corrupt-replacement-object"
-	data := makeSingleTripTestData(smallFileThreshold*16, 43)
+	data := makeFastOpenTestData(smallFileThreshold*16, 43)
 	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -1208,7 +1208,7 @@ func TestFastOpenGETLazyReplacementOnMidStreamCorrupt(t *testing.T) {
 	if !bytes.Equal(fast, baseline) {
 		t.Fatalf("midstream replacement bytes differ from baseline: got %d bytes, want %d, first diff at %d, offsets=%v", len(fast), len(baseline), firstByteDiff(fast, baseline), fastOpenGETOpenOffsets(countingDisks))
 	}
-	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 	assertFastOpenGETHasNonZeroOffset(t, countingDisks)
 }
 
@@ -1226,12 +1226,12 @@ func TestFastOpenGETLazyReplacementOnConcurrentMidStreamCorrupt(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 	withFastOpenSpreadSelection(t, false)
 
 	bucket := "bucket"
 	object := "concurrent-midstream-corrupt-replacement-object"
-	data := makeSingleTripTestData(smallFileThreshold*16, 47)
+	data := makeFastOpenTestData(smallFileThreshold*16, 47)
 	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -1253,7 +1253,7 @@ func TestFastOpenGETLazyReplacementOnConcurrentMidStreamCorrupt(t *testing.T) {
 	if !bytes.Equal(fast, baseline) {
 		t.Fatalf("concurrent midstream replacement bytes differ from baseline: got %d bytes, want %d, first diff at %d, offsets=%v", len(fast), len(baseline), firstByteDiff(fast, baseline), fastOpenGETOpenOffsets(countingDisks))
 	}
-	assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 	assertFastOpenGETNonZeroOffsetCount(t, countingDisks, 2)
 }
 
@@ -1271,12 +1271,12 @@ func TestFastOpenGETMetrics(t *testing.T) {
 	z := obj.(*erasureServerPools)
 	sets := z.serverPools[0]
 	xl := sets.sets[0]
-	withSingleTripEnabled(t, false)
+	withFastOpenEnabled(t, false)
 	withFastOpenSpreadSelection(t, false)
 
 	bucket := "bucket"
 	object := "metrics-object"
-	data := makeSingleTripTestData(int(3*blockSizeV2+12345), 79)
+	data := makeFastOpenTestData(int(3*blockSizeV2+12345), 79)
 	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -1378,12 +1378,12 @@ func TestFastOpenGETLazyReplacementHardening(t *testing.T) {
 			z := obj.(*erasureServerPools)
 			sets := z.serverPools[0]
 			xl := sets.sets[0]
-			withSingleTripEnabled(t, false)
+			withFastOpenEnabled(t, false)
 			withFastOpenSpreadSelection(t, false)
 
 			bucket := "bucket"
 			object := "lazy-hardening-" + test.name
-			data := makeSingleTripTestData(test.size, 53)
+			data := makeFastOpenTestData(test.size, 53)
 			if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 				t.Fatal(err)
 			}
@@ -1417,7 +1417,7 @@ func TestFastOpenGETLazyReplacementHardening(t *testing.T) {
 			if !bytes.Equal(fast, baseline) {
 				t.Fatalf("%s bytes differ from baseline: got %d bytes, want %d, first diff at %d, offsets=%v", test.name, len(fast), len(baseline), firstByteDiff(fast, baseline), fastOpenGETOpenOffsets(countingDisks))
 			}
-			assertSingleTripObjectInfoEqual(t, fastInfo, baselineInfo)
+			assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 			assertFastOpenGETNonZeroOffsetCount(t, countingDisks, test.wantNonZero)
 			if test.wantOpenLimit != nil {
 				assertFastOpenGETOpensLessThan(t, countingDisks, test.wantOpenLimit(xl, countingDisks))
@@ -1598,7 +1598,7 @@ func (d *fastOpenCountingDisk) FastOpenPart(ctx context.Context, volume, path st
 	}, nil
 }
 
-func readFastOpenTestObject(t *testing.T, obj singleTripGetObjectNInfo, bucket, object string, rs *HTTPRangeSpec) ([]byte, ObjectInfo) {
+func readFastOpenTestObject(t *testing.T, obj fastOpenGetObjectNInfo, bucket, object string, rs *HTTPRangeSpec) ([]byte, ObjectInfo) {
 	t.Helper()
 
 	out, info, err := readFastOpenTestObjectOptions(t, obj, bucket, object, rs, http.Header{}, ObjectOptions{FastGetObjInfo: true})
@@ -1608,7 +1608,7 @@ func readFastOpenTestObject(t *testing.T, obj singleTripGetObjectNInfo, bucket, 
 	return out, info
 }
 
-func readFastOpenTestObjectOptions(t *testing.T, obj singleTripGetObjectNInfo, bucket, object string, rs *HTTPRangeSpec, h http.Header, opts ObjectOptions) ([]byte, ObjectInfo, error) {
+func readFastOpenTestObjectOptions(t *testing.T, obj fastOpenGetObjectNInfo, bucket, object string, rs *HTTPRangeSpec, h http.Header, opts ObjectOptions) ([]byte, ObjectInfo, error) {
 	t.Helper()
 
 	gr, err := obj.GetObjectNInfo(t.Context(), bucket, object, rs, h, opts)

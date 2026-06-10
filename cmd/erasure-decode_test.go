@@ -64,6 +64,91 @@ func TestParallelReaderPreferReadersDoesNotDeadlock(t *testing.T) {
 	}
 }
 
+type slowReaderAt struct {
+	inner io.ReaderAt
+	delay time.Duration
+}
+
+func (s slowReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	time.Sleep(s.delay)
+	return s.inner.ReadAt(p, off)
+}
+
+func TestErasureDecodeMixedPreferredAndSlowReadersReconstructNoHang(t *testing.T) {
+	ctx := context.Background()
+	const dataBlocks, parityBlocks = 4, 2
+	const blockSize = int64(1 << 20)
+	erasure, err := NewErasure(ctx, dataBlocks, parityBlocks, blockSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := makeFastOpenTestData(640*1024, 33)
+	shards, err := erasure.EncodeData(ctx, payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shardSize := erasure.ShardSize()
+	shardFileSize := ceilFrac(int64(len(payload)), int64(dataBlocks))
+	encoded := make([][]byte, len(shards))
+	for i := range shards {
+		encoded[i] = buildTestBitrotPayload(t, shards[i], shardSize)
+	}
+
+	for iter := 0; iter < 200; iter++ {
+		readers := make([]io.ReaderAt, len(shards))
+		prefer := make([]bool, len(shards))
+		for i := range shards {
+			switch i {
+			case 0, dataBlocks + 1:
+				readers[i] = nil
+			case dataBlocks:
+				br := newFastOpenStreamingBitrotReader(io.NopCloser(bytes.NewReader(encoded[i])), DefaultBitrotAlgorithm, shardSize, shardFileSize)
+				readers[i] = slowReaderAt{inner: br, delay: 20 * time.Millisecond}
+			default:
+				readers[i] = newFastOpenStreamingBitrotReader(io.NopCloser(bytes.NewReader(encoded[i])), DefaultBitrotAlgorithm, shardSize, shardFileSize)
+				prefer[i] = true
+			}
+		}
+
+		done := make(chan error, 1)
+		var out bytes.Buffer
+		go func() {
+			_, derr := erasure.Decode(ctx, &out, readers, 0, int64(len(payload)), int64(len(payload)), prefer)
+			done <- derr
+		}()
+		select {
+		case derr := <-done:
+			if derr != nil {
+				t.Fatalf("iter %d: decode error: %v", iter, derr)
+			}
+			if !bytes.Equal(out.Bytes(), payload) {
+				t.Fatalf("iter %d: decoded bytes mismatch", iter)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatalf("iter %d: erasure.Decode deadlocked with mixed preferred and slow readers", iter)
+		}
+	}
+}
+
+func buildTestBitrotPayload(t *testing.T, payload []byte, shardSize int64) []byte {
+	t.Helper()
+
+	var src bytes.Buffer
+	h := DefaultBitrotAlgorithm.New()
+	for len(payload) > 0 {
+		n := min(len(payload), int(shardSize))
+		chunk := payload[:n]
+		payload = payload[n:]
+		h.Reset()
+		if _, err := h.Write(chunk); err != nil {
+			t.Fatal(err)
+		}
+		src.Write(h.Sum(nil))
+		src.Write(chunk)
+	}
+	return src.Bytes()
+}
+
 func (a badDisk) ReadFile(ctx context.Context, volume string, path string, offset int64, buf []byte, verifier *BitrotVerifier) (n int64, err error) {
 	return 0, errFaultyDisk
 }

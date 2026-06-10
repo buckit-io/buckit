@@ -84,9 +84,9 @@ var (
 	apiRequestsCanceledTotalMD = NewCounterMD(apiRequestsCanceledTotal,
 		"Total number of requests canceled by the client", "name", "type")
 	apiRequestsFastGetHitsMD = NewCounterMD(apiRequestsFastGetHits,
-		"Total number of GET requests served by the single-trip fast path", "type")
+		"Total number of GET requests served by the FastOpen path", "type")
 	apiRequestsFastGetFallbacksMD = NewCounterMD(apiRequestsFastGetFallbacks,
-		"Total number of single-trip eligible GET requests that fell back to the normal path", "type")
+		"Total number of FastOpen-eligible GET requests that fell back to the normal path", "type")
 	apiRequestsFastOpenAttemptedMD = NewCounterMD(apiRequestsFastOpenAttempted,
 		"Total number of GET requests attempted on the FastOpen path", "type")
 	apiRequestsFastOpenHitsMD = NewCounterMD(apiRequestsFastOpenHits,
