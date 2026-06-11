@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"path"
 	"strconv"
@@ -190,6 +191,22 @@ func (client *storageRESTClient) callGet(ctx context.Context, rpcMethod string, 
 		values = make(url.Values)
 	}
 	values.Set(storageRESTDiskID, *client.diskID.Load())
+	if rpcMethod == storageRESTMethodFastOpenPart {
+		trace := &httptrace.ClientTrace{
+			GotConn: func(info httptrace.GotConnInfo) {
+				globalFastOpenMetrics.connGot.Add(1)
+				if info.Reused {
+					globalFastOpenMetrics.connReused.Add(1)
+				} else {
+					globalFastOpenMetrics.connFresh.Add(1)
+				}
+				if info.WasIdle {
+					globalFastOpenMetrics.connWasIdle.Add(1)
+				}
+			},
+		}
+		ctx = httptrace.WithClientTrace(ctx, trace)
+	}
 	respBody, err := client.restClient.CallWithHTTPMethod(ctx, http.MethodGet, rpcMethod, values, body, length)
 	if err != nil {
 		return nil, toStorageErr(err)
