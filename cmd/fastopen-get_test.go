@@ -1169,6 +1169,118 @@ func TestFastOpenGETReplacementOnBlockZeroCorrupt(t *testing.T) {
 	assertFastOpenGETOpensLessThan(t, countingDisks, xl.fastOpenInitialOpenCount()+len(countingDisks))
 }
 
+func TestFastOpenGETInlineReplacementOnBlockZeroCorrupt(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	obj, fsDirs, err := prepareErasure16(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer obj.Shutdown(t.Context())
+	defer removeRoots(fsDirs)
+
+	z := obj.(*erasureServerPools)
+	sets := z.serverPools[0]
+	xl := sets.sets[0]
+	withFastOpenEnabled(t, false)
+	withFastOpenSpreadSelection(t, false)
+
+	bucket := "bucket"
+	object := "inline-corrupt-replacement-object"
+	data := makeFastOpenTestData(smallFileThreshold, 38)
+	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	fi, _, _, err := xl.getObjectFileInfo(ctx, bucket, object, ObjectOptions{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if shardFileSize, shardSize := fi.Erasure.ShardFileSize(fi.Parts[0].Size), fi.Erasure.ShardSize(); shardFileSize > shardSize {
+		t.Fatalf("test object is not inline-replacement safe: shard_file_size=%d shard_size=%d", shardFileSize, shardSize)
+	}
+
+	baseline, baselineInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
+	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+	for _, diskIndex := range []int{0, 1} {
+		countingDisks[diskIndex].corruptBody = true
+	}
+
+	globalFastGetEnabled = true
+	fast, fastInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
+	if !bytes.Equal(fast, baseline) {
+		t.Fatalf("inline block-zero replacement bytes differ from baseline: got %d bytes, want %d, first diff at %d, offsets=%v", len(fast), len(baseline), firstByteDiff(fast, baseline), fastOpenGETOpenOffsets(countingDisks))
+	}
+	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
+	if !fastOpenGETSawBodyMode(countingDisks[0], FastOpenBodyInline) || !fastOpenGETSawBodyMode(countingDisks[1], FastOpenBodyInline) {
+		t.Fatalf("corrupted selected disks did not serve inline bodies, modes[0]=%v modes[1]=%v", fastOpenGETBodyModes(countingDisks[0]), fastOpenGETBodyModes(countingDisks[1]))
+	}
+	if got, initial := fastOpenGETOpenCount(countingDisks), xl.fastOpenInitialOpenCount(); got <= initial {
+		t.Fatalf("FastOpenPart opens = %d, want more than initial open count %d for inline replacement, offsets=%v", got, initial, fastOpenGETOpenOffsets(countingDisks))
+	}
+}
+
+func TestFastOpenGETUnrecoverableBlockZeroCorruptReturnsReaderThenReadError(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	obj, fsDirs, err := prepareErasure16(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer obj.Shutdown(t.Context())
+	defer removeRoots(fsDirs)
+
+	z := obj.(*erasureServerPools)
+	sets := z.serverPools[0]
+	xl := sets.sets[0]
+	withFastOpenEnabled(t, false)
+	withFastOpenSpreadSelection(t, false)
+
+	bucket := "bucket"
+	object := "unrecoverable-block-zero-corrupt-object"
+	data := makeFastOpenTestData(smallFileThreshold*16, 39)
+	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+	for _, diskIndex := range []int{0, 1, 2, 3, 4, 5, 6, 7, 8} {
+		countingDisks[diskIndex].corruptBody = true
+	}
+
+	globalFastGetEnabled = true
+	gr, err := xl.GetObjectNInfo(ctx, bucket, object, nil, http.Header{}, ObjectOptions{FastGetObjInfo: true})
+	if err != nil {
+		t.Fatalf("GetObjectNInfo error = %v, want reader returned before block-0 decode", err)
+	}
+	if gr == nil {
+		t.Fatal("GetObjectNInfo returned nil reader")
+	}
+	defer gr.Close()
+
+	var out bytes.Buffer
+	_, err = io.Copy(&out, gr)
+	if !isErrReadQuorum(err) {
+		t.Fatalf("read error = %T %v, want read quorum, offsets=%v", err, err, fastOpenGETOpenOffsets(countingDisks))
+	}
+	if out.Len() != 0 {
+		t.Fatalf("bytes written before unrecoverable block-0 error = %d, want 0", out.Len())
+	}
+	if got := globalFastOpenMetrics.hits.Load(); got != 1 {
+		t.Fatalf("hits = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.finalErrors[fastOpenFinalErrorReadQuorum].Load(); got != 1 {
+		t.Fatalf("read-quorum final errors = %d, want 1", got)
+	}
+}
+
 func TestFastOpenGETLazyReplacementOnMidStreamCorrupt(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -1553,6 +1665,7 @@ type fastOpenCountingDisk struct {
 	opens            atomic.Int64
 	mu               sync.Mutex
 	offsets          []int64
+	bodyModes        []FastOpenBodyMode
 	fastOpenErr      error
 	corruptBody      bool
 	corruptBodyAt    int64
@@ -1576,6 +1689,9 @@ func (d *fastOpenCountingDisk) FastOpenPart(ctx context.Context, volume, path st
 		rc.Close()
 		return nil, err
 	}
+	d.mu.Lock()
+	d.bodyModes = append(d.bodyModes, frame.BodyMode)
+	d.mu.Unlock()
 	frameBytes, err := encodeFastOpenFrame(frame)
 	if err != nil {
 		rc.Close()
@@ -1660,6 +1776,7 @@ func resetFastOpenGETOpenCounts(disks []*fastOpenCountingDisk) {
 		disk.opens.Store(0)
 		disk.mu.Lock()
 		disk.offsets = nil
+		disk.bodyModes = nil
 		disk.mu.Unlock()
 	}
 }
@@ -1672,6 +1789,21 @@ func fastOpenGETOpenOffsets(disks []*fastOpenCountingDisk) [][]int64 {
 		disk.mu.Unlock()
 	}
 	return out
+}
+
+func fastOpenGETBodyModes(disk *fastOpenCountingDisk) []FastOpenBodyMode {
+	disk.mu.Lock()
+	defer disk.mu.Unlock()
+	return append([]FastOpenBodyMode(nil), disk.bodyModes...)
+}
+
+func fastOpenGETSawBodyMode(disk *fastOpenCountingDisk, want FastOpenBodyMode) bool {
+	for _, got := range fastOpenGETBodyModes(disk) {
+		if got == want {
+			return true
+		}
+	}
+	return false
 }
 
 func initFastOpenGETAPIRouter(t *testing.T, ctx context.Context, obj ObjectLayer) (http.Handler, string, string) {
@@ -1875,10 +2007,7 @@ func (r *fastOpenCorruptAtReader) Read(p []byte) (int, error) {
 func assertFastOpenGETOpens(t *testing.T, xl *erasureObjects, disks []*fastOpenCountingDisk, want int) {
 	t.Helper()
 
-	got := 0
-	for _, disk := range disks {
-		got += int(disk.opens.Load())
-	}
+	got := fastOpenGETOpenCount(disks)
 	if got != want {
 		t.Fatalf("FastOpenPart opens = %d, want %d", got, want)
 	}
@@ -1887,13 +2016,18 @@ func assertFastOpenGETOpens(t *testing.T, xl *erasureObjects, disks []*fastOpenC
 func assertFastOpenGETOpensLessThan(t *testing.T, disks []*fastOpenCountingDisk, limit int) {
 	t.Helper()
 
+	got := fastOpenGETOpenCount(disks)
+	if got >= limit {
+		t.Fatalf("FastOpenPart opens = %d, want less than %d", got, limit)
+	}
+}
+
+func fastOpenGETOpenCount(disks []*fastOpenCountingDisk) int {
 	got := 0
 	for _, disk := range disks {
 		got += int(disk.opens.Load())
 	}
-	if got >= limit {
-		t.Fatalf("FastOpenPart opens = %d, want less than %d", got, limit)
-	}
+	return got
 }
 
 func assertFastOpenGETHasNonZeroOffset(t *testing.T, disks []*fastOpenCountingDisk) {

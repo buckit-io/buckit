@@ -102,10 +102,10 @@ func TestErasureDecodeMixedPreferredAndSlowReadersReconstructNoHang(t *testing.T
 			case 0, dataBlocks + 1:
 				readers[i] = nil
 			case dataBlocks:
-				br := newFastOpenStreamingBitrotReader(io.NopCloser(bytes.NewReader(encoded[i])), DefaultBitrotAlgorithm, shardSize, shardFileSize)
+				br := newFastOpenStreamingBitrotReader(t.Context(), io.NopCloser(bytes.NewReader(encoded[i])), DefaultBitrotAlgorithm, shardSize, shardFileSize)
 				readers[i] = slowReaderAt{inner: br, delay: 20 * time.Millisecond}
 			default:
-				readers[i] = newFastOpenStreamingBitrotReader(io.NopCloser(bytes.NewReader(encoded[i])), DefaultBitrotAlgorithm, shardSize, shardFileSize)
+				readers[i] = newFastOpenStreamingBitrotReader(t.Context(), io.NopCloser(bytes.NewReader(encoded[i])), DefaultBitrotAlgorithm, shardSize, shardFileSize)
 				prefer[i] = true
 			}
 		}
