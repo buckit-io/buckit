@@ -12,11 +12,18 @@ NODES=4
 DRIVES=4
 DRIVE_SIZE="1G"
 MEMORY="256M"
+CPUS="1.0"
 IMAGE="ubuntu:24.04"
 BASE_PORT=9000
 SSH_BASE_PORT=2201
 SSH_PASSWORD="buckitadmin"
 BUCKIT_FAST_GET="${BUCKIT_FAST_GET:-0}"
+HDD_DELAY_MS="${HDD_DELAY_MS:-0}"
+NETEM_DELAY="${NETEM_DELAY:-0ms}"
+NETEM_JITTER="${NETEM_JITTER:-0ms}"
+MINIO_STORAGE_CLASS_STANDARD="${MINIO_STORAGE_CLASS_STANDARD:-}"
+MINIO_PROMETHEUS_AUTH_TYPE="${MINIO_PROMETHEUS_AUTH_TYPE:-public}"
+HOST_DRIVE_ROOT="${HOST_DRIVE_ROOT:-}"
 STATE_DIR="$SCRIPT_DIR/.state"
 
 usage() {
@@ -35,10 +42,15 @@ Options (create / expand):
   -d, --drives NUM         Drives per node (default: $DRIVES)
   -s, --drive-size SIZE    Size per drive, e.g. 1G, 500M (default: $DRIVE_SIZE)
   -m, --memory SIZE        RAM limit per container, e.g. 2G, 512M (default: $MEMORY)
+  --cpus NUM               CPU limit per container, e.g. 1, 1.5, 2 (default: $CPUS)
   -i, --image IMAGE        Base Docker image (default: $IMAGE)
   --ssh-base-port PORT     First host port mapped to container SSH (default: $SSH_BASE_PORT)
   --ssh-password PASS      Root password for SSH in test containers (default: $SSH_PASSWORD)
   --fast-get VALUE         BUCKIT_FAST_GET value for Buckit nodes (default: $BUCKIT_FAST_GET)
+  --hdd-delay-ms NUM       Per-drive dm-delay latency in ms (default: $HDD_DELAY_MS)
+  --netem-delay VALUE      Per-node egress netem base delay on eth0, e.g. 100us, 0.25ms, 1ms (default: $NETEM_DELAY)
+  --netem-jitter VALUE     Per-node egress netem jitter on eth0, e.g. 8us, 0.1ms (default: $NETEM_JITTER)
+  --host-drive-root DIR    Bind-mount per-node drive state under DIR instead of Docker named volumes
   -N, --name NAME          Cluster name (default: $CLUSTER_NAME)
   -h, --help               Show this help
 
@@ -70,6 +82,10 @@ parse_args() {
 			MEMORY="$2"
 			shift 2
 			;;
+		--cpus)
+			CPUS="$2"
+			shift 2
+			;;
 		-i | --image)
 			IMAGE="$2"
 			shift 2
@@ -86,6 +102,22 @@ parse_args() {
 			BUCKIT_FAST_GET="$2"
 			shift 2
 			;;
+		--hdd-delay-ms)
+			HDD_DELAY_MS="$2"
+			shift 2
+			;;
+		--netem-delay)
+			NETEM_DELAY="$2"
+			shift 2
+			;;
+		--netem-jitter)
+			NETEM_JITTER="$2"
+			shift 2
+			;;
+		--host-drive-root)
+			HOST_DRIVE_ROOT="$2"
+			shift 2
+			;;
 		-N | --name)
 			CLUSTER_NAME="$2"
 			shift 2
@@ -98,6 +130,11 @@ parse_args() {
 
 build_buckit_binary() {
 	local repo_root goos goarch
+
+	if [ -x "$SCRIPT_DIR/buckit" ]; then
+		echo "Using prebuilt Buckit binary at $SCRIPT_DIR/buckit"
+		return
+	fi
 
 	repo_root="$(cd "$SCRIPT_DIR/../.." && pwd)"
 	goos="${GOOS:-linux}"
@@ -155,6 +192,7 @@ EOF
     hostname: node${i}
     privileged: true
     mem_limit: ${MEMORY}
+    cpus: ${CPUS}
     dns:
       - 8.8.8.8
       - 1.1.1.1
@@ -165,9 +203,24 @@ EOF
       - MINIO_ROOT_PASSWORD=buckitadmin
       - BUCKIT_ENDPOINTS=${endpoints}
       - BUCKIT_FAST_GET=${BUCKIT_FAST_GET}
+      - HDD_DELAY_MS=${HDD_DELAY_MS}
+      - NETEM_DELAY=${NETEM_DELAY}
+      - NETEM_JITTER=${NETEM_JITTER}
+      - MINIO_STORAGE_CLASS_STANDARD=${MINIO_STORAGE_CLASS_STANDARD}
+      - MINIO_PROMETHEUS_AUTH_TYPE=${MINIO_PROMETHEUS_AUTH_TYPE}
       - SSH_ROOT_PASSWORD=${SSH_PASSWORD}
     volumes:
+EOF
+		if [ -n "$HOST_DRIVE_ROOT" ]; then
+			cat >>"$compose_file" <<EOF
+      - ${HOST_DRIVE_ROOT}/${CLUSTER_NAME}/node${i}:/var/lib/buckit-drives
+EOF
+		else
+			cat >>"$compose_file" <<EOF
       - node${i}-drives:/var/lib/buckit-drives
+EOF
+		fi
+		cat >>"$compose_file" <<EOF
     tmpfs:
       - /run
       - /run/lock
@@ -184,6 +237,7 @@ EOF
 	# Write volumes and network (rewrite tail section)
 	# Remove old volumes/networks section if appending
 	if [ "$start_node" -eq 1 ]; then
+		if [ -z "$HOST_DRIVE_ROOT" ]; then
 		cat >>"$compose_file" <<EOF
 volumes:
 EOF
@@ -197,7 +251,25 @@ networks:
   ${CLUSTER_NAME}-net:
     driver: bridge
 EOF
+		else
+			cat >>"$compose_file" <<EOF
+networks:
+  ${CLUSTER_NAME}-net:
+    driver: bridge
+EOF
+		fi
 	fi
+}
+
+ensure_host_drive_dirs() {
+	if [ -z "$HOST_DRIVE_ROOT" ]; then
+		return
+	fi
+	local node_dir
+	for i in $(seq 1 "$NODES"); do
+		node_dir="${HOST_DRIVE_ROOT}/${CLUSTER_NAME}/node${i}"
+		mkdir -p "$node_dir"
+	done
 }
 
 save_state() {
@@ -208,10 +280,17 @@ NODES=${NODES}
 DRIVES=${DRIVES}
 DRIVE_SIZE=${DRIVE_SIZE}
 MEMORY=${MEMORY}
+CPUS=${CPUS}
 IMAGE=${IMAGE}
 SSH_BASE_PORT=${SSH_BASE_PORT}
 SSH_PASSWORD=${SSH_PASSWORD}
 BUCKIT_FAST_GET=${BUCKIT_FAST_GET}
+HDD_DELAY_MS=${HDD_DELAY_MS}
+NETEM_DELAY=${NETEM_DELAY}
+NETEM_JITTER=${NETEM_JITTER}
+MINIO_STORAGE_CLASS_STANDARD=${MINIO_STORAGE_CLASS_STANDARD}
+MINIO_PROMETHEUS_AUTH_TYPE=${MINIO_PROMETHEUS_AUTH_TYPE}
+HOST_DRIVE_ROOT=${HOST_DRIVE_ROOT}
 EOF
 }
 
@@ -236,6 +315,7 @@ cmd_create() {
 
 	# Generate docker-compose.yml
 	generate_compose 1 "$NODES" "$NODES" "$SCRIPT_DIR/docker-compose.yml"
+	ensure_host_drive_dirs
 
 	save_state
 
@@ -272,6 +352,7 @@ cmd_expand() {
 	NODES=$new_total
 	generate_dockerfile "$IMAGE" "$SCRIPT_DIR/Dockerfile"
 	generate_compose 1 "$new_total" "$new_total" "$SCRIPT_DIR/docker-compose.yml"
+	ensure_host_drive_dirs
 
 	save_state
 
