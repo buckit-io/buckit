@@ -108,6 +108,12 @@ func newMetricGroups(r *prometheus.Registry) *metricsV3Collection {
 			apiRequestsFastOpenConnReusedMD,
 			apiRequestsFastOpenConnFreshMD,
 			apiRequestsFastOpenConnWasIdleMD,
+			apiRequestsFastOpenTrySecondsMD,
+			apiRequestsFastOpenTryCountMD,
+			apiRequestsFastOpenOpenInfoSecondsMD,
+			apiRequestsFastOpenOpenInfoCountMD,
+			apiRequestsFastOpenBodyDecodeSecondsMD,
+			apiRequestsFastOpenBodyDecodeCountMD,
 
 			apiRequestsTTFBSecondsDistributionMD,
 

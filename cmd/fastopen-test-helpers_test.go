@@ -35,7 +35,6 @@ func unsetFastGetEnvForTest(t *testing.T) {
 		envBuckitFastGet,
 		envBuckitFastGetSpread,
 		envBuckitFastGetNoFallback,
-		envBuckitFastOpenProfile,
 	}
 	old := make(map[string]string, len(keys))
 	present := make(map[string]bool, len(keys))
@@ -72,9 +71,6 @@ func TestReadFastGetRuntimeConfigDefaultsToSpread(t *testing.T) {
 	if cfg.noFallback {
 		t.Fatalf("default fast-get config = %+v, want no-fallback disabled", cfg)
 	}
-	if cfg.fastOpenProfile {
-		t.Fatalf("default fast-get config = %+v, want FastOpen profile disabled", cfg)
-	}
 }
 
 func TestReadFastGetRuntimeConfigHonorsExplicitOverrides(t *testing.T) {
@@ -82,7 +78,6 @@ func TestReadFastGetRuntimeConfigHonorsExplicitOverrides(t *testing.T) {
 	t.Setenv(envBuckitFastGet, "1")
 	t.Setenv(envBuckitFastGetSpread, "0")
 	t.Setenv(envBuckitFastGetNoFallback, "1")
-	t.Setenv(envBuckitFastOpenProfile, "1")
 
 	cfg := readFastGetRuntimeConfig()
 	if !cfg.enabled {
@@ -93,9 +88,6 @@ func TestReadFastGetRuntimeConfigHonorsExplicitOverrides(t *testing.T) {
 	}
 	if !cfg.noFallback {
 		t.Fatalf("noFallback = false, want true")
-	}
-	if !cfg.fastOpenProfile {
-		t.Fatalf("fastOpenProfile = false, want true")
 	}
 }
 
@@ -189,6 +181,12 @@ func resetFastOpenMetrics() {
 	globalFastOpenMetrics.connReused.Store(0)
 	globalFastOpenMetrics.connFresh.Store(0)
 	globalFastOpenMetrics.connWasIdle.Store(0)
+	globalFastOpenMetrics.tryNS.Store(0)
+	globalFastOpenMetrics.tryCount.Store(0)
+	globalFastOpenMetrics.openInfoNS.Store(0)
+	globalFastOpenMetrics.openInfoCount.Store(0)
+	globalFastOpenMetrics.bodyDecodeNS.Store(0)
+	globalFastOpenMetrics.bodyDecodeCount.Store(0)
 	for i := range globalFastOpenMetrics.failures {
 		globalFastOpenMetrics.failures[i].Store(0)
 	}

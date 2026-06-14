@@ -27,14 +27,12 @@ const (
 	envBuckitFastGet           = "BUCKIT_FAST_GET"
 	envBuckitFastGetSpread     = "BUCKIT_FASTGET_SPREAD"
 	envBuckitFastGetNoFallback = "BUCKIT_FASTGET_NO_FALLBACK"
-	envBuckitFastOpenProfile   = "BUCKIT_FASTOPEN_PROFILE"
 )
 
 type fastGetRuntimeConfig struct {
 	enabled         bool
 	spreadSelection bool
 	noFallback      bool
-	fastOpenProfile bool
 }
 
 func fastGetEnvBool(name string, defaultValue bool) bool {
@@ -51,7 +49,6 @@ func readFastGetRuntimeConfig() fastGetRuntimeConfig {
 		enabled:         enabled,
 		spreadSelection: fastGetEnvBool(envBuckitFastGetSpread, enabled),
 		noFallback:      fastGetEnvBool(envBuckitFastGetNoFallback, false),
-		fastOpenProfile: fastGetEnvBool(envBuckitFastOpenProfile, false),
 	}
 }
 
@@ -61,7 +58,6 @@ var (
 	globalFastGetEnabled         = globalFastGetRuntimeConfig.enabled
 	globalFastGetSpreadSelection = globalFastGetRuntimeConfig.spreadSelection
 	globalFastGetNoFallback      = globalFastGetRuntimeConfig.noFallback
-	globalFastOpenProfile        = globalFastGetRuntimeConfig.fastOpenProfile
 	fastGetHits                  atomic.Uint64
 	fastGetFallbacks             atomic.Uint64
 )

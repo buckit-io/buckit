@@ -1419,6 +1419,24 @@ func TestFastOpenGETMetrics(t *testing.T) {
 	if got := globalFastOpenMetrics.unsupported.Load(); got != 0 {
 		t.Fatalf("unsupported = %d, want 0", got)
 	}
+	if got := globalFastOpenMetrics.tryCount.Load(); got != 1 {
+		t.Fatalf("try count = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.tryNS.Load(); got == 0 {
+		t.Fatal("try duration = 0, want nonzero")
+	}
+	if got := globalFastOpenMetrics.openInfoCount.Load(); got != 1 {
+		t.Fatalf("open info count = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.openInfoNS.Load(); got == 0 {
+		t.Fatal("open info duration = 0, want nonzero")
+	}
+	if got := globalFastOpenMetrics.bodyDecodeCount.Load(); got != 1 {
+		t.Fatalf("body decode count = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.bodyDecodeNS.Load(); got == 0 {
+		t.Fatal("body decode duration = 0, want nonzero")
+	}
 	if got := globalFastOpenMetrics.replacementOpen.Load(); got == 0 {
 		t.Fatal("replacement opens = 0, want nonzero")
 	}
