@@ -27,6 +27,7 @@ import (
 
 	"github.com/buckit-io/buckit/internal/bucket/lifecycle"
 	xhttp "github.com/buckit-io/buckit/internal/http"
+	"github.com/tinylib/msgp/msgp"
 )
 
 func TestFastOpenFrameRoundTrip(t *testing.T) {
@@ -119,6 +120,24 @@ func TestFastOpenFrameRejectsTruncatedOversizedAndMismatchedFrames(t *testing.T)
 	}
 	if _, err = unmarshalCoalescedMetadataFrame(append(payload, 0xc0)); !errors.Is(err, errFastOpenFrameBadPayload) {
 		t.Fatalf("trailing payload error = %v, want %v", err, errFastOpenFrameBadPayload)
+	}
+}
+
+func TestFastOpenFrameRejectsImpossibleContainerCounts(t *testing.T) {
+	metaPayload := msgp.AppendMapHeader(nil, 1)
+	metaPayload = msgp.AppendString(metaPayload, "meta")
+	metaPayload = msgp.AppendMapHeader(metaPayload, 2)
+	metaPayload = msgp.AppendString(metaPayload, "k")
+	if _, _, err := readFastOpenGETMeta(metaPayload); !errors.Is(err, errFastOpenFrameBadPayload) {
+		t.Fatalf("impossible metadata map error = %v, want %v", err, errFastOpenFrameBadPayload)
+	}
+
+	erasurePayload := msgp.AppendMapHeader(nil, 1)
+	erasurePayload = msgp.AppendString(erasurePayload, "dist")
+	erasurePayload = msgp.AppendArrayHeader(erasurePayload, 2)
+	erasurePayload = msgp.AppendInt(erasurePayload, 1)
+	if _, _, err := readFastOpenErasureMeta(erasurePayload); !errors.Is(err, errFastOpenFrameBadPayload) {
+		t.Fatalf("impossible distribution array error = %v, want %v", err, errFastOpenFrameBadPayload)
 	}
 }
 

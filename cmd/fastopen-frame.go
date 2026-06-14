@@ -775,6 +775,9 @@ func readStringMap(b []byte) (map[string]string, []byte, error) {
 	if err != nil {
 		return nil, b, err
 	}
+	if n > uint32(len(b)/2) {
+		return nil, b, errFastOpenFrameBadPayload
+	}
 	m := make(map[string]string, n)
 	for n > 0 {
 		n--
@@ -812,6 +815,9 @@ func readIntSlice(b []byte) ([]int, []byte, error) {
 	n, b, err := msgp.ReadArrayHeaderBytes(b)
 	if err != nil {
 		return nil, b, err
+	}
+	if n > uint32(len(b)) {
+		return nil, b, errFastOpenFrameBadPayload
 	}
 	ints := make([]int, n)
 	for i := range ints {
