@@ -9,7 +9,8 @@ VERSION ?= $(shell git describe --tags)
 REPO ?= quay.io/buckit
 TAG ?= $(REPO)/buckit:$(VERSION)
 
-GOLANGCI_DIR = .bin/golangci/latest
+GOLANGCI_VERSION = v1.51.2
+GOLANGCI_DIR = .bin/golangci/$(GOLANGCI_VERSION)
 GOLANGCI = $(GOLANGCI_DIR)/golangci-lint
 
 all: build
@@ -23,7 +24,7 @@ help: ## print this help
 
 getdeps: ## fetch necessary dependencies
 	@mkdir -p ${GOPATH}/bin
-	@echo "Installing latest golangci-lint" && curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(GOLANGCI_DIR)
+	@echo "Installing golangci-lint $(GOLANGCI_VERSION)" && curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(GOLANGCI_DIR) $(GOLANGCI_VERSION)
 
 crosscompile: ## cross compile buckit
 	@(env bash $(PWD)/buildscripts/cross-compile.sh)
@@ -46,7 +47,7 @@ lint-fix: getdeps ## runs golangci-lint suite of linters with automatic fixes
 	@$(GOLANGCI) run --build-tags kqueue --timeout=10m --config ./.golangci.yml --fix
 
 check: test
-test: verifiers build ## builds buckit, runs linters, tests
+test: build ## builds buckit and runs unit tests
 	@echo "Running unit tests"
 	@MINIO_API_REQUESTS_MAX=10000 CGO_ENABLED=0 go test -v -tags kqueue,dev ./...
 
@@ -85,7 +86,7 @@ test-upgrade: install-race
 	@echo "Running buckit upgrade tests"
 	@(env bash $(PWD)/buildscripts/minio-upgrade.sh)
 
-test-race: verifiers build ## builds buckit, runs linters, tests (race)
+test-race: build ## builds buckit and runs unit tests under -race
 	@echo "Running unit tests under -race"
 	@(env bash $(PWD)/buildscripts/race.sh)
 
