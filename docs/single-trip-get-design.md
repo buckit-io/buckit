@@ -1,502 +1,387 @@
-# Single-Trip Direct GET - Design Note
+# Single-Trip FastOpen GET - Design Note
 
-**Status:** Draft / discussion notes
+**Status:** Implemented in this branch
 
-**Summary:** Buckit currently serves a normal shard-backed GET in two storage
-phases: first read `xl.meta` across the erasure set to choose the visible version
-and layout, then read shard bytes from the selected data files. This note proposes
-adding **direct data paths** on top of the current metadata model: `xl.meta`
-remains the canonical version index, while the physical shard directory for the
-latest version is named `current` and older versions are named by version ID. The
-shard files carry a small checked header before the existing bitrot-protected
-shard bytes. A plain latest GET can open
-`bucket/object/current/part.1`, read header then shard in one trip, and fall back
-to today's `xl.meta` path whenever the fast path is missing, stale, inconsistent,
-or not applicable.
+**Summary:** Buckit's final FastOpen design does **not** add `current/` shadow
+directories, `versions/<id>/` direct paths, or write-side shadow repair. Instead,
+it adds a **read-side storage protocol** that lets each disk answer a GET with a
+single streamed response:
 
-This is not a replacement for `xl.meta`, and `current` is not an extra copy of
-the latest shard data. There is one physical data location for a version:
-`current` while it is latest, then `versions/<versionId>` after it is superseded.
-The first target is plain latest GET; the same mechanism can also accelerate
-explicit version GET.
+1. read that disk's `xl.meta`;
+2. encode the chosen object version into a compact FastOpen frame;
+3. immediately continue with the shard body bytes from the same stream when the
+   object is streamable.
 
-Read `request-flow.md` first; this note assumes its vocabulary (set, shard,
-`xl.meta`, `DataDir`, quorum, `ErasureDist`).
+The landing node opens FastOpen streams on a first wave of disks, reads only the
+frame headers to establish the winning object/version/layout, then reuses the
+already-open body streams for decode. If the first wave is not sufficient, it
+opens additional disks or falls back to canonical GET. `xl.meta` remains
+canonical; FastOpen is an opportunistic read optimization only.
 
----
+This note describes the **shipped FastOpen design**. It supersedes earlier
+proposals based on `current/part.1`, `versions/<versionId>/`, and write-side
+shadow copies.
 
-## 1. Context and motivation
-
-### 1.1 Why this matters: making HDD more viable
-
-The architecture Buckit inherited from MinIO is optimized for flash media. HDDs
-are cheaper per terabyte and strong at sequential I/O, but weak at random metadata
-IOPS. This matters for capacity-oriented deployments such as backups, archives,
-media stores, and data lakes.
-
-The HDD issue is broader than GET alone: small-object workloads, listing,
-versioning, healing, scanning, and degraded reads can all create random I/O. This
-proposal targets one concrete hot-path contributor: latest GET currently pays a
-metadata-file read phase before it can open shard files.
-
-### 1.2 Current GET path
-
-For a healthy 16-disk set with `EC:4` (M=12 data, N=4 parity), a normal large
-object GET generally does:
-
-1. **Metadata fan-out:** read `xl.meta` from disks in the set to establish quorum
-   on the visible version and learn its layout.
-2. **Shard read:** open the selected `DataDir/part.N` files and Reed-Solomon
-   decode from M available shard streams, pulling extra shards only on failures.
-
-For large shard-backed objects, this is roughly one metadata-file seek plus one
-data-file seek on the disks that participate in the read. On HDD, those seeks and
-the second storage request phase dominate first-byte latency. On flash, the seek
-cost is small, but the extra request phase still costs latency.
-
-This statement has important exceptions:
-
-- Small objects can already be returned from the metadata read path when inline
-  data is present or when `ReadData` inlines a small single-part shard.
-- Zero-byte and transitioned objects take special paths.
-- The decoder does not eagerly read all M+N shards; it starts with M readers per
-  stripe and falls back to more only when needed.
-
-The target is therefore not "all GETs." The first target is the common large,
-local, shard-backed latest GET, with explicit version GET as a natural extension
-when the version ID maps directly to a stable data directory.
+Read `request-flow.md` first; this note assumes its vocabulary (`xl.meta`,
+erasure sets, parts, `FileInfo`, quorum, distribution, local vs remote disk
+access).
 
 ---
 
-## 2. Core design: `xl.meta` canonical, direct data paths
+## 1. Goal
 
-The proposed layout adds stable directly-openable data directories alongside the
-canonical metadata file:
+Canonical GET pays two logical storage phases:
 
-```
-bucket/object/xl.meta                  # canonical version chain and metadata
-bucket/object/current/part.1           # physical data for the latest version
-bucket/object/versions/<versionId-1>/part.1  # physical data for older version
-bucket/object/versions/<versionId-2>/part.1
-```
+1. read `xl.meta` enough times to establish the visible version and layout;
+2. open shard data files and decode from the selected readers.
 
-For non-versioned or null-version objects, the direct version path needs an
-encoded reserved name rather than the literal empty/null value.
+FastOpen keeps the same correctness rules but collapses those into one per-disk
+storage request. Each participating disk returns metadata and, when possible,
+body bytes from the same open stream.
 
-There is no duplicate `part.1` under both `current` and `versions/<versionId>` for
-the same version. When a latest version is superseded, its data directory is
-renamed or exchanged out of `current` into its deterministic version path.
-
-`xl.meta` remains the source of truth for:
-
-- version existence and ordering;
-- delete markers;
-- fallback for explicit `GET ?versionId=...`;
-- listing and version listing;
-- lifecycle, replication, healing, scanner, and repair decisions;
-- compatibility with existing objects.
-
-`current` is the direct path for plain GET without `versionId`.
-`versions/<versionId>` is the direct path for explicit GET of non-current
-versions. If a direct path is missing or disagrees with quorum, the request falls
-back to the existing `xl.meta`-driven path. Repair can later reconstruct missing
-or corrupt direct data from erasure quorum, with `xl.meta` deciding what should
-exist.
-
-### 2.1 Current shard file format
-
-Each direct-path `part.N` file starts with a small header, then the existing shard
-payload:
-
-```
-current/part.1  (one disk's current shard for one S3 part)
-+--------------+-----------------------------------------------------------+
-|  HEADER      |  SHARD DATA                                               |
-|  (metadata)  |  hash_0 | block_0 | hash_1 | block_1 | ... | hash_k | block_k |
-+--------------+-----------------------------------------------------------+
-  ^ length-prefixed, checksummed       ^ existing per-block bitrot layout
-```
-
-The header carries enough information for the landing node to validate and decode
-the fast path:
-
-- object name, version ID, modtime, etag, object size;
-- whether the current entry is an object or delete marker;
-- direct path identity (`current` or `versions/<versionId>`) and canonical
-  version identity;
-- `ErasureM`, `ErasureN`, `ErasureIndex`, `ErasureDist`, block size;
-- part number, part size, actual shard file size, checksum algorithm;
-- version/header signature used for cross-disk quorum comparison;
-- format version and header checksum.
-
-The shard-data region should remain byte-for-byte compatible with the existing
-bitrot block layout after accounting for the header offset. Existing bitrot
-verification and erasure decode should not need semantic changes, but the reader
-must know that shard offsets are relative to the payload start, not file offset 0.
-
-The header should be **variable-length with a self-describing payload** (a
-length-prefixed, version-tagged frame followed by tagged/keyed fields, e.g.
-TLV or msgpack), not a fixed-size positional record, so fields can be
-added/removed across releases without lockstep: the reader takes the payload
-length from the frame and the shard data begins immediately after, preserving
-the single trip. Because `current` is a rebuildable cache of `xl.meta`, an
-unrecognized format version or any decode failure simply falls back to the
-canonical path and the shadow is lazily rewritten — so the schema can evolve with
-no in-place migration. (The Phase 1 prototype uses a fixed 1024-byte header with a
-positional payload for simplicity; that is an implementation shortcut, not the
-intended on-disk contract.)
-
-### 2.2 Delete-marker current
-
-Latest can be a delete marker. A plain GET must return not found when the quorum
-latest entry is a delete marker, even if older data versions exist.
-
-Therefore `current` must also represent "latest is deleted." Options:
-
-- a small `current/marker` file with the same checked header and no shard data;
-- a reserved `current/part.1` header marked delete-marker with empty payload;
-- no `current` data plus a separate marker file.
-
-The fast path must never silently fall through to older shard data when latest is
-a delete marker. If the delete-marker fast path is missing or inconsistent, fall
-back to `xl.meta`.
+This is a **GET-only** optimization. It does not change the canonical write
+format, object version layout, or healing authority model.
 
 ---
 
-## 3. Fast GET protocol
+## 2. High-level architecture
 
-### 3.1 Plain latest GET
+### 2.1 Canonical state stays unchanged
 
-For `GET /bucket/object` without `versionId`:
+FastOpen does not introduce a second on-disk object namespace.
 
-1. The landing node opens `current/part.N` on each disk in the set for the S3 part
-   needed by the request.
-2. Each disk returns the checked header first.
-3. The landing node compares headers and establishes quorum on the same current
-   version/signature.
-4. If the quorum current is a delete marker, return not found.
-5. If the quorum current is object data, stream from the selected M shard readers.
-6. If any check fails, fall back to the existing `xl.meta` path and queue repair
-   of the direct data path.
+- `xl.meta` remains the source of truth for visible versions, delete markers,
+  transition state, erasure layout, and object metadata.
+- The ordinary shard files under the version's existing `DataDir` remain the only
+  physical shard bytes.
+- PUT/DELETE do not create `current/` shadow copies or `versions/<id>/` direct
+  paths for FastOpen.
 
-The common healthy path removes the separate `xl.meta` read phase from latest
-GET. The correctness rule is simple: `current` can accelerate the answer, but it
-cannot override `xl.meta`.
+FastOpen is therefore always allowed to fall back to the normal `xl.meta` path
+without any repair or reconciliation step.
 
-### 3.2 Header-pause vs speculative stream
+### 2.2 New storage primitive
 
-For large objects, the safest protocol is header-pause:
+Each disk implements:
 
-```
-each disk -> stream HEADER -> pause
-landing node:
-   collect headers and establish quorum
-   continue selected M shard streams
-   stop the rest
-```
+- `StorageAPI.FastOpenPart`
 
-For small objects or low-latency flash deployments, the implementation may choose
-to stream header and data speculatively and cancel losers after quorum selection.
-This trades some wasted bandwidth for lower control-plane complexity.
+This operation:
 
-The existing decoder already starts with M readers per stripe and reads additional
-shards only after missing/corrupt reads. The new protocol should preserve that
-behavior rather than eagerly reading all M+N shards.
+1. reads the disk-local `xl.meta`;
+2. resolves the requested object version (`latest` or an explicit `VersionID`);
+3. converts the chosen object version into a compact `FastOpenGETMeta`;
+4. returns a stream whose first bytes are a checked FastOpen frame;
+5. appends either:
+   - shard bytes,
+   - inline bytes,
+   - no body for metadata-only outcomes,
+   - or a transitioned marker.
 
-### 3.3 Explicit version GET
-
-Explicit version GET can use the same direct-path mechanism, but the lookup must
-account for the no-duplicate rule:
-
-```
-GET /bucket/object?versionId=<v>
--> try bucket/object/current/part.N and accept it only if the header says <v>
--> otherwise try bucket/object/versions/<v>/part.N
--> read header, establish quorum for <v>, stream selected M shards
-```
-
-This removes the `xl.meta` lookup for healthy explicit version GETs when the
-requested version is either current or already under `versions/<v>`. If the direct
-paths are missing, corrupt, stale, or not supported by an old object, fall back to
-today's `xl.meta` path and queue repair if enough shard data exists.
-
-The directory name must be a safe encoding of the S3 version ID. The header still
-needs to carry and validate the canonical version ID; the path name alone is not
-sufficient for correctness.
-
-### 3.4 Multipart and range GET
-
-In the current layout, `part.N` is the S3 multipart part number, not the erasure
-shard number. Most single-part objects only have `part.1`; multipart objects may
-have `part.2`, `part.3`, and so on.
-
-Today's multipart read flow is:
-
-1. read `xl.meta` and choose the visible version;
-2. use that version's part list to map the requested object byte range to a start
-   part, offset within that part, and end part;
-3. for each needed S3 part, open `bucket/object/<DataDir>/part.N` across disks;
-4. Reed-Solomon decode that part's shard streams, then continue to the next
-   `part.N` until the requested range is complete.
-
-Range GET complicates the fast path because the starting byte may map to a later
-S3 part. To keep the fast path correct, every direct-path `part.N` that can be
-opened directly must carry enough header information to validate the requested
-version and that part's layout.
-
-In the direct-path layout, a multipart current version would look like:
-
-```
-bucket/object/current/part.1
-bucket/object/current/part.2
-bucket/object/current/part.3
-```
-
-Each file needs its own header so a range GET that starts in `part.3` can validate
-the version and part layout without first reading `part.1` or `xl.meta`.
-
-Initial implementation can reasonably limit the fast path to:
-
-- full-object or range reads that begin in `part.1`;
-- single-part objects;
-- non-transitioned shard-backed data.
-
-Other requests fall back to `xl.meta` until the multipart/range protocol is
-explicitly designed.
+This works both locally and over storage REST. The landing node therefore uses
+the same abstraction for local and remote disks.
 
 ---
 
-## 4. Write and crash consistency
+## 3. FastOpen frame protocol
 
-### 4.1 Canonical commit
+The protocol is defined in [cmd/fastopen-frame.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastopen-frame.go:1).
 
-PUT/DELETE correctness remains based on today's canonical metadata commit:
+Each successful FastOpen stream begins with:
 
-1. write shard data to temporary files;
-2. commit the new latest data to `current`;
-3. if an older latest version existed, move that old `current` directory to
-   `versions/<oldVersionId>`;
-4. update `xl.meta` as the canonical visible version chain.
+- a fixed prelude:
+  - magic
+  - protocol version
+  - payload length
+  - CRC
+  - body mode
+- a compact encoded payload:
+  - object/version identity
+  - part metadata
+  - erasure metadata
+  - transition metadata when relevant
 
-The ordering can be adjusted as long as recovery has a deterministic rule. The
-important invariant is that `xl.meta` decides which versions are visible and which
-direct path should contain each version. If a crash leaves a mismatch, fast GET
-falls back to `xl.meta`; repair either reconstructs the missing direct path from
-erasure quorum or removes uncommitted data.
+Body modes are:
 
-If a crash leaves `current` newer than `xl.meta`, `xl.meta` wins. The fast path
-must detect that by quorum/header validation or by falling back when the `current`
-headers do not form a valid committed quorum.
+- `FastOpenBodyShard`
+- `FastOpenBodyInline`
+- `FastOpenBodyMetadataOnly`
+- `FastOpenBodyTransitioned`
 
-### 4.2 Updating `current`
+Frame statuses are:
 
-A stable `current` directory is attractive because latest GET can open:
+- `FastOpenStatusOK`
+- `FastOpenStatusDeleteMarker`
+- `FastOpenStatusNotFound`
+- `FastOpenStatusVersionNotFound`
+- `FastOpenStatusUnsupported`
 
-```
-bucket/object/current/part.1
-```
+Important design point:
 
-without resolving an opaque `DataDir` through `xl.meta`.
-
-The important rule is to replace `current` by rename/exchange, not by overwriting
-shard bytes in place. A reader that already opened `current/part.1` holds a file
-descriptor to the old inode, so it can keep streaming even after the `current`
-path is atomically swapped to a new directory. The swapped-out old directory then
-becomes the immutable `versions/<oldVersionId>` directory; it is not a temporary
-duplicate.
-
-Updating that directory is not identical to today's `RenameData` flow. Today a
-fresh immutable `DataDir` is committed under an opaque name and then made visible
-through `xl.meta`. In the new layout, the latest version's physical data must land
-at:
-
-```
-bucket/object/current
-```
-
-and the previous latest data must be preserved under:
-
-```
-bucket/object/versions/<oldVersionId>
-```
-
-There is no second copy. The filesystem operation is a rename/exchange of
-directories, not a copy into `current`.
-
-On Linux, `renameat2(RENAME_EXCHANGE)` can atomically swap two existing pathnames,
-including directories on filesystems that support it:
-
-```
-bucket/object/current      <-> bucket/object/.staging-new
-```
-
-After the exchange:
-
-```
-bucket/object/current      # new latest data
-bucket/object/.staging-new # old latest data, to rename to versions/<oldVersionId>
-```
-
-This can make latest replacement atomic at the per-disk namespace level, but it is
-not portable POSIX behavior and still needs:
-
-- startup capability detection for kernel and filesystem support;
-- correct file and parent-directory fsync ordering;
-- recovery of the old swapped-out directory into `versions/<oldVersionId>`;
-- handling when latest is a delete marker;
-- fallback for platforms/filesystems without `RENAME_EXCHANGE`.
-
-The post-exchange rename of old data to `versions/<oldVersionId>` is another
-crash point. Recovery must be able to recognize a swapped-out old-current staging
-directory from its header and finish the rename or discard it if `xl.meta` says it
-is not a committed version.
+- FastOpen does **not** bypass `xl.meta` on the storage node.
+- It bypasses a **second request phase** from the landing node by coalescing
+  metadata and body into one stream per disk.
 
 ---
 
-## 5. Durability risks and remediations
+## 4. Request eligibility
 
-The new direct paths do not weaken erasure coding, but they add crash states that
-the current opaque-`DataDir` layout does not have. The safe rule is:
+FastOpen is intentionally narrow. The request-level gate is implemented in
+[cmd/fastopen-get.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastopen-get.go:175).
 
-```
-xl.meta remains canonical.
-Direct paths are served only when their headers form quorum for a committed version.
-Staging/current/version mismatches are reconciled against xl.meta.
-```
+FastOpen is attempted only when:
 
-### 5.1 Crash-state risks
+- `BUCKIT_FAST_GET=1`
+- `opts.FastGetObjInfo` is set by the caller
+- the bucket is not the internal metadata bucket
+- the request is not a `PartNumber` GET
+- the request is not a range GET
+- the request is not a replication or proxy request
+- SSE-C is not requested
 
-| Risk | Example state | Remediation |
-|---|---|---|
-| `current` ahead of `xl.meta` | `current` header says `v2`, but `xl.meta` still says latest is `v1` | Fast GET falls back to `xl.meta`; scanner/repair quarantines or removes uncommitted `v2` unless quorum metadata later confirms it. |
-| `xl.meta` ahead of `current` | `xl.meta` says latest is `v2`, but `current` still contains `v1` | Fast GET detects header mismatch and falls back; repair moves/reconstructs `v2` into `current`. |
-| old latest stranded in staging | after exchange, `.staging-new` contains `v1`, but `versions/v1` is missing | Recovery reads the staging header, verifies `v1` is committed in `xl.meta`, and renames it to `versions/v1`. |
-| delete marker torn update | `xl.meta` latest is delete marker, but `current` still contains old data | Fast GET must not serve old data unless `current` headers form quorum for the committed latest; fallback returns 404 and repair installs the delete-marker current state. |
-| partial per-disk commit | some disks have `current=v2`, some `current=v1`, some staging leftovers | Landing node groups headers by signature; serve only a committed quorum, otherwise fall back and queue per-disk repair. |
-| missing fsync after rename/exchange | syscall returned success, but crash loses a directory entry | Follow strict fsync ordering for files and parent directories; recovery treats missing direct paths as repairable if `xl.meta` has quorum. |
-| stale or orphan direct dirs | directory contains a version not present in `xl.meta` | Scanner quarantines or deletes after confirming it is not referenced by canonical metadata. |
+At object/layout selection time, FastOpen may still reject the object and fall
+back. Important fallback cases include:
 
-### 5.2 Request-time repair trigger
+- unsupported frame status from any selected disk
+- unsupported checksum algorithm
+- inability to assemble enough valid readers
+- body mode/layout combinations not handled by the FastOpen reader path
+- non-zero body offset after `NewGetObjectReader`
 
-The fast GET path can detect direct-path divergence cheaply from headers:
-
-1. The landing node asks all disks for `current/part.N` or `versions/<id>/part.N`.
-2. It groups returned headers by version/signature.
-3. It reads from the quorum group if the group is valid for the request.
-4. Disks whose headers are missing, corrupt, or outside the quorum group are
-   excluded from the read.
-5. The landing node queues a repair for those disk/object paths.
-
-The landing node should not tell a disk "your version is wrong" based only on the
-header mismatch. It should tell the disk to reconcile that object against
-canonical `xl.meta`. The disk-local repair then decides whether its direct path is
-ahead, behind, stranded in staging, or uncommitted.
-
-### 5.3 Disk-local reconciliation algorithm
-
-Per-disk repair extends the existing healing/scanner model:
-
-1. Read local `xl.meta`.
-2. Build the expected direct-path map:
-   `current` -> latest committed object version or delete-marker marker, and
-   `versions/<id>` -> each committed non-current object version.
-3. Inspect `current`, `versions/*`, and staging directories by reading their
-   checked headers.
-4. Keep directories whose header matches the version expected at that path.
-5. If a staging/current/version directory contains a committed version expected
-   elsewhere, rename it into the expected path.
-6. If a directory contains an uncommitted version not present in `xl.meta`,
-   quarantine/delete it.
-7. If committed shard data is missing or corrupt but recoverable from other disks,
-   invoke normal erasure healing to reconstruct it.
-
-This is the same authority model Buckit uses today: metadata decides what should
-exist; shard directories are repaired or cleaned up to match it.
+Delete markers, zero-byte objects, and transitioned objects are still handled via
+FastOpen metadata when possible, but they return metadata-only object-level
+results rather than streamed shard decode.
 
 ---
 
-## 6. Expected performance
+## 5. Landing-node read flow
 
-For a healthy 16-disk EC:4 set serving large shard-backed latest GETs, the current
-path is roughly:
+The read path lives in [cmd/fastopen-get.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastopen-get.go:1).
 
-```
-16 xl.meta reads + 12 shard reads
-```
+### 5.1 First wave
 
-The fast path is roughly:
+`tryFastOpenGET` calls `openFastOpenGETInfo`, which:
 
-```
-16 current header reads, then M shard streams from the same opened files
-```
+1. chooses an initial wave of online disks;
+2. opens `FastOpenPart` on each selected disk;
+3. reads only the FastOpen frame from each stream;
+4. leaves the stream positioned immediately after the frame.
 
-On HDD, the optimistic seek-bound ceiling is about:
+Disk selection uses two modes:
 
-```
-28 / 16 ~= 1.75x
-```
+- default: local-first, then stable disk order
+- spread mode: rotate the first wave by object hash when
+  `BUCKIT_FASTGET_SPREAD=1`
 
-In practice, expected gains are lower:
+The initial open count is based on the set's configured data/parity shape, not
+the object's eventual winning layout. If the object's actual layout needs more
+help than the first wave provides, FastOpen opens additional disks.
 
-- seek-bound small/medium shard-backed GET throughput: up to about 1.5x-1.75x;
-- first-byte latency on HDD: roughly 30%-50% lower in the healthy fast path;
-- large sequential transfers: usually 0%-10% total transfer improvement, mostly
-  faster first byte;
-- flash/NVMe: mostly one fewer storage request phase, often a smaller latency win.
+### 5.2 Quorum and winning object selection
 
-These are estimates, not measured results. The win shrinks or disappears when the
-request falls back to `xl.meta`, targets old objects that have not been migrated
-to direct paths, targets transitioned objects, needs multipart/range behavior not
-covered by the fast path, or runs from warm metadata cache where the `xl.meta`
-seek is already cheap.
+FastOpen does not invent new correctness rules. After reading the per-disk
+frames, it rebuilds `FileInfo` values and reuses the same quorum and version
+selection rules as canonical GET:
 
----
+- `objectQuorumFromMeta`
+- `reduceReadQuorumErrs`
+- `listOnlineDisks`
+- `pickValidFileInfo`
+- `filterOnlineDisksInplace`
 
-## 7. Fallback and repair rules
+That means:
 
-Fast GET must fall back to the current implementation when:
+- `NotFound` and `VersionNotFound` are still object-level outcomes only after
+  normal quorum rules are applied.
+- stale but individually valid disk metadata does not win the read.
+- `xl.meta` semantics remain canonical even though the landing node did not call
+  the normal metadata fan-out helper.
 
-- the direct path (`current` or `versions/<versionId>`) is missing on too many
-  disks;
-- headers do not form quorum on version/signature;
-- a header checksum fails;
-- the current entry is ambiguous relative to delete-marker semantics;
-- requested range maps to a `part.N` not supported by the fast path;
-- bitrot verification fails and quorum cannot be reconstructed from available
-  fast-path shards;
-- the object is transitioned, restored, or otherwise not local shard-backed data.
+### 5.3 Replacement wave
 
-After fallback succeeds through `xl.meta`, the system should queue a repair to
-finish any interrupted rename/exchange, reconstruct missing shards from erasure
-quorum, or delete uncommitted direct data.
+If the first wave is not enough before response commit:
 
----
+1. FastOpen records a replacement-path attempt.
+2. It opens the remaining online disks.
+3. It retries object selection with the larger set.
 
-## 8. Open decisions
-
-1. **Direct-path layout:** `current/part.N` for the latest version plus
-   `versions/<versionId>/part.N` for non-current versions, stable regular files,
-   or another no-duplicate path scheme.
-2. **Current update protocol:** `renameat2(RENAME_EXCHANGE)` vs. staged
-   rename/recovery fallback for filesystems without atomic directory exchange.
-3. **Delete-marker representation:** marker file, empty current shard header, or
-   separate current state file.
-4. **Multipart/range scope:** whether v1 supports only single-part `part.1` reads
-   or duplicates headers into every direct-path `part.N`.
-5. **Transport:** header-pause control protocol vs. speculative stream/cancel.
-6. **Migration:** old objects simply miss direct paths and use `xl.meta`; scanner
-   or write/read repair can migrate them opportunistically.
+If selection still cannot succeed, the request falls back to canonical GET unless
+`BUCKIT_FASTGET_NO_FALLBACK=1`, in which case the request returns an error.
 
 ---
 
-## 9. References
+## 6. Reader assembly and decode
 
-- `docs/request-flow.md` - current GET/PUT/DELETE flows, `xl.meta` format,
-  quorum, and local-vs-distributed transport split.
-- `cmd/erasure-object.go` - `GetObjectNInfo`, `getObjectFileInfo`, and the decode
-  loop.
-- `cmd/erasure-decode.go` - M-reader decode behavior and degraded fallback.
-- `cmd/xl-storage.go` - `ReadXL`, `ReadVersion`, inline-data behavior, and
-  `ReadFileStream`.
-- `cmd/storage-interface.go` - storage API signatures for metadata and file
-  reads.
+### 6.1 Reusing the opened body streams
+
+Once the winning `FileInfo` is known, FastOpen maps the already-open per-disk
+streams into erasure-slot readers.
+
+For directly usable body streams:
+
+- shard mode becomes a `fastOpenStreamingBitrotReader`
+- inline mode is also accepted when it can be validated safely
+
+Readers are placed by `Erasure.Index`, not by response order, so they match the
+same slot semantics canonical decode expects.
+
+### 6.2 Lazy replacement readers
+
+If the initially selected body streams do not cover enough slots, FastOpen can
+fill missing positions with lazy replacement readers.
+
+The lazy replacement path:
+
+1. records which disks are already engaged;
+2. chooses the one disk that can satisfy each missing erasure slot;
+3. opens a new `FastOpenPart` stream only when that slot is actually read;
+4. validates that the replacement frame still matches the winning object/layout;
+5. resumes decode from the requested shard offset.
+
+This allows FastOpen to recover some pre-commit selection failures and some
+decode-time missing-reader situations without abandoning the request before body
+streaming begins.
+
+### 6.3 Streaming bitrot verification
+
+The FastOpen body path uses `HighwayHash256S` only. Other algorithms currently
+force fallback.
+
+The streaming reader verifies the existing on-disk bitrot layout inline:
+
+1. read block hash
+2. read block bytes
+3. recompute hash
+4. compare
+
+No new shard-body format is introduced. FastOpen only changes how the landing
+node gets to the shard bytes.
+
+### 6.4 Range behavior
+
+The current FastOpen path is effectively full-object only:
+
+- request-level range GETs are rejected up front
+- if `NewGetObjectReader` computes a non-zero offset, FastOpen falls back
+
+Multipart part selection is also not supported in the FastOpen path.
+
+---
+
+## 7. Fallback model
+
+FastOpen is allowed to fail only **before** it commits to a streaming response as
+the request's object-selection path.
+
+Pre-commit failures fall into two categories:
+
+- `ok=false`: abandon FastOpen and fall back to canonical GET
+- `ok=true, err!=nil`: FastOpen determined the object-level result, including
+  delete marker or quorum failure cases
+
+Once FastOpen has started the body goroutine and returned a `GetObjectReader`,
+mid-stream failures are reported as stream errors, not by restarting through the
+canonical path. This matches the fact that HTTP response commit has already
+happened.
+
+This is the central simplification versus the abandoned `current/` design:
+
+- no request-time repair
+- no direct-path reconciliation
+- no crash-state cleanup
+- no write-side invalidation rules
+
+Fallback is always safe because the canonical layout was never changed.
+
+---
+
+## 8. Observability
+
+FastOpen observability is exposed under
+`/minio/metrics/v3/api/requests` in
+[cmd/metrics-v3-api.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/metrics-v3-api.go:1).
+
+Counters include:
+
+- `fast_get_hits_total`
+- `fast_get_fallbacks_total`
+- `fast_open_attempted_total`
+- `fast_open_hits_total`
+- `fast_open_unsupported_total`
+- `fast_open_replacement_path_total`
+- `fast_open_streams_opened_total`
+- `fast_open_replacement_opens_total`
+- `fast_open_selected_set_failures_total`
+- `fast_open_stream_cancellations_total`
+- `fast_open_final_errors_total`
+- `fast_open_httptrace_connections_total`
+- `fast_open_httptrace_reused_connections_total`
+- `fast_open_httptrace_fresh_connections_total`
+- `fast_open_httptrace_was_idle_connections_total`
+
+Timing metrics include:
+
+- `fast_open_try_seconds_total`
+- `fast_open_try_seconds_count`
+- `fast_open_open_info_seconds_total`
+- `fast_open_open_info_seconds_count`
+- `fast_open_body_decode_seconds_total`
+- `fast_open_body_decode_seconds_count`
+
+The old `BUCKIT_FASTOPEN_PROFILE` stderr logging path has been removed. Timing is
+now metrics-based.
+
+---
+
+## 9. What the final implementation is not
+
+The current FastOpen implementation does **not** do any of the following:
+
+- no `current/part.N` shadow copy
+- no `versions/<versionId>/part.N` direct namespace
+- no `renameat2(RENAME_EXCHANGE)`-based latest swap
+- no write-side direct-path install/invalidate protocol
+- no crash-state repair for direct data paths
+- no scanner-driven direct-path reconciliation
+- no arbitrary range or multipart FastOpen read path
+- no support for all checksum algorithms
+
+Those ideas belonged to earlier design exploration. They are not part of the
+implemented FastOpen shipped in this branch.
+
+---
+
+## 10. Expected behavior and tradeoffs
+
+FastOpen improves the healthy full-object GET path by removing one landing-node
+request phase to each participating disk. It does **not** remove the disk-local
+`xl.meta` lookup itself.
+
+Benefits:
+
+- lower first-byte latency when the request stays on the FastOpen path
+- fewer landing-node storage RPC phases
+- opportunistic reuse of already-open body streams
+- no write-path format migration
+
+Costs and limitations:
+
+- narrow eligibility
+- fallback is still common for unsupported objects/requests
+- some recovery cases require opening additional disks
+- mid-stream errors are not converted into a new canonical GET
+- observability is required to know whether a benchmark actually hit the path
+
+This is therefore best understood as a conservative read-path optimization layered
+on top of Buckit's existing metadata and erasure semantics.
+
+---
+
+## 11. References
+
+- [cmd/fastopen-frame.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastopen-frame.go:1) - FastOpen frame protocol and compact metadata encoding
+- [cmd/fastopen-part.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastopen-part.go:1) - disk-side `FastOpenPart` implementation
+- [cmd/fastopen-get.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastopen-get.go:1) - landing-node FastOpen GET path
+- [cmd/fastget-config.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastget-config.go:1) - runtime flags
+- [cmd/metrics-v3-api.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/metrics-v3-api.go:1) - exported metrics
+- [docs/single-trip-get-phase1-implementation.md](/Users/rooseveltlai/develop/buckit-io/buckit/docs/single-trip-get-phase1-implementation.md:1) - historical prototype/implementation notes
