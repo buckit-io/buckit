@@ -964,7 +964,9 @@ func (r *fastOpenStreamingBitrotReader) ReadAt(buf []byte, offset int64) (int, e
 	return len(buf), nil
 }
 
-var _ io.ReaderAt = (*fastOpenLazyReplacementReader)(nil)
-var _ io.Closer = (*fastOpenLazyReplacementReader)(nil)
-var _ io.ReaderAt = (*fastOpenStreamingBitrotReader)(nil)
-var _ io.Closer = (*fastOpenStreamingBitrotReader)(nil)
+var (
+	_ io.ReaderAt = (*fastOpenLazyReplacementReader)(nil)
+	_ io.Closer   = (*fastOpenLazyReplacementReader)(nil)
+	_ io.ReaderAt = (*fastOpenStreamingBitrotReader)(nil)
+	_ io.Closer   = (*fastOpenStreamingBitrotReader)(nil)
+)

@@ -18,10 +18,6 @@
 package cmd
 
 import (
-	"bytes"
-	"context"
-	"io"
-	"net/http"
 	"os"
 	"testing"
 
@@ -50,7 +46,8 @@ func unsetFastGetEnvForTest(t *testing.T) {
 	t.Cleanup(func() {
 		for _, key := range keys {
 			if present[key] {
-				if err := os.Setenv(key, old[key]); err != nil {
+				// t.Setenv would set this during cleanup, then schedule a later cleanup.
+				if err := os.Setenv(key, old[key]); err != nil { //nolint:usetesting
 					t.Error(err)
 				}
 			} else if err := os.Unsetenv(key); err != nil {
@@ -89,40 +86,6 @@ func TestReadFastGetRuntimeConfigHonorsExplicitOverrides(t *testing.T) {
 	if !cfg.noFallback {
 		t.Fatalf("noFallback = false, want true")
 	}
-}
-
-type fastOpenGetObjectNInfo interface {
-	GetObjectNInfo(ctx context.Context, bucket, object string, rs *HTTPRangeSpec, h http.Header, opts ObjectOptions) (*GetObjectReader, error)
-}
-
-func readFastOpenHelperObject(t *testing.T, obj fastOpenGetObjectNInfo, bucket, object string) ([]byte, ObjectInfo) {
-	return readFastOpenHelperObjectRange(t, obj, bucket, object, nil)
-}
-
-func readFastOpenHelperObjectRange(t *testing.T, obj fastOpenGetObjectNInfo, bucket, object string, rs *HTTPRangeSpec) ([]byte, ObjectInfo) {
-	t.Helper()
-
-	out, info, err := readFastOpenHelperObjectRangeAllowError(t, obj, bucket, object, rs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return out, info
-}
-
-func readFastOpenHelperObjectRangeAllowError(t *testing.T, obj fastOpenGetObjectNInfo, bucket, object string, rs *HTTPRangeSpec) ([]byte, ObjectInfo, error) {
-	t.Helper()
-
-	gr, err := obj.GetObjectNInfo(t.Context(), bucket, object, rs, http.Header{}, ObjectOptions{})
-	if err != nil {
-		return nil, ObjectInfo{}, err
-	}
-	defer gr.Close()
-
-	var out bytes.Buffer
-	if _, err = io.Copy(&out, gr); err != nil {
-		return out.Bytes(), gr.ObjInfo, err
-	}
-	return out.Bytes(), gr.ObjInfo, nil
 }
 
 func makeFastOpenTestData(size int, seed byte) []byte {

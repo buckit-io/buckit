@@ -305,7 +305,7 @@ func TestFastOpenGETHandlerChecksumAndLifecycleHeaders(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	router, accessKey, secretKey := initFastOpenGETAPIRouter(t, ctx, obj)
+	router, accessKey, secretKey := initFastOpenGETAPIRouter(ctx, t, obj)
 	lifecycleConfig := []byte(`<LifecycleConfiguration><Rule><ID>expire-fastopen</ID><Status>Enabled</Status><Filter></Filter><Expiration><Days>1</Days></Expiration></Rule></LifecycleConfiguration>`)
 	if _, err = globalBucketMetadataSys.Update(ctx, bucket, bucketLifecycleConfig, lifecycleConfig); err != nil {
 		t.Fatal(err)
@@ -445,7 +445,7 @@ func TestFastOpenGETReplicationConfiguredMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	arn := "arn:minio:replication:::target"
-	installFastOpenReplicationConfig(t, ctx, bucket, arn)
+	installFastOpenReplicationConfig(ctx, t, bucket, arn)
 	dsc := ReplicateDecision{}
 	dsc.Set(newReplicateTargetDecision(arn, true, false))
 
@@ -637,7 +637,7 @@ func TestFastOpenGETTransformedFullObjectEndToEnd(t *testing.T) {
 	tests := []struct {
 		name       string
 		init       func(t *testing.T)
-		putObject  func(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte)
+		putObject  func(ctx context.Context, t *testing.T, xl *erasureObjects, bucket, object string, data []byte)
 		verifyInfo func(t *testing.T, info ObjectInfo)
 	}{
 		{
@@ -695,7 +695,7 @@ func TestFastOpenGETTransformedFullObjectEndToEnd(t *testing.T) {
 			if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 				t.Fatal(err)
 			}
-			test.putObject(t, ctx, xl, bucket, object, data)
+			test.putObject(ctx, t, xl, bucket, object, data)
 
 			baseline, baselineInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
 			test.verifyInfo(t, baselineInfo)
@@ -718,13 +718,13 @@ func TestFastOpenGETAdditionalGoldenMetadata(t *testing.T) {
 		name       string
 		init       func(t *testing.T)
 		opts       ObjectOptions
-		putObject  func(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte)
+		putObject  func(ctx context.Context, t *testing.T, xl *erasureObjects, bucket, object string, data []byte)
 		verifyInfo func(t *testing.T, info ObjectInfo)
 	}{
 		{
 			name: "version-suspended-null",
 			opts: ObjectOptions{VersionSuspended: true},
-			putObject: func(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte) {
+			putObject: func(ctx context.Context, t *testing.T, xl *erasureObjects, bucket, object string, data []byte) {
 				t.Helper()
 				if _, err := xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{VersionSuspended: true}); err != nil {
 					t.Fatal(err)
@@ -739,7 +739,7 @@ func TestFastOpenGETAdditionalGoldenMetadata(t *testing.T) {
 		},
 		{
 			name: "restored-on-disk",
-			putObject: func(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte) {
+			putObject: func(ctx context.Context, t *testing.T, xl *erasureObjects, bucket, object string, data []byte) {
 				t.Helper()
 				if _, err := xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
 					t.Fatal(err)
@@ -771,7 +771,7 @@ func TestFastOpenGETAdditionalGoldenMetadata(t *testing.T) {
 		},
 		{
 			name: "object-lock-metadata",
-			putObject: func(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte) {
+			putObject: func(ctx context.Context, t *testing.T, xl *erasureObjects, bucket, object string, data []byte) {
 				t.Helper()
 				retainUntil := UTCNow().Add(24 * time.Hour).Format(time.RFC3339)
 				metadata := map[string]string{
@@ -833,7 +833,7 @@ func TestFastOpenGETAdditionalGoldenMetadata(t *testing.T) {
 			if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
 				t.Fatal(err)
 			}
-			test.putObject(t, ctx, xl, bucket, object, data)
+			test.putObject(ctx, t, xl, bucket, object, data)
 
 			baseline, baselineInfo, baselineErr := readFastOpenTestObjectOptions(t, xl, bucket, object, nil, http.Header{}, test.opts)
 			if baselineErr != nil {
@@ -865,7 +865,7 @@ func TestFastOpenGETAdditionalGoldenMetadata(t *testing.T) {
 	}
 }
 
-func putCompressedFastOpenTestObject(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte) {
+func putCompressedFastOpenTestObject(ctx context.Context, t *testing.T, xl *erasureObjects, bucket, object string, data []byte) {
 	t.Helper()
 
 	rc, idxCB := newS2CompressReader(bytes.NewReader(data), int64(len(data)), false)
@@ -890,7 +890,7 @@ func putCompressedFastOpenTestObject(t *testing.T, ctx context.Context, xl *eras
 	}
 }
 
-func putEncryptedFastOpenTestObject(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte) {
+func putEncryptedFastOpenTestObject(ctx context.Context, t *testing.T, xl *erasureObjects, bucket, object string, data []byte) {
 	t.Helper()
 
 	metadata := make(map[string]string)
@@ -927,7 +927,7 @@ func putEncryptedFastOpenTestObject(t *testing.T, ctx context.Context, xl *erasu
 	}
 }
 
-func putKMSFastOpenTestObject(t *testing.T, ctx context.Context, xl *erasureObjects, bucket, object string, data []byte) {
+func putKMSFastOpenTestObject(ctx context.Context, t *testing.T, xl *erasureObjects, bucket, object string, data []byte) {
 	t.Helper()
 
 	metadata := make(map[string]string)
@@ -1732,6 +1732,10 @@ func (d *fastOpenCountingDisk) FastOpenPart(ctx context.Context, volume, path st
 	}, nil
 }
 
+type fastOpenGetObjectNInfo interface {
+	GetObjectNInfo(ctx context.Context, bucket, object string, rs *HTTPRangeSpec, h http.Header, opts ObjectOptions) (*GetObjectReader, error)
+}
+
 func readFastOpenTestObject(t *testing.T, obj fastOpenGetObjectNInfo, bucket, object string, rs *HTTPRangeSpec) ([]byte, ObjectInfo) {
 	t.Helper()
 
@@ -1824,7 +1828,7 @@ func fastOpenGETSawBodyMode(disk *fastOpenCountingDisk, want FastOpenBodyMode) b
 	return false
 }
 
-func initFastOpenGETAPIRouter(t *testing.T, ctx context.Context, obj ObjectLayer) (http.Handler, string, string) {
+func initFastOpenGETAPIRouter(ctx context.Context, t *testing.T, obj ObjectLayer) (http.Handler, string, string) {
 	t.Helper()
 
 	oldObjectLayer := newObjectLayerFn()
@@ -1967,7 +1971,7 @@ func installFastOpenTestWarmBackend(t *testing.T, tier string, backend WarmBacke
 	})
 }
 
-func installFastOpenReplicationConfig(t *testing.T, ctx context.Context, bucket, arn string) {
+func installFastOpenReplicationConfig(ctx context.Context, t *testing.T, bucket, arn string) {
 	t.Helper()
 
 	cfg := replication.Config{

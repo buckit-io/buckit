@@ -713,7 +713,7 @@ func verifyBinary(u *url.URL, sha256Sum []byte, releaseInfo, mode string, reader
 		// Derive .minisig URL as a sibling of the final binary URL.
 		// This applies both to the default release-channel flow and to an
 		// operator-supplied direct binary URL.
-		u.Path = u.Path + ".minisig"
+		u.Path += ".minisig"
 		if err = v.LoadFromURL(u.String(), minisignPubkey, transport); err != nil {
 			return AdminError{
 				Code:       AdminUpdateApplyFailure,

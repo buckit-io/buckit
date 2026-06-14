@@ -24,6 +24,8 @@ jobs:
         os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
@@ -33,6 +35,7 @@ jobs:
         env:
           CGO_ENABLED: 0
           GO111MODULE: on
+          GOLANGCI_LINT_FLAGS: --new-from-merge-base=origin/master --whole-files
         run: |
           sudo apt install jq -y
           sudo sysctl net.ipv6.conf.all.disable_ipv6=0

@@ -70,25 +70,37 @@ type FastOpenFramePrelude struct {
 	BodyMode    FastOpenBodyMode
 }
 
+// FastOpenBodyMode describes how the payload following a FastOpen frame is encoded.
 type FastOpenBodyMode uint8
 
 const (
+	// FastOpenBodyShard streams the requested shard bytes from the local disk.
 	FastOpenBodyShard FastOpenBodyMode = iota + 1
+	// FastOpenBodyInline carries the object bytes directly in the frame body.
 	FastOpenBodyInline
+	// FastOpenBodyMetadataOnly returns metadata without a payload body.
 	FastOpenBodyMetadataOnly
+	// FastOpenBodyTransitioned indicates that the object body is remote-tiered.
 	FastOpenBodyTransitioned
 )
 
+// FastOpenFrameStatus is the object lookup result encoded in a FastOpen frame.
 type FastOpenFrameStatus uint8
 
 const (
+	// FastOpenStatusOK indicates a usable metadata frame.
 	FastOpenStatusOK FastOpenFrameStatus = iota
+	// FastOpenStatusDeleteMarker indicates that the selected version is a delete marker.
 	FastOpenStatusDeleteMarker
+	// FastOpenStatusNotFound indicates the object was not found.
 	FastOpenStatusNotFound
+	// FastOpenStatusVersionNotFound indicates the requested version was not found.
 	FastOpenStatusVersionNotFound
+	// FastOpenStatusUnsupported indicates the disk cannot serve the object through FastOpen.
 	FastOpenStatusUnsupported
 )
 
+// CoalescedMetadataFrame is the compact metadata envelope returned by FastOpenPart.
 type CoalescedMetadataFrame struct {
 	Status   FastOpenFrameStatus
 	Meta     FastOpenGETMeta
@@ -96,6 +108,7 @@ type CoalescedMetadataFrame struct {
 	BodyLen  int64
 }
 
+// FastOpenGETMeta is the subset of FileInfo needed to reconstruct GET metadata.
 type FastOpenGETMeta struct {
 	VersionID             string
 	IsLatest              bool
@@ -111,6 +124,7 @@ type FastOpenGETMeta struct {
 	SuccessorModTimeNanos int64
 }
 
+// FastOpenTransitionMeta carries remote-tier metadata for a FastOpen GET.
 type FastOpenTransitionMeta struct {
 	Status    string
 	Object    string
@@ -127,6 +141,7 @@ type FastOpenPartMeta struct {
 	ActualSize int64
 }
 
+// FastOpenErasureMeta carries erasure layout data required to decode a shard body.
 type FastOpenErasureMeta struct {
 	DataBlocks   int
 	ParityBlocks int
@@ -136,6 +151,7 @@ type FastOpenErasureMeta struct {
 	Bitrot       FastOpenBitrotMeta
 }
 
+// FastOpenBitrotMeta carries per-part checksum metadata for shard verification.
 type FastOpenBitrotMeta struct {
 	PartNumber int
 	Algorithm  uint8
