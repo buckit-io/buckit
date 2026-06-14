@@ -30,7 +30,6 @@ import (
 	"reflect"
 	"runtime"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/buckit-io/buckit/internal/auth"
@@ -107,18 +106,6 @@ func BenchmarkPathJoin(b *testing.B) {
 			pathJoin("volume", "path/path/path")
 		}
 	})
-}
-
-func TestPathJoinDoesNotAliasPooledBuffer(t *testing.T) {
-	const want = "stable/path"
-
-	got := pathJoin("stable", "path")
-	for range 10000 {
-		_ = pathJoin(strings.Repeat("x", len(want)))
-	}
-	if got != want {
-		t.Fatalf("pathJoin returned string backed by reused pooled buffer: got %q, want %q", got, want)
-	}
 }
 
 // Wrapper

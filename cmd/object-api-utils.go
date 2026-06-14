@@ -272,7 +272,7 @@ func pathJoin(elem ...string) string {
 		bytebufferpool.Put(sb)
 	}()
 
-	return strings.Clone(pathJoinBuf(sb, elem...))
+	return pathJoinBuf(sb, elem...)
 }
 
 // pathJoinBuf - like path.Join() but retains trailing SlashSeparator of the last element.

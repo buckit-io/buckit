@@ -19,6 +19,7 @@ package cmd
 
 import (
 	"bufio"
+	"bytes"
 	"crypto"
 	"crypto/sha256"
 	"crypto/tls"
@@ -679,7 +680,7 @@ func downloadBinary(u *url.URL, mode string) (binCompressed []byte, bin []byte, 
 	}
 
 	w.Close()
-	return bc.Bytes(), b.Bytes(), nil
+	return bytes.Clone(bc.Bytes()), bytes.Clone(b.Bytes()), nil
 }
 
 const (

@@ -30,6 +30,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/valyala/bytebufferpool"
 )
 
 func TestMinioVersionToReleaseTime(t *testing.T) {
@@ -514,5 +516,45 @@ func TestSelfUpdateHostedFlowIntegration(t *testing.T) {
 	}
 	if releaseInfo != "buckit.RELEASE.2026-05-11T17-20-40Z" {
 		t.Fatalf("expected release info %q, got %q", "buckit.RELEASE.2026-05-11T17-20-40Z", releaseInfo)
+	}
+}
+
+func TestDownloadBinaryReturnsOwnedBuffers(t *testing.T) {
+	bin := []byte("prefix RELEASE.2026-05-11T17-20-40Z suffix")
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/buckit" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(bin)
+	}))
+	defer ts.Close()
+
+	binURL, err := url.Parse(ts.URL + "/buckit")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	compressed, downloaded, err := downloadBinary(binURL, "")
+	if err != nil {
+		t.Fatalf("downloadBinary: %v", err)
+	}
+	wantCompressed := bytes.Clone(compressed)
+	wantDownloaded := bytes.Clone(downloaded)
+
+	overwrite := bytes.Repeat([]byte("x"), max(len(wantCompressed), len(wantDownloaded)))
+	for range 10000 {
+		b := bytebufferpool.Get()
+		_, _ = b.Write(overwrite)
+		b.Reset()
+		bytebufferpool.Put(b)
+	}
+
+	if !bytes.Equal(downloaded, wantDownloaded) {
+		t.Fatalf("downloaded binary aliases a returned bytebufferpool buffer")
+	}
+	if !bytes.Equal(compressed, wantCompressed) {
+		t.Fatalf("compressed binary aliases a returned bytebufferpool buffer")
 	}
 }
