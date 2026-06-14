@@ -47,7 +47,7 @@ lint-fix: getdeps ## runs golangci-lint suite of linters with automatic fixes
 	@$(GOLANGCI) run --build-tags kqueue --timeout=10m --config ./.golangci.yml --fix
 
 check: test
-test: build ## builds buckit and runs unit tests
+test: verifiers build ## builds buckit, runs linters, tests
 	@echo "Running unit tests"
 	@MINIO_API_REQUESTS_MAX=10000 CGO_ENABLED=0 go test -v -tags kqueue,dev ./...
 
@@ -86,7 +86,7 @@ test-upgrade: install-race
 	@echo "Running buckit upgrade tests"
 	@(env bash $(PWD)/buildscripts/minio-upgrade.sh)
 
-test-race: build ## builds buckit and runs unit tests under -race
+test-race: verifiers build ## builds buckit, runs linters, tests (race)
 	@echo "Running unit tests under -race"
 	@(env bash $(PWD)/buildscripts/race.sh)
 
