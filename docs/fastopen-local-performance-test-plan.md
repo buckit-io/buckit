@@ -2815,3 +2815,176 @@ next session should keep the existing two-host workflow, reuse
 `threaded_seed.py`, and scale object count upward from `5k` once a cleaner
 seed strategy is in place.
 ```
+
+## 14. Ubuntu Docker 2-Node Mixed Replay: OFF vs 24h ON
+
+This section records the later host-local Docker replay on `ubuntudell`. This
+is distinct from the small local single-host runs above. It uses a 2-container
+distributed Buckit cluster with host-backed data directories and a long mixed
+replay against a seeded bucket.
+
+### Rig
+
+Environment:
+
+```text
+host: ubuntudell
+cluster: 2 Buckit containers
+drives per container: 4
+drive size: 15G
+cpu limit: 1 per container
+memory limit: 2G per container
+data root: /home/rooseveltlai/buckit-docker-data
+bucket: docker-mixed-seed
+request mix: GET-heavy mixed replay with PUT and DELETE
+concurrency: 5 per host
+delay: random 100ms to 500ms before each request
+report interval: 120s
+```
+
+The ON arm reused the same seeded data and the same exported key pools as the
+OFF arm. The only intentional configuration change was:
+
+```text
+OFF: BUCKIT_FAST_GET=0
+ON:  BUCKIT_FAST_GET=1
+```
+
+### OFF Run
+
+Run directory:
+
+```text
+/home/rooseveltlai/buckit-docker-rig/results/replay-12h-5x2-20260613T132536Z-off-rebooted
+```
+
+Final GET summary:
+
+```text
+node1 completed: 605859
+node2 completed: 604879
+
+node1 GET count: 592624
+node2 GET count: 591543
+
+TTFB p50:  node1 29.707 ms  node2 29.666 ms
+TTFB p90:  node1 98.751 ms  node2 100.982 ms
+total p50: node1 32.619 ms  node2 32.581 ms
+total p90: node1 104.717 ms node2 107.123 ms
+```
+
+Cluster averages:
+
+```text
+TTFB p50:  29.687 ms
+TTFB p90:  99.867 ms
+total p50: 32.600 ms
+total p90: 105.920 ms
+```
+
+The OFF arm showed no FastOpen activity, as expected.
+
+### ON Run
+
+Run directory:
+
+```text
+/home/rooseveltlai/buckit-docker-rig/results/replay-24h-5x2-20260614T020920Z-on-rebooted-latest
+```
+
+Final GET summary:
+
+```text
+node1 completed: 1214410
+node2 completed: 1212560
+
+node1 GET count: 1187436
+node2 GET count: 1185707
+
+TTFB p50:  node1 28.263 ms  node2 28.243 ms
+TTFB p90:  node1 98.645 ms  node2 100.755 ms
+total p50: node1 31.140 ms  node2 31.125 ms
+total p90: node1 104.294 ms node2 106.797 ms
+```
+
+Cluster averages:
+
+```text
+TTFB p50:  28.253 ms
+TTFB p90:  99.700 ms
+total p50: 31.133 ms
+total p90: 105.545 ms
+```
+
+FastOpen engagement was clean throughout the ON arm:
+
+```text
+fallbacks: effectively zero in the live windows and zero at final summary level
+final errors: zero
+hits: tracked GET windows closely across the full run
+```
+
+### ON vs OFF
+
+Cluster-average GET comparison:
+
+```text
+Metric      OFF         ON          Delta
+TTFB p50    29.687 ms   28.253 ms   -1.434 ms  (-4.8%)
+TTFB p90    99.867 ms   99.700 ms   -0.167 ms  (-0.2%)
+total p50   32.600 ms   31.133 ms   -1.468 ms  (-4.5%)
+total p90   105.920 ms  105.545 ms  -0.374 ms  (-0.4%)
+```
+
+Interpretation:
+
+- FastOpen ON improved the median path materially in this Docker replay.
+- The tail at p90 was effectively flat. ON was slightly better, but the margin
+  was small.
+- The finished 24-hour ON arm did not show a clear progressive late-run
+  collapse. Hourly TTFB p50 stayed in a narrow band around `28.0` to `28.6 ms`.
+
+### Finished ON Hourly TTFB Averages
+
+```text
+hour 1:  p50 27.77 ms  p90  89.63 ms  p99 249.21 ms
+hour 2:  p50 28.27 ms  p90 101.84 ms  p99 279.31 ms
+hour 3:  p50 28.36 ms  p90 101.97 ms  p99 277.86 ms
+hour 4:  p50 28.42 ms  p90 100.45 ms  p99 280.51 ms
+hour 5:  p50 28.35 ms  p90  95.20 ms  p99 268.26 ms
+hour 6:  p50 28.43 ms  p90  99.26 ms  p99 276.69 ms
+hour 7:  p50 28.53 ms  p90  99.19 ms  p99 275.06 ms
+hour 8:  p50 28.48 ms  p90  99.50 ms  p99 281.02 ms
+hour 9:  p50 28.44 ms  p90  99.99 ms  p99 278.51 ms
+hour 10: p50 28.35 ms  p90  96.02 ms  p99 274.37 ms
+hour 11: p50 28.42 ms  p90 101.58 ms  p99 292.25 ms
+hour 12: p50 28.28 ms  p90  98.39 ms  p99 274.88 ms
+hour 13: p50 28.48 ms  p90 100.85 ms  p99 286.91 ms
+hour 14: p50 28.27 ms  p90  99.70 ms  p99 286.36 ms
+hour 15: p50 28.26 ms  p90  98.98 ms  p99 281.28 ms
+hour 16: p50 27.88 ms  p90  96.31 ms  p99 281.40 ms
+hour 17: p50 28.14 ms  p90 100.01 ms  p99 296.12 ms
+hour 18: p50 28.03 ms  p90 100.29 ms  p99 286.65 ms
+hour 19: p50 28.13 ms  p90 101.26 ms  p99 290.56 ms
+hour 20: p50 28.21 ms  p90 100.71 ms  p99 284.87 ms
+hour 21: p50 28.18 ms  p90 101.70 ms  p99 284.41 ms
+hour 22: p50 28.01 ms  p90  97.74 ms  p99 285.66 ms
+hour 23: p50 28.30 ms  p90 101.61 ms  p99 292.92 ms
+hour 24: p50 28.63 ms  p90 103.21 ms  p99 285.69 ms
+```
+
+### Artifacts
+
+Remote result directories:
+
+```text
+/home/rooseveltlai/buckit-docker-rig/results/replay-12h-5x2-20260613T132536Z-off-rebooted
+/home/rooseveltlai/buckit-docker-rig/results/replay-24h-5x2-20260614T020920Z-on-rebooted-latest
+```
+
+Local copies used during analysis:
+
+```text
+/Users/rooseveltlai/buckit-docker-rig/results/replay-12h-5x2-20260613T132536Z-off-rebooted
+/Users/rooseveltlai/buckit-docker-rig/results/replay-24h-5x2-20260614T020920Z-on-rebooted-latest
+```
