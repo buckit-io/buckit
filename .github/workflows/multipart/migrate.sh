@@ -1,9 +1,33 @@
 #!/bin/bash
 
-set -x
+set -ex
 
 ## change working directory
 cd .github/workflows/multipart/
+
+repo_root=$(cd ../../.. && pwd)
+s3_check_md5="${repo_root}/s3-check-md5"
+
+function add_host_entry() {
+	local compose_file="$1"
+	local service="$2"
+	local hostname="$3"
+	local container_id
+	local ip
+
+	if getent hosts "${hostname}" >/dev/null 2>&1; then
+		return
+	fi
+
+	container_id=$(docker compose -f "${compose_file}" ps -q "${service}")
+	ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${container_id}")
+	if [ -z "${ip}" ]; then
+		echo "Unable to resolve container IP for ${service}"
+		exit 1
+	fi
+
+	echo "${ip} ${hostname}" | sudo tee -a /etc/hosts >/dev/null
+}
 
 function cleanup() {
 	docker compose -f docker-compose-site1.yaml rm -s -f || true
@@ -29,14 +53,16 @@ export REPO=quay.io/minio/minio
 
 docker compose -f docker-compose-site1.yaml up -d
 docker compose -f docker-compose-site2.yaml up -d
+add_host_entry docker-compose-site1.yaml site1-nginx site1-nginx
+add_host_entry docker-compose-site2.yaml site2-nginx site2-nginx
 
 sleep 30s
 
 ./mc alias set site1 http://site1-nginx:9001 minioadmin minioadmin --api s3v4
 ./mc alias set site2 http://site2-nginx:9002 minioadmin minioadmin --api s3v4
 
-./mc ready site1/
-./mc ready site2/
+timeout 5m ./mc ready site1/
+timeout 5m ./mc ready site2/
 
 ./mc admin replicate add site1 site2
 ./mc mb site1/testbucket/
@@ -44,10 +70,10 @@ sleep 30s
 
 sleep 5
 
-./s3-check-md5 -h
+"${s3_check_md5}" -h
 
-failed_count_site1=$(./s3-check-md5 -versions -access-key minioadmin -secret-key minioadmin -endpoint http://site1-nginx:9001 -bucket testbucket 2>&1 | grep FAILED | wc -l)
-failed_count_site2=$(./s3-check-md5 -versions -access-key minioadmin -secret-key minioadmin -endpoint http://site2-nginx:9002 -bucket testbucket 2>&1 | grep FAILED | wc -l)
+failed_count_site1=$("${s3_check_md5}" -versions -access-key minioadmin -secret-key minioadmin -endpoint http://site1-nginx:9001 -bucket testbucket 2>&1 | grep FAILED | wc -l)
+failed_count_site2=$("${s3_check_md5}" -versions -access-key minioadmin -secret-key minioadmin -endpoint http://site2-nginx:9002 -bucket testbucket 2>&1 | grep FAILED | wc -l)
 
 if [ $failed_count_site1 -ne 0 ]; then
 	echo "failed with multipart on site1 uploads"
@@ -63,8 +89,8 @@ fi
 
 sleep 5
 
-failed_count_site1=$(./s3-check-md5 -versions -access-key minioadmin -secret-key minioadmin -endpoint http://site1-nginx:9001 -bucket testbucket 2>&1 | grep FAILED | wc -l)
-failed_count_site2=$(./s3-check-md5 -versions -access-key minioadmin -secret-key minioadmin -endpoint http://site2-nginx:9002 -bucket testbucket 2>&1 | grep FAILED | wc -l)
+failed_count_site1=$("${s3_check_md5}" -versions -access-key minioadmin -secret-key minioadmin -endpoint http://site1-nginx:9001 -bucket testbucket 2>&1 | grep FAILED | wc -l)
+failed_count_site2=$("${s3_check_md5}" -versions -access-key minioadmin -secret-key minioadmin -endpoint http://site2-nginx:9002 -bucket testbucket 2>&1 | grep FAILED | wc -l)
 
 ## we do not need to fail here, since we are going to test
 ## upgrading to master, healing and being able to recover
@@ -83,8 +109,8 @@ export REPO=quay.io/buckit/buckit
 docker compose -f docker-compose-site1.yaml up -d
 docker compose -f docker-compose-site2.yaml up -d
 
-./mc ready site1/
-./mc ready site2/
+timeout 5m ./mc ready site1/
+timeout 5m ./mc ready site2/
 
 for i in $(seq 1 10); do
 	# mc admin heal -r --remove when used against a LB endpoint
@@ -93,8 +119,8 @@ for i in $(seq 1 10); do
 	./mc admin heal -r --remove --json site2/ 2>&1 >/dev/null
 done
 
-failed_count_site1=$(./s3-check-md5 -versions -access-key minioadmin -secret-key minioadmin -endpoint http://site1-nginx:9001 -bucket testbucket 2>&1 | grep FAILED | wc -l)
-failed_count_site2=$(./s3-check-md5 -versions -access-key minioadmin -secret-key minioadmin -endpoint http://site2-nginx:9002 -bucket testbucket 2>&1 | grep FAILED | wc -l)
+failed_count_site1=$("${s3_check_md5}" -versions -access-key minioadmin -secret-key minioadmin -endpoint http://site1-nginx:9001 -bucket testbucket 2>&1 | grep FAILED | wc -l)
+failed_count_site2=$("${s3_check_md5}" -versions -access-key minioadmin -secret-key minioadmin -endpoint http://site2-nginx:9002 -bucket testbucket 2>&1 | grep FAILED | wc -l)
 
 if [ $failed_count_site1 -ne 0 ]; then
 	echo "failed with multipart on site1 uploads"
