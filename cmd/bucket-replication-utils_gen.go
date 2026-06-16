@@ -903,7 +903,7 @@ func (z *ReplicationState) DecodeMsg(dc *msgp.Reader) (err error) {
 					return
 				}
 				var za0004 VersionPurgeStatusType
-				err = za0004.DecodeMsg(dc)
+				err = (*replication.VersionPurgeStatusType)(&za0004).DecodeMsg(dc)
 				if err != nil {
 					err = msgp.WrapError(err, "PurgeTargets", za0003)
 					return
@@ -1060,7 +1060,7 @@ func (z *ReplicationState) EncodeMsg(en *msgp.Writer) (err error) {
 			err = msgp.WrapError(err, "PurgeTargets")
 			return
 		}
-		err = za0004.EncodeMsg(en)
+		err = (*replication.VersionPurgeStatusType)(&za0004).EncodeMsg(en)
 		if err != nil {
 			err = msgp.WrapError(err, "PurgeTargets", za0003)
 			return
@@ -1136,7 +1136,7 @@ func (z *ReplicationState) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.AppendMapHeader(o, uint32(len(z.PurgeTargets)))
 	for za0003, za0004 := range z.PurgeTargets {
 		o = msgp.AppendString(o, za0003)
-		o, err = za0004.MarshalMsg(o)
+		o, err = (*replication.VersionPurgeStatusType)(&za0004).MarshalMsg(o)
 		if err != nil {
 			err = msgp.WrapError(err, "PurgeTargets", za0003)
 			return
@@ -1261,7 +1261,7 @@ func (z *ReplicationState) UnmarshalMsg(bts []byte) (o []byte, err error) {
 					err = msgp.WrapError(err, "PurgeTargets")
 					return
 				}
-				bts, err = za0004.UnmarshalMsg(bts)
+				bts, err = (*replication.VersionPurgeStatusType)(&za0004).UnmarshalMsg(bts)
 				if err != nil {
 					err = msgp.WrapError(err, "PurgeTargets", za0003)
 					return
@@ -1321,7 +1321,7 @@ func (z *ReplicationState) Msgsize() (s int) {
 	if z.PurgeTargets != nil {
 		for za0003, za0004 := range z.PurgeTargets {
 			_ = za0004
-			s += msgp.StringPrefixSize + len(za0003) + za0004.Msgsize()
+			s += msgp.StringPrefixSize + len(za0003) + (*replication.VersionPurgeStatusType)(&za0004).Msgsize()
 		}
 	}
 	s += 17 + msgp.MapHeaderSize

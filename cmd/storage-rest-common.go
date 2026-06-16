@@ -20,7 +20,7 @@ package cmd
 //go:generate msgp -file $GOFILE -unexported
 
 const (
-	storageRESTVersion       = "v63" // Introduce RenamePart and ReadParts API
+	storageRESTVersion       = "v64" // Introduce FastOpenPart API
 	storageRESTVersionPrefix = SlashSeparator + storageRESTVersion
 	storageRESTPrefix        = minioReservedBucketPath + "/storage"
 )
@@ -36,6 +36,7 @@ const (
 	storageRESTMethodReadAll        = "/rall"
 	storageRESTMethodReadFile       = "/rfile"
 	storageRESTMethodReadFileStream = "/rfilest"
+	storageRESTMethodFastOpenPart   = "/fopenpart"
 	storageRESTMethodListDir        = "/ls"
 	storageRESTMethodDeleteVersions = "/dvers"
 	storageRESTMethodRenameFile     = "/rfile"
@@ -72,6 +73,9 @@ const (
 	storageRESTOrigVolume       = "ovol"
 	storageRESTInclFreeVersions = "incl-fv"
 	storageRESTRange            = "rng"
+	storageRESTFastOpenVersion  = "fov"
+	storageRESTPartNumber       = "pnum"
+	storageRESTFastOpenFlags    = "foflags"
 )
 
 type nsScannerOptions struct {

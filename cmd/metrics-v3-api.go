@@ -19,6 +19,7 @@ package cmd
 
 import (
 	"context"
+	"time"
 
 	"github.com/buckit-io/minio-go/v7/pkg/set"
 )
@@ -32,12 +33,31 @@ const (
 	apiRequestsWaitingTotal  MetricName = "waiting_total"
 	apiRequestsIncomingTotal MetricName = "incoming_total"
 
-	apiRequestsInFlightTotal  MetricName = "inflight_total"
-	apiRequestsTotal          MetricName = "total"
-	apiRequestsErrorsTotal    MetricName = "errors_total"
-	apiRequests5xxErrorsTotal MetricName = "5xx_errors_total"
-	apiRequests4xxErrorsTotal MetricName = "4xx_errors_total"
-	apiRequestsCanceledTotal  MetricName = "canceled_total"
+	apiRequestsInFlightTotal             MetricName = "inflight_total"
+	apiRequestsTotal                     MetricName = "total"
+	apiRequestsErrorsTotal               MetricName = "errors_total"
+	apiRequests5xxErrorsTotal            MetricName = "5xx_errors_total"
+	apiRequests4xxErrorsTotal            MetricName = "4xx_errors_total"
+	apiRequestsCanceledTotal             MetricName = "canceled_total"
+	apiRequestsFastOpenAttempted         MetricName = "fast_open_attempted_total"
+	apiRequestsFastOpenHits              MetricName = "fast_open_hits_total"
+	apiRequestsFastOpenUnsupported       MetricName = "fast_open_unsupported_total"
+	apiRequestsFastOpenReplacementPath   MetricName = "fast_open_replacement_path_total"
+	apiRequestsFastOpenStreamsOpened     MetricName = "fast_open_streams_opened_total"
+	apiRequestsFastOpenReplacementOpen   MetricName = "fast_open_replacement_opens_total"
+	apiRequestsFastOpenFailures          MetricName = "fast_open_selected_set_failures_total"
+	apiRequestsFastOpenStreamCancels     MetricName = "fast_open_stream_cancellations_total"
+	apiRequestsFastOpenFinalErrors       MetricName = "fast_open_final_errors_total"
+	apiRequestsFastOpenConnGot           MetricName = "fast_open_httptrace_connections_total"
+	apiRequestsFastOpenConnReused        MetricName = "fast_open_httptrace_reused_connections_total"
+	apiRequestsFastOpenConnFresh         MetricName = "fast_open_httptrace_fresh_connections_total"
+	apiRequestsFastOpenConnWasIdle       MetricName = "fast_open_httptrace_was_idle_connections_total"
+	apiRequestsFastOpenTrySeconds        MetricName = "fast_open_try_seconds_total"
+	apiRequestsFastOpenTryCount          MetricName = "fast_open_try_seconds_count"
+	apiRequestsFastOpenOpenInfoSeconds   MetricName = "fast_open_open_info_seconds_total"
+	apiRequestsFastOpenOpenInfoCount     MetricName = "fast_open_open_info_seconds_count"
+	apiRequestsFastOpenBodyDecodeSeconds MetricName = "fast_open_body_decode_seconds_total"
+	apiRequestsFastOpenBodyDecodeCount   MetricName = "fast_open_body_decode_seconds_count"
 
 	apiRequestsTTFBSecondsDistribution MetricName = "ttfb_seconds_distribution"
 
@@ -72,6 +92,44 @@ var (
 		"Total number of requests with 4xx errors", "name", "type")
 	apiRequestsCanceledTotalMD = NewCounterMD(apiRequestsCanceledTotal,
 		"Total number of requests canceled by the client", "name", "type")
+	apiRequestsFastOpenAttemptedMD = NewCounterMD(apiRequestsFastOpenAttempted,
+		"Total number of GET requests attempted on the FastOpen path", "type")
+	apiRequestsFastOpenHitsMD = NewCounterMD(apiRequestsFastOpenHits,
+		"Total number of GET requests decided by the FastOpen path, including object-level errors", "type")
+	apiRequestsFastOpenUnsupportedMD = NewCounterMD(apiRequestsFastOpenUnsupported,
+		"Total number of FastOpen-eligible requests that fell back before response commit", "type")
+	apiRequestsFastOpenReplacementPathMD = NewCounterMD(apiRequestsFastOpenReplacementPath,
+		"Total number of FastOpen GET requests that used the replacement path", "type")
+	apiRequestsFastOpenStreamsOpenedMD = NewCounterMD(apiRequestsFastOpenStreamsOpened,
+		"Total number of FastOpenPart streams opened by GET requests", "type")
+	apiRequestsFastOpenReplacementOpenMD = NewCounterMD(apiRequestsFastOpenReplacementOpen,
+		"Total number of non-zero-offset FastOpenPart replacement streams opened by GET requests", "type")
+	apiRequestsFastOpenFailuresMD = NewCounterMD(apiRequestsFastOpenFailures,
+		"Total number of FastOpen selected-set failures by reason", "reason", "type")
+	apiRequestsFastOpenStreamCancelsMD = NewCounterMD(apiRequestsFastOpenStreamCancels,
+		"Total number of FastOpenPart streams canceled by GET request cleanup", "type")
+	apiRequestsFastOpenFinalErrorsMD = NewCounterMD(apiRequestsFastOpenFinalErrors,
+		"Total number of FastOpen GET requests that returned an object-level error by category", "category", "type")
+	apiRequestsFastOpenConnGotMD = NewCounterMD(apiRequestsFastOpenConnGot,
+		"Total number of FastOpenPart HTTP connections observed by httptrace", "type")
+	apiRequestsFastOpenConnReusedMD = NewCounterMD(apiRequestsFastOpenConnReused,
+		"Total number of FastOpenPart HTTP connections reported as reused by httptrace", "type")
+	apiRequestsFastOpenConnFreshMD = NewCounterMD(apiRequestsFastOpenConnFresh,
+		"Total number of FastOpenPart HTTP connections reported as fresh by httptrace", "type")
+	apiRequestsFastOpenConnWasIdleMD = NewCounterMD(apiRequestsFastOpenConnWasIdle,
+		"Total number of FastOpenPart HTTP connections reported as previously idle by httptrace", "type")
+	apiRequestsFastOpenTrySecondsMD = NewCounterMD(apiRequestsFastOpenTrySeconds,
+		"Total wall time spent in tryFastOpenGET", "type")
+	apiRequestsFastOpenTryCountMD = NewCounterMD(apiRequestsFastOpenTryCount,
+		"Total number of timed tryFastOpenGET calls", "type")
+	apiRequestsFastOpenOpenInfoSecondsMD = NewCounterMD(apiRequestsFastOpenOpenInfoSeconds,
+		"Total wall time spent opening FastOpen GET info", "type")
+	apiRequestsFastOpenOpenInfoCountMD = NewCounterMD(apiRequestsFastOpenOpenInfoCount,
+		"Total number of timed FastOpen GET info opens", "type")
+	apiRequestsFastOpenBodyDecodeSecondsMD = NewCounterMD(apiRequestsFastOpenBodyDecodeSeconds,
+		"Total wall time spent decoding FastOpen GET bodies", "type")
+	apiRequestsFastOpenBodyDecodeCountMD = NewCounterMD(apiRequestsFastOpenBodyDecodeCount,
+		"Total number of timed FastOpen GET body decodes", "type")
 
 	apiRequestsTTFBSecondsDistributionMD = NewCounterMD(apiRequestsTTFBSecondsDistribution,
 		"Distribution of time to first byte across API calls", "name", "type", "le")
@@ -120,6 +178,29 @@ func loadAPIRequestsHTTPMetrics(ctx context.Context, m MetricValues, _ *metricsC
 	}
 	for name, value := range httpStats.TotalS3Canceled.APIStats {
 		m.Set(apiRequestsCanceledTotal, float64(value), "name", name, "type", "s3")
+	}
+	m.Set(apiRequestsFastOpenAttempted, float64(globalFastOpenMetrics.attempted.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenHits, float64(globalFastOpenMetrics.hits.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenUnsupported, float64(globalFastOpenMetrics.unsupported.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenReplacementPath, float64(globalFastOpenMetrics.replacementPath.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenStreamsOpened, float64(globalFastOpenMetrics.streamsOpened.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenReplacementOpen, float64(globalFastOpenMetrics.replacementOpen.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenStreamCancels, float64(globalFastOpenMetrics.streamCancels.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenConnGot, float64(globalFastOpenMetrics.connGot.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenConnReused, float64(globalFastOpenMetrics.connReused.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenConnFresh, float64(globalFastOpenMetrics.connFresh.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenConnWasIdle, float64(globalFastOpenMetrics.connWasIdle.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenTrySeconds, float64(globalFastOpenMetrics.tryNS.Load())/float64(time.Second), "type", "s3")
+	m.Set(apiRequestsFastOpenTryCount, float64(globalFastOpenMetrics.tryCount.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenOpenInfoSeconds, float64(globalFastOpenMetrics.openInfoNS.Load())/float64(time.Second), "type", "s3")
+	m.Set(apiRequestsFastOpenOpenInfoCount, float64(globalFastOpenMetrics.openInfoCount.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenBodyDecodeSeconds, float64(globalFastOpenMetrics.bodyDecodeNS.Load())/float64(time.Second), "type", "s3")
+	m.Set(apiRequestsFastOpenBodyDecodeCount, float64(globalFastOpenMetrics.bodyDecodeCount.Load()), "type", "s3")
+	for reason := fastOpenFailureReason(0); reason < fastOpenFailureCount; reason++ {
+		m.Set(apiRequestsFastOpenFailures, float64(globalFastOpenMetrics.failures[reason].Load()), "reason", reason.String(), "type", "s3")
+	}
+	for category := fastOpenFinalErrorCategory(0); category < fastOpenFinalErrorCount; category++ {
+		m.Set(apiRequestsFastOpenFinalErrors, float64(globalFastOpenMetrics.finalErrors[category].Load()), "category", category.String(), "type", "s3")
 	}
 	return nil
 }

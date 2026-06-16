@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"path"
 	"strconv"
@@ -32,13 +33,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/bpool"
 	"github.com/buckit-io/buckit/internal/cachevalue"
 	"github.com/buckit-io/buckit/internal/grid"
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/buckit/internal/rest"
+	"github.com/buckit-io/madmin-go/v3"
 	xnet "github.com/minio/pkg/v3/net"
 	xbufio "github.com/philhofer/fwd"
 	"github.com/tinylib/msgp/msgp"
@@ -146,6 +147,16 @@ func toStorageErr(err error) error {
 		return errMaxVersionsExceeded
 	case errInconsistentDisk.Error():
 		return errInconsistentDisk
+	case errFastOpenFrameBadVersion.Error():
+		return errFastOpenFrameBadVersion
+	case errFastOpenFrameHeaderTooLarge.Error():
+		return errFastOpenFrameHeaderTooLarge
+	case errFastOpenFrameBadBodyMode.Error():
+		return errFastOpenFrameBadBodyMode
+	case errFastOpenFrameBadStatus.Error():
+		return errFastOpenFrameBadStatus
+	case errFastOpenFrameBadBitrot.Error():
+		return errFastOpenFrameBadBitrot
 	case errDriveIsRoot.Error():
 		return errDriveIsRoot
 	case errDiskOngoingReq.Error():
@@ -180,6 +191,22 @@ func (client *storageRESTClient) callGet(ctx context.Context, rpcMethod string, 
 		values = make(url.Values)
 	}
 	values.Set(storageRESTDiskID, *client.diskID.Load())
+	if rpcMethod == storageRESTMethodFastOpenPart {
+		trace := &httptrace.ClientTrace{
+			GotConn: func(info httptrace.GotConnInfo) {
+				globalFastOpenMetrics.connGot.Add(1)
+				if info.Reused {
+					globalFastOpenMetrics.connReused.Add(1)
+				} else {
+					globalFastOpenMetrics.connFresh.Add(1)
+				}
+				if info.WasIdle {
+					globalFastOpenMetrics.connWasIdle.Add(1)
+				}
+			},
+		}
+		ctx = httptrace.WithClientTrace(ctx, trace)
+	}
 	respBody, err := client.restClient.CallWithHTTPMethod(ctx, http.MethodGet, rpcMethod, values, body, length)
 	if err != nil {
 		return nil, toStorageErr(err)
@@ -403,6 +430,40 @@ func (client *storageRESTClient) CreateFile(ctx context.Context, origvolume, vol
 	}
 	_, err = waitForHTTPResponse(respBody)
 	return toStorageErr(err)
+}
+
+func (client *storageRESTClient) FastOpenPart(ctx context.Context, volume, path string, req FastOpenPartRequest) (io.ReadCloser, error) {
+	ctx, cancel := context.WithCancel(ctx)
+
+	values := make(url.Values)
+	values.Set(storageRESTVolume, volume)
+	values.Set(storageRESTFilePath, path)
+	values.Set(storageRESTFastOpenVersion, strconv.FormatUint(uint64(req.Version), 10))
+	values.Set(storageRESTVersionID, req.VersionID)
+	values.Set(storageRESTPartNumber, strconv.Itoa(req.PartNumber))
+	values.Set(storageRESTOffset, strconv.FormatInt(req.Offset, 10))
+	values.Set(storageRESTLength, strconv.FormatInt(req.Length, 10))
+	values.Set(storageRESTFastOpenFlags, strconv.FormatUint(uint64(req.Flags), 10))
+
+	respBody, err := client.callGet(ctx, storageRESTMethodFastOpenPart, values, nil, -1)
+	if err != nil {
+		cancel()
+		return nil, toStorageErr(err)
+	}
+	return &fastOpenRemoteReadCloser{
+		ReadCloser: respBody,
+		cancel:     cancel,
+	}, nil
+}
+
+type fastOpenRemoteReadCloser struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (rc *fastOpenRemoteReadCloser) Close() error {
+	rc.cancel()
+	return rc.ReadCloser.Close()
 }
 
 func (client *storageRESTClient) WriteMetadata(ctx context.Context, origvolume, volume, path string, fi FileInfo) error {

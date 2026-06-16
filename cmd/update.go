@@ -19,6 +19,7 @@ package cmd
 
 import (
 	"bufio"
+	"bytes"
 	"crypto"
 	"crypto/sha256"
 	"crypto/tls"
@@ -44,7 +45,6 @@ import (
 	xnet "github.com/minio/pkg/v3/net"
 	"github.com/minio/selfupdate"
 	gopsutilcpu "github.com/shirou/gopsutil/v3/cpu"
-	"github.com/valyala/bytebufferpool"
 )
 
 const (
@@ -659,22 +659,18 @@ func downloadBinary(u *url.URL, mode string) (binCompressed []byte, bin []byte, 
 	}
 	defer xhttp.DrainBody(reader)
 
-	b := bytebufferpool.Get()
-	bc := bytebufferpool.Get()
-	defer func() {
-		b.Reset()
-		bc.Reset()
+	// Use local buffers (not bytebufferpool) so the returned slices solely own
+	// their backing arrays. Pooling here is unsafe (the returned slices would
+	// alias buffers handed back to the pool) and inappropriate for binaries that
+	// can be hundreds of MB, which would also bloat the shared pool.
+	var b, bc bytes.Buffer
 
-		bytebufferpool.Put(b)
-		bytebufferpool.Put(bc)
-	}()
-
-	w, err := zstd.NewWriter(bc)
+	w, err := zstd.NewWriter(&bc)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if _, err = io.Copy(w, io.TeeReader(reader, b)); err != nil {
+	if _, err = io.Copy(w, io.TeeReader(reader, &b)); err != nil {
 		return nil, nil, err
 	}
 
@@ -717,7 +713,7 @@ func verifyBinary(u *url.URL, sha256Sum []byte, releaseInfo, mode string, reader
 		// Derive .minisig URL as a sibling of the final binary URL.
 		// This applies both to the default release-channel flow and to an
 		// operator-supplied direct binary URL.
-		u.Path = u.Path + ".minisig"
+		u.Path += ".minisig"
 		if err = v.LoadFromURL(u.String(), minisignPubkey, transport); err != nil {
 			return AdminError{
 				Code:       AdminUpdateApplyFailure,

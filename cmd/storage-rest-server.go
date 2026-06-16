@@ -38,13 +38,13 @@ import (
 	"github.com/buckit-io/buckit/internal/grid"
 	"github.com/tinylib/msgp/msgp"
 
-	jwtreq "github.com/golang-jwt/jwt/v4/request"
-	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/config"
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	xjwt "github.com/buckit-io/buckit/internal/jwt"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/madmin-go/v3"
+	jwtreq "github.com/golang-jwt/jwt/v4/request"
 	"github.com/minio/mux"
 	xnet "github.com/minio/pkg/v3/net"
 )
@@ -626,6 +626,58 @@ func (s *storageRESTServer) ReadFileStreamHandler(w http.ResponseWriter, r *http
 
 	_, err = xioutil.Copy(w, rc)
 	if !xnet.IsNetworkOrHostDown(err, true) { // do not need to log disconnected clients
+		storageLogIf(r.Context(), err)
+	}
+}
+
+func (s *storageRESTServer) FastOpenPartHandler(w http.ResponseWriter, r *http.Request) {
+	if !s.IsValid(w, r) {
+		return
+	}
+	volume := r.Form.Get(storageRESTVolume)
+	filePath := r.Form.Get(storageRESTFilePath)
+	version, err := strconv.ParseUint(r.Form.Get(storageRESTFastOpenVersion), 10, 16)
+	if err != nil {
+		s.writeErrorResponse(w, err)
+		return
+	}
+	partNumber, err := strconv.Atoi(r.Form.Get(storageRESTPartNumber))
+	if err != nil {
+		s.writeErrorResponse(w, err)
+		return
+	}
+	offset, err := strconv.ParseInt(r.Form.Get(storageRESTOffset), 10, 64)
+	if err != nil {
+		s.writeErrorResponse(w, err)
+		return
+	}
+	length, err := strconv.ParseInt(r.Form.Get(storageRESTLength), 10, 64)
+	if err != nil {
+		s.writeErrorResponse(w, err)
+		return
+	}
+	flags, err := strconv.ParseUint(r.Form.Get(storageRESTFastOpenFlags), 10, 32)
+	if err != nil {
+		s.writeErrorResponse(w, err)
+		return
+	}
+
+	rc, err := s.getStorage().FastOpenPart(r.Context(), volume, filePath, FastOpenPartRequest{
+		Version:    uint16(version),
+		VersionID:  r.Form.Get(storageRESTVersionID),
+		PartNumber: partNumber,
+		Offset:     offset,
+		Length:     length,
+		Flags:      FastOpenPartFlags(flags),
+	})
+	if err != nil {
+		s.writeErrorResponse(w, err)
+		return
+	}
+	defer rc.Close()
+
+	_, err = xioutil.Copy(w, rc)
+	if !xnet.IsNetworkOrHostDown(err, true) {
 		storageLogIf(r.Context(), err)
 	}
 }
@@ -1369,6 +1421,7 @@ func registerStorageRESTHandlers(router *mux.Router, endpointServerPools Endpoin
 			subrouter.Methods(http.MethodPost).Path(storageRESTVersionPrefix + storageRESTMethodReadParts).HandlerFunc(h(server.ReadPartsHandler))
 
 			subrouter.Methods(http.MethodGet).Path(storageRESTVersionPrefix + storageRESTMethodReadFileStream).HandlerFunc(h(server.ReadFileStreamHandler))
+			subrouter.Methods(http.MethodGet).Path(storageRESTVersionPrefix + storageRESTMethodFastOpenPart).HandlerFunc(h(server.FastOpenPartHandler))
 			subrouter.Methods(http.MethodGet).Path(storageRESTVersionPrefix + storageRESTMethodReadVersion).HandlerFunc(h(server.ReadVersionHandler))
 			subrouter.Methods(http.MethodGet).Path(storageRESTVersionPrefix + storageRESTMethodReadXL).HandlerFunc(h(server.ReadXLHandler))
 			subrouter.Methods(http.MethodGet).Path(storageRESTVersionPrefix + storageRESTMethodReadFile).HandlerFunc(h(server.ReadFileHandler))

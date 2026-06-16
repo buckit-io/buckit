@@ -35,9 +35,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/klauspost/readahead"
-	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7/pkg/tags"
 	"github.com/buckit-io/buckit/internal/bucket/lifecycle"
 	"github.com/buckit-io/buckit/internal/bucket/object/lock"
 	"github.com/buckit-io/buckit/internal/bucket/replication"
@@ -49,6 +46,9 @@ import (
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7/pkg/tags"
+	"github.com/klauspost/readahead"
 	"github.com/minio/pkg/v3/mimedb"
 	"github.com/minio/pkg/v3/sync/errgroup"
 	"github.com/minio/sio"
@@ -204,7 +204,6 @@ func (er erasureObjects) GetObjectNInfo(ctx context.Context, bucket, object stri
 	if !opts.NoAuditLog {
 		auditObjectErasureSet(ctx, "GetObject", object, &er)
 	}
-
 	var unlockOnDefer bool
 	nsUnlocker := func() {}
 	defer func() {
@@ -236,6 +235,27 @@ func (er erasureObjects) GetObjectNInfo(ctx context.Context, bucket, object stri
 		nsUnlocker = func() { lock.RUnlock(lkctx) }
 	}
 
+	if fastOpenGETRequestEligible(bucket, h, rs, opts) {
+		globalFastOpenMetrics.attempted.Add(1)
+		gr, ok, err := er.tryFastOpenGET(ctx, bucket, object, rs, h, opts, nsUnlocker)
+		if err != nil {
+			if ok {
+				globalFastOpenMetrics.hits.Add(1)
+				fastOpenRecordFinalError(ctx, err)
+			}
+			return gr, err
+		}
+		if ok {
+			unlockOnDefer = false
+			globalFastOpenMetrics.hits.Add(1)
+			return gr, nil
+		}
+		globalFastOpenMetrics.unsupported.Add(1)
+		globalFastOpenMetrics.failures[fastOpenFailureUnsupported].Add(1)
+		if globalFastGetNoFallback {
+			return nil, toObjectErr(errFastGetNoFallback, bucket, object)
+		}
+	}
 	fi, metaArr, onlineDisks, err := er.getObjectFileInfo(ctx, bucket, object, opts, true)
 	if err != nil {
 		return nil, toObjectErr(err, bucket, object)
@@ -386,7 +406,6 @@ func (er erasureObjects) getObjectWithFileInfo(ctx context.Context, bucket, obje
 			// Prefer local disks
 			prefer[index] = disk.Hostname() == ""
 		}
-
 		written, err := erasure.Decode(ctx, writer, readers, partOffset, partLength, partSize, prefer)
 		// Note: we should not be defer'ing the following closeBitrotReaders() call as
 		// we are inside a for loop i.e if we use defer, we would accumulate a lot of open files by the time

@@ -31,11 +31,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/cachevalue"
 	"github.com/buckit-io/buckit/internal/grid"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/madmin-go/v3"
 )
 
 //go:generate stringer -type=storageMetric -trimprefix=storageMetric $GOFILE
@@ -74,6 +74,7 @@ const (
 	storageMetricDeleteBulk
 	storageMetricRenamePart
 	storageMetricReadParts
+	storageMetricFastOpenPart
 
 	// .... add more
 
@@ -451,9 +452,10 @@ func (p *xlStorageDiskIDCheck) ReadFileStream(ctx context.Context, volume, path 
 	}
 	defer done(length, &err)
 
-	return xioutil.WithDeadline[io.ReadCloser](ctx, globalDriveConfig.GetMaxTimeout(), func(ctx context.Context) (result io.ReadCloser, err error) {
+	result, err := xioutil.WithDeadline[io.ReadCloser](ctx, globalDriveConfig.GetMaxTimeout(), func(ctx context.Context) (result io.ReadCloser, err error) {
 		return p.storage.ReadFileStream(ctx, volume, path, offset, length)
 	})
+	return result, err
 }
 
 func (p *xlStorageDiskIDCheck) RenamePart(ctx context.Context, srcVolume, srcPath, dstVolume, dstPath string, meta []byte, skipParent string) (err error) {

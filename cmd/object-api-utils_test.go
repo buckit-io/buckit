@@ -32,10 +32,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/klauspost/compress/s2"
 	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/buckit-io/buckit/internal/config/compress"
 	"github.com/buckit-io/buckit/internal/crypto"
+	"github.com/klauspost/compress/s2"
 	"github.com/minio/pkg/v3/trie"
 )
 
