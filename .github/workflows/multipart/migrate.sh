@@ -6,8 +6,8 @@ set -x
 cd .github/workflows/multipart/
 
 function cleanup() {
-	docker-compose -f docker-compose-site1.yaml rm -s -f || true
-	docker-compose -f docker-compose-site2.yaml rm -s -f || true
+	docker compose -f docker-compose-site1.yaml rm -s -f || true
+	docker compose -f docker-compose-site2.yaml rm -s -f || true
 	for volume in $(docker volume ls -q | grep minio); do
 		docker volume rm ${volume} || true
 	done
@@ -27,8 +27,8 @@ fi
 export RELEASE=RELEASE.2023-08-29T23-07-35Z
 export REPO=quay.io/minio/minio
 
-docker-compose -f docker-compose-site1.yaml up -d
-docker-compose -f docker-compose-site2.yaml up -d
+docker compose -f docker-compose-site1.yaml up -d
+docker compose -f docker-compose-site2.yaml up -d
 
 sleep 30s
 
@@ -80,8 +80,8 @@ fi
 export RELEASE=${1}
 export REPO=quay.io/buckit/buckit
 
-docker-compose -f docker-compose-site1.yaml up -d
-docker-compose -f docker-compose-site2.yaml up -d
+docker compose -f docker-compose-site1.yaml up -d
+docker compose -f docker-compose-site2.yaml up -d
 
 ./mc ready site1/
 ./mc ready site2/

@@ -18,7 +18,7 @@ cd .github/workflows/mint
 ## always pull latest
 docker pull docker.io/minio/mint:edge
 
-docker-compose -f minio-${MODE}.yaml up -d
+docker compose -f minio-${MODE}.yaml up -d
 sleep 1m
 
 docker system prune -f || true
@@ -26,11 +26,11 @@ docker volume prune -f || true
 docker volume rm $(docker volume ls -q -f dangling=true) || true
 
 # Stop two nodes, one of each pool, to check that all S3 calls work while quorum is still there
-[ "${MODE}" == "pools" ] && docker-compose -f minio-${MODE}.yaml stop minio2
-[ "${MODE}" == "pools" ] && docker-compose -f minio-${MODE}.yaml stop minio6
+[ "${MODE}" == "pools" ] && docker compose -f minio-${MODE}.yaml stop minio2
+[ "${MODE}" == "pools" ] && docker compose -f minio-${MODE}.yaml stop minio6
 
 # Pause one node, to check that all S3 calls work while one node goes wrong
-[ "${MODE}" == "resiliency" ] && docker-compose -f minio-${MODE}.yaml pause minio4
+[ "${MODE}" == "resiliency" ] && docker compose -f minio-${MODE}.yaml pause minio4
 
 docker run --rm --net=mint_default \
 	--name="mint-${MODE}-${JOB_NAME}" \
@@ -43,7 +43,7 @@ docker run --rm --net=mint_default \
 
 # FIXME: enable this after fixing aws-sdk-java-v2 tests
 # # unpause the node, to check that all S3 calls work while one node goes wrong
-# [ "${MODE}" == "resiliency" ] && docker-compose -f minio-${MODE}.yaml unpause minio4
+# [ "${MODE}" == "resiliency" ] && docker compose -f minio-${MODE}.yaml unpause minio4
 # [ "${MODE}" == "resiliency" ] && docker run --rm --net=mint_default \
 # 	--name="mint-${MODE}-${JOB_NAME}" \
 # 	-e SERVER_ENDPOINT="nginx:9000" \
@@ -53,7 +53,7 @@ docker run --rm --net=mint_default \
 # 	-e MINT_MODE="${MINT_MODE}" \
 # 	docker.io/minio/mint:edge
 
-docker-compose -f minio-${MODE}.yaml down || true
+docker compose -f minio-${MODE}.yaml down || true
 sleep 10s
 
 docker system prune -f || true

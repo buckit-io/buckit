@@ -20,13 +20,9 @@ permissions:
 
 jobs:
   mint-test:
-    runs-on: mint
+    runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - name: cleanup #https://github.com/actions/checkout/issues/273
-        run: |
-          sudo -S rm -rf ${GITHUB_WORKSPACE}
-          mkdir ${GITHUB_WORKSPACE}
       - name: checkout-step
         uses: actions/checkout@v4
 
@@ -69,12 +65,12 @@ jobs:
         run: |
           export JOB_NAME=${{ steps.vars.outputs.sha_short }}
           for mode in $(echo compress-encrypt pools erasure); do
-             docker-compose -f ${GITHUB_WORKSPACE}/.github/workflows/mint/minio-${mode}.yaml down || true
-             docker-compose -f ${GITHUB_WORKSPACE}/.github/workflows/mint/minio-${mode}.yaml rm || true
+             docker compose -f ${GITHUB_WORKSPACE}/.github/workflows/mint/minio-${mode}.yaml down || true
+             docker compose -f ${GITHUB_WORKSPACE}/.github/workflows/mint/minio-${mode}.yaml rm || true
           done
 
-          docker-compose -f ${GITHUB_WORKSPACE}/.github/workflows/multipart/docker-compose-site1.yaml rm -s -f || true
-          docker-compose -f ${GITHUB_WORKSPACE}/.github/workflows/multipart/docker-compose-site2.yaml rm -s -f || true
+          docker compose -f ${GITHUB_WORKSPACE}/.github/workflows/multipart/docker-compose-site1.yaml rm -s -f || true
+          docker compose -f ${GITHUB_WORKSPACE}/.github/workflows/multipart/docker-compose-site2.yaml rm -s -f || true
           for volume in $(docker volume ls -q | grep minio); do
             docker volume rm ${volume} || true
           done
