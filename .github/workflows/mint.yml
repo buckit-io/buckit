@@ -37,7 +37,8 @@ jobs:
 
       - name: build-buckit
         run: |
-          TAG="quay.io/buckit/buckit:${{ steps.vars.outputs.sha_short }}" make docker
+          make build
+          docker build -q --no-cache -t "quay.io/buckit/buckit:${{ steps.vars.outputs.sha_short }}" -f .github/workflows/Dockerfile.mint .
 
       - name: multipart uploads test
         run: |
