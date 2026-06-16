@@ -74,6 +74,7 @@ const (
 	storageMetricDeleteBulk
 	storageMetricRenamePart
 	storageMetricReadParts
+	storageMetricFastOpenPart
 
 	// .... add more
 

@@ -649,15 +649,28 @@ func TestFastOpenGETTransformedFullObjectEndToEnd(t *testing.T) {
 			},
 		},
 		{
-			name: "encrypted",
+			name: "sse-s3",
 			init: func(t *testing.T) {
 				enableEncryption(t)
 			},
 			putObject: putEncryptedFastOpenTestObject,
 			verifyInfo: func(t *testing.T, info ObjectInfo) {
 				t.Helper()
-				if _, encrypted := crypto.IsEncrypted(info.UserDefined); !encrypted {
-					t.Fatal("object is not encrypted")
+				if !crypto.S3.IsEncrypted(info.UserDefined) {
+					t.Fatalf("object is not SSE-S3 encrypted: %#v", info.UserDefined)
+				}
+			},
+		},
+		{
+			name: "sse-kms",
+			init: func(t *testing.T) {
+				enableEncryption(t)
+			},
+			putObject: putKMSFastOpenTestObject,
+			verifyInfo: func(t *testing.T, info ObjectInfo) {
+				t.Helper()
+				if !crypto.S3KMS.IsEncrypted(info.UserDefined) {
+					t.Fatalf("object is not SSE-KMS encrypted: %#v", info.UserDefined)
 				}
 			},
 		},
@@ -697,8 +710,8 @@ func TestFastOpenGETTransformedFullObjectEndToEnd(t *testing.T) {
 
 			globalFastGetEnabled = true
 			fast, fastInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
-			if !bytes.Equal(fast, baseline) {
-				t.Fatalf("fastopen %s bytes differ from baseline: got %d bytes, want %d", test.name, len(fast), len(baseline))
+			if !bytes.Equal(fast, baseline) || !bytes.Equal(fast, data) {
+				t.Fatalf("fastopen %s bytes differ: fast=%d baseline=%d plaintext=%d", test.name, len(fast), len(baseline), len(data))
 			}
 			assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 			test.verifyInfo(t, fastInfo)
@@ -783,6 +796,19 @@ func TestFastOpenGETAdditionalGoldenMetadata(t *testing.T) {
 					info.UserDefined[strings.ToLower(xhttp.AmzObjectLockLegalHold)] != "ON" ||
 					info.UserDefined[strings.ToLower(xhttp.AmzObjectLockRetainUntilDate)] == "" {
 					t.Fatalf("object-lock metadata = %#v", info.UserDefined)
+				}
+			},
+		},
+		{
+			name: "sse-s3",
+			init: func(t *testing.T) {
+				enableEncryption(t)
+			},
+			putObject: putEncryptedFastOpenTestObject,
+			verifyInfo: func(t *testing.T, info ObjectInfo) {
+				t.Helper()
+				if !crypto.S3.IsEncrypted(info.UserDefined) {
+					t.Fatalf("object is not SSE-S3 encrypted: %#v", info.UserDefined)
 				}
 			},
 		},

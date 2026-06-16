@@ -199,6 +199,42 @@ func TestFastOpenEmptyChecksumsUseCanonicalDefaultBitrot(t *testing.T) {
 	}
 }
 
+func TestFastOpenBitrotMappingCoversSupportedAlgorithms(t *testing.T) {
+	supported := []BitrotAlgorithm{SHA256, HighwayHash256, HighwayHash256S, BLAKE2b512}
+	if len(supported) != len(bitrotAlgorithms) {
+		t.Fatalf("FastOpen bitrot mapping covers %d algorithms, want %d", len(supported), len(bitrotAlgorithms))
+	}
+
+	for _, algo := range supported {
+		code, err := fastOpenBitrotCode(algo)
+		if err != nil {
+			t.Fatalf("algorithm %v missing FastOpen code: %v", algo, err)
+		}
+		got, err := fastOpenBitrotAlgorithm(code)
+		if err != nil {
+			t.Fatalf("code %d missing FastOpen algorithm: %v", code, err)
+		}
+		if got != algo {
+			t.Fatalf("code %d round-tripped to %v, want %v", code, got, algo)
+		}
+		gotCode, err := fastOpenBitrotCode(got)
+		if err != nil {
+			t.Fatalf("round-tripped algorithm %v missing FastOpen code: %v", got, err)
+		}
+		if gotCode != code {
+			t.Fatalf("algorithm %v round-tripped to code %d, want %d", algo, gotCode, code)
+		}
+	}
+
+	code, err := fastOpenBitrotCode(HighwayHash256S)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code != 3 {
+		t.Fatalf("HighwayHash256S FastOpen code = %d, want 3", code)
+	}
+}
+
 func TestFastOpenExplicitChecksumIsPreserved(t *testing.T) {
 	fi := testFastOpenFileInfo()
 	fi.Erasure.Checksums = []ChecksumInfo{{

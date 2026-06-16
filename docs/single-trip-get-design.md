@@ -85,7 +85,7 @@ the same abstraction for local and remote disks.
 
 ## 3. FastOpen frame protocol
 
-The protocol is defined in [cmd/fastopen-frame.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastopen-frame.go:1).
+The protocol is defined in [cmd/fastopen-frame.go](../cmd/fastopen-frame.go).
 
 Each successful FastOpen stream begins with:
 
@@ -127,7 +127,7 @@ Important design point:
 ## 4. Request eligibility
 
 FastOpen is intentionally narrow. The request-level gate is implemented in
-[cmd/fastopen-get.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastopen-get.go:175).
+[cmd/fastopen-get.go](../cmd/fastopen-get.go).
 
 FastOpen is attempted only when:
 
@@ -156,7 +156,7 @@ results rather than streamed shard decode.
 
 ## 5. Landing-node read flow
 
-The read path lives in [cmd/fastopen-get.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastopen-get.go:1).
+The read path lives in [cmd/fastopen-get.go](../cmd/fastopen-get.go).
 
 ### 5.1 First wave
 
@@ -299,7 +299,7 @@ Fallback is always safe because the canonical layout was never changed.
 
 FastOpen observability is exposed under
 `/minio/metrics/v3/api/requests` in
-[cmd/metrics-v3-api.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/metrics-v3-api.go:1).
+[cmd/metrics-v3-api.go](../cmd/metrics-v3-api.go).
 
 Counters include:
 
@@ -377,9 +377,9 @@ on top of Buckit's existing metadata and erasure semantics.
 
 ## 11. References
 
-- [cmd/fastopen-frame.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastopen-frame.go:1) - FastOpen frame protocol and compact metadata encoding
-- [cmd/fastopen-part.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastopen-part.go:1) - disk-side `FastOpenPart` implementation
-- [cmd/fastopen-get.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastopen-get.go:1) - landing-node FastOpen GET path
-- [cmd/fastget-config.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/fastget-config.go:1) - runtime flags
-- [cmd/metrics-v3-api.go](/Users/rooseveltlai/develop/buckit-io/buckit/cmd/metrics-v3-api.go:1) - exported metrics
-- [docs/single-trip-get-phase1-implementation.md](/Users/rooseveltlai/develop/buckit-io/buckit/docs/single-trip-get-phase1-implementation.md:1) - historical prototype/implementation notes
+- [cmd/fastopen-frame.go](../cmd/fastopen-frame.go) - FastOpen frame protocol and compact metadata encoding
+- [cmd/fastopen-part.go](../cmd/fastopen-part.go) - disk-side `FastOpenPart` implementation
+- [cmd/fastopen-get.go](../cmd/fastopen-get.go) - landing-node FastOpen GET path
+- [cmd/fastget-config.go](../cmd/fastget-config.go) - runtime flags
+- [cmd/metrics-v3-api.go](../cmd/metrics-v3-api.go) - exported metrics
+- [docs/single-trip-get-phase1-implementation.md](single-trip-get-phase1-implementation.md) - historical prototype/implementation notes

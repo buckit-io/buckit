@@ -142,7 +142,7 @@ func (s *xlStorage) FastOpenPart(ctx context.Context, volume, object string, req
 }
 
 func (p *xlStorageDiskIDCheck) FastOpenPart(ctx context.Context, volume, object string, req FastOpenPartRequest) (rc io.ReadCloser, err error) {
-	ctx, done, err := p.TrackDiskHealth(ctx, storageMetricReadVersion, volume, object)
+	ctx, done, err := p.TrackDiskHealth(ctx, storageMetricFastOpenPart, volume, object)
 	if err != nil {
 		return nil, err
 	}
