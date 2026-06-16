@@ -39,8 +39,6 @@ const (
 	apiRequests5xxErrorsTotal            MetricName = "5xx_errors_total"
 	apiRequests4xxErrorsTotal            MetricName = "4xx_errors_total"
 	apiRequestsCanceledTotal             MetricName = "canceled_total"
-	apiRequestsFastGetHits               MetricName = "fast_get_hits_total"
-	apiRequestsFastGetFallbacks          MetricName = "fast_get_fallbacks_total"
 	apiRequestsFastOpenAttempted         MetricName = "fast_open_attempted_total"
 	apiRequestsFastOpenHits              MetricName = "fast_open_hits_total"
 	apiRequestsFastOpenUnsupported       MetricName = "fast_open_unsupported_total"
@@ -94,14 +92,10 @@ var (
 		"Total number of requests with 4xx errors", "name", "type")
 	apiRequestsCanceledTotalMD = NewCounterMD(apiRequestsCanceledTotal,
 		"Total number of requests canceled by the client", "name", "type")
-	apiRequestsFastGetHitsMD = NewCounterMD(apiRequestsFastGetHits,
-		"Total number of GET requests served by the FastOpen path", "type")
-	apiRequestsFastGetFallbacksMD = NewCounterMD(apiRequestsFastGetFallbacks,
-		"Total number of FastOpen-eligible GET requests that fell back to the normal path", "type")
 	apiRequestsFastOpenAttemptedMD = NewCounterMD(apiRequestsFastOpenAttempted,
 		"Total number of GET requests attempted on the FastOpen path", "type")
 	apiRequestsFastOpenHitsMD = NewCounterMD(apiRequestsFastOpenHits,
-		"Total number of GET requests served by the FastOpen path", "type")
+		"Total number of GET requests decided by the FastOpen path, including object-level errors", "type")
 	apiRequestsFastOpenUnsupportedMD = NewCounterMD(apiRequestsFastOpenUnsupported,
 		"Total number of FastOpen-eligible requests that fell back before response commit", "type")
 	apiRequestsFastOpenReplacementPathMD = NewCounterMD(apiRequestsFastOpenReplacementPath,
@@ -185,8 +179,6 @@ func loadAPIRequestsHTTPMetrics(ctx context.Context, m MetricValues, _ *metricsC
 	for name, value := range httpStats.TotalS3Canceled.APIStats {
 		m.Set(apiRequestsCanceledTotal, float64(value), "name", name, "type", "s3")
 	}
-	m.Set(apiRequestsFastGetHits, float64(fastGetHits.Load()), "type", "s3")
-	m.Set(apiRequestsFastGetFallbacks, float64(fastGetFallbacks.Load()), "type", "s3")
 	m.Set(apiRequestsFastOpenAttempted, float64(globalFastOpenMetrics.attempted.Load()), "type", "s3")
 	m.Set(apiRequestsFastOpenHits, float64(globalFastOpenMetrics.hits.Load()), "type", "s3")
 	m.Set(apiRequestsFastOpenUnsupported, float64(globalFastOpenMetrics.unsupported.Load()), "type", "s3")

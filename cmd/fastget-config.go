@@ -20,7 +20,6 @@ package cmd
 import (
 	"errors"
 	"os"
-	"sync/atomic"
 )
 
 const (
@@ -58,8 +57,6 @@ var (
 	globalFastGetEnabled         = globalFastGetRuntimeConfig.enabled
 	globalFastGetSpreadSelection = globalFastGetRuntimeConfig.spreadSelection
 	globalFastGetNoFallback      = globalFastGetRuntimeConfig.noFallback
-	fastGetHits                  atomic.Uint64
-	fastGetFallbacks             atomic.Uint64
 )
 
 var errFastGetNoFallback = errors.New("FastOpen unavailable and fallback disabled")

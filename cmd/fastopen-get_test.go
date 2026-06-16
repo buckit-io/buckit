@@ -79,8 +79,7 @@ func TestFastOpenGETEndToEnd(t *testing.T) {
 	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
 
 	globalFastGetEnabled = true
-	fastGetHits.Store(0)
-	fastGetFallbacks.Store(0)
+	resetFastOpenMetrics()
 	fast, fastInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
 	if !bytes.Equal(fast, baseline) {
 		t.Fatalf("fastopen bytes differ from baseline: got %d bytes, want %d", len(fast), len(baseline))
@@ -184,8 +183,7 @@ func TestFastOpenGETGoldenVersionedDeleteAndZero(t *testing.T) {
 			baseline, baselineInfo, baselineErr := readFastOpenTestObjectOptions(t, xl, bucket, test.object, nil, http.Header{}, test.opts)
 
 			globalFastGetEnabled = true
-			fastGetHits.Store(0)
-			fastGetFallbacks.Store(0)
+			resetFastOpenMetrics()
 			fastOpts := test.opts
 			fastOpts.FastGetObjInfo = true
 			fast, fastInfo, fastErr := readFastOpenTestObjectOptions(t, xl, bucket, test.object, nil, http.Header{}, fastOpts)
@@ -202,8 +200,8 @@ func TestFastOpenGETGoldenVersionedDeleteAndZero(t *testing.T) {
 				t.Fatalf("bytes differ: baseline=%d fast=%d want=%d", len(baseline), len(fast), len(test.wantBytes))
 			}
 			assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
-			if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
-				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", fastGetHits.Load(), fastGetFallbacks.Load())
+			if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.unsupported.Load() != 0 {
+				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.unsupported.Load())
 			}
 			assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 		})
@@ -256,16 +254,15 @@ func TestFastOpenGETMultipartFallsBack(t *testing.T) {
 	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
 
 	globalFastGetEnabled = true
-	fastGetHits.Store(0)
-	fastGetFallbacks.Store(0)
+	resetFastOpenMetrics()
 	fast, fastInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
 	globalFastGetEnabled = false
 	if !bytes.Equal(fast, baseline) || !bytes.Equal(fast, append(append([]byte(nil), part1...), part2...)) {
 		t.Fatalf("multipart bytes differ: fast=%d baseline=%d", len(fast), len(baseline))
 	}
 	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
-	if fastGetHits.Load() != 0 || fastGetFallbacks.Load() == 0 {
-		t.Fatalf("fast counters hits=%d fallbacks=%d, want 0/>0", fastGetHits.Load(), fastGetFallbacks.Load())
+	if globalFastOpenMetrics.hits.Load() != 0 || globalFastOpenMetrics.unsupported.Load() == 0 {
+		t.Fatalf("fast counters hits=%d fallbacks=%d, want 0/>0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.unsupported.Load())
 	}
 	if got := globalFastOpenMetrics.unsupported.Load(); got != 1 {
 		t.Fatalf("fastopen unsupported metric = %d, want 1", got)
@@ -332,8 +329,7 @@ func TestFastOpenGETHandlerChecksumAndLifecycleHeaders(t *testing.T) {
 
 	resetFastOpenGETOpenCounts(countingDisks)
 	globalFastGetEnabled = true
-	fastGetHits.Store(0)
-	fastGetFallbacks.Store(0)
+	resetFastOpenMetrics()
 	fastRec, fastBody := doFastOpenGETHandlerRequest(t, router, bucket, object, accessKey, secretKey, headers)
 	globalFastGetEnabled = false
 
@@ -348,8 +344,8 @@ func TestFastOpenGETHandlerChecksumAndLifecycleHeaders(t *testing.T) {
 			t.Fatalf("%s header differs: fast=%v baseline=%v", header, got, want)
 		}
 	}
-	if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
-		t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", fastGetHits.Load(), fastGetFallbacks.Load())
+	if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.unsupported.Load() != 0 {
+		t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.unsupported.Load())
 	}
 	assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 }
@@ -400,8 +396,7 @@ func TestFastOpenGETRemoteTierWithBackend(t *testing.T) {
 	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
 
 	globalFastGetEnabled = true
-	fastGetHits.Store(0)
-	fastGetFallbacks.Store(0)
+	resetFastOpenMetrics()
 	fast, fastInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
 	globalFastGetEnabled = false
 
@@ -415,8 +410,8 @@ func TestFastOpenGETRemoteTierWithBackend(t *testing.T) {
 	if backend.gets.Load() != 2 {
 		t.Fatalf("warm backend GETs = %d, want 2", backend.gets.Load())
 	}
-	if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
-		t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", fastGetHits.Load(), fastGetFallbacks.Load())
+	if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.unsupported.Load() != 0 {
+		t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.unsupported.Load())
 	}
 	assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 }
@@ -512,8 +507,7 @@ func TestFastOpenGETReplicationConfiguredMetadata(t *testing.T) {
 			baseline, baselineInfo, baselineErr := readFastOpenTestObjectOptions(t, xl, bucket, test.object, nil, http.Header{}, test.opts)
 
 			globalFastGetEnabled = true
-			fastGetHits.Store(0)
-			fastGetFallbacks.Store(0)
+			resetFastOpenMetrics()
 			fastOpts := test.opts
 			fastOpts.FastGetObjInfo = true
 			fast, fastInfo, fastErr := readFastOpenTestObjectOptions(t, xl, bucket, test.object, nil, http.Header{}, fastOpts)
@@ -531,8 +525,8 @@ func TestFastOpenGETReplicationConfiguredMetadata(t *testing.T) {
 			}
 			assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 			test.verify(t, fastInfo)
-			if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
-				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", fastGetHits.Load(), fastGetFallbacks.Load())
+			if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.unsupported.Load() != 0 {
+				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.unsupported.Load())
 			}
 			assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 		})
@@ -843,8 +837,7 @@ func TestFastOpenGETAdditionalGoldenMetadata(t *testing.T) {
 			countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
 
 			globalFastGetEnabled = true
-			fastGetHits.Store(0)
-			fastGetFallbacks.Store(0)
+			resetFastOpenMetrics()
 			fastOpts := test.opts
 			fastOpts.FastGetObjInfo = true
 			fast, fastInfo, fastErr := readFastOpenTestObjectOptions(t, xl, bucket, object, nil, http.Header{}, fastOpts)
@@ -857,8 +850,8 @@ func TestFastOpenGETAdditionalGoldenMetadata(t *testing.T) {
 			}
 			assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 			test.verifyInfo(t, fastInfo)
-			if fastGetHits.Load() != 1 || fastGetFallbacks.Load() != 0 {
-				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", fastGetHits.Load(), fastGetFallbacks.Load())
+			if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.unsupported.Load() != 0 {
+				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.unsupported.Load())
 			}
 			assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 		})
@@ -1009,8 +1002,7 @@ func TestFastOpenGETNotFoundCountsAsHit(t *testing.T) {
 	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
 
 	globalFastGetEnabled = true
-	fastGetHits.Store(0)
-	fastGetFallbacks.Store(0)
+	resetFastOpenMetrics()
 	gr, err := xl.GetObjectNInfo(t.Context(), bucket, object, nil, http.Header{}, ObjectOptions{FastGetObjInfo: true})
 	if err == nil {
 		if gr != nil {

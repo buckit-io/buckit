@@ -303,8 +303,6 @@ FastOpen observability is exposed under
 
 Counters include:
 
-- `fast_get_hits_total`
-- `fast_get_fallbacks_total`
 - `fast_open_attempted_total`
 - `fast_open_hits_total`
 - `fast_open_unsupported_total`

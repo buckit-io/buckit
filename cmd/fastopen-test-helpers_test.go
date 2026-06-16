@@ -115,8 +115,6 @@ func withFastOpenEnabled(t *testing.T, enabled bool) {
 	}
 	globalStorageClass.Update(defaultStorageClass)
 	globalFastGetEnabled = enabled
-	fastGetHits.Store(0)
-	fastGetFallbacks.Store(0)
 	resetFastOpenMetrics()
 	t.Cleanup(func() {
 		globalFastGetEnabled = oldEnabled
@@ -126,8 +124,6 @@ func withFastOpenEnabled(t *testing.T, enabled bool) {
 		globalCompressConfigMu.Lock()
 		globalCompressConfig = oldCompressConfig
 		globalCompressConfigMu.Unlock()
-		fastGetHits.Store(0)
-		fastGetFallbacks.Store(0)
 		resetFastOpenMetrics()
 	})
 }
@@ -161,8 +157,8 @@ func resetFastOpenMetrics() {
 func assertFastOpenCounterDelta(t *testing.T, hitsBefore, fallbacksBefore, wantHits, wantFallbacks uint64, label string) {
 	t.Helper()
 
-	gotHits := fastGetHits.Load() - hitsBefore
-	gotFallbacks := fastGetFallbacks.Load() - fallbacksBefore
+	gotHits := globalFastOpenMetrics.hits.Load() - hitsBefore
+	gotFallbacks := globalFastOpenMetrics.unsupported.Load() - fallbacksBefore
 	if gotHits != wantHits || gotFallbacks != wantFallbacks {
 		t.Fatalf("%s counters delta = hits:%d fallbacks:%d, want hits:%d fallbacks:%d", label, gotHits, gotFallbacks, wantHits, wantFallbacks)
 	}
