@@ -254,19 +254,19 @@ function test_resiliency_healing_truncated_parts() {
 	WANT='{ "before": { "color": "green", "missing": 0, "corrupted": 1 }, "after": { "color": "green", "missing": 0, "corrupted": 0 }, "args": {"file": "'${FILE}'", "dir": "'${DIR}'"} }'
 	verify_resiliency_healing "${FUNCNAME[0]}" "${WANT}"
 
-	# Truncate two parts -- status becomes yellow (2 missing)
+	# Use a deep scan so the pre-heal color reflects the truncated parts instead of scanner timing.
 	OUTPUT=$(docker exec resiliency-minio2-1 /bin/sh -c "truncate --size=10K /data{$((DATA_DRIVE))..$((DATA_DRIVE + 1))}/test-bucket/initial-data/$FILE/*/part.1")
-	WANT='{ "before": { "color": "yellow", "missing": 0, "corrupted": 2 }, "after": { "color": "green", "missing": 0, "corrupted": 0 }, "args": {"file": "'${FILE}'", "dir": "'${DIR}'"} }'
+	WANT='{ "before": { "color": "yellow", "missing": 0, "corrupted": 2 }, "after": { "color": "green", "missing": 0, "corrupted": 0 }, "args": {"file": "'${FILE}'", "dir": "'${DIR}'", "deep": true} }'
 	verify_resiliency_healing "${FUNCNAME[0]}" "${WANT}"
 
-	# Truncate three parts -- status becomes red (3 missing)
+	# Use a deep scan so the pre-heal color reflects the truncated parts instead of scanner timing.
 	OUTPUT=$(docker exec resiliency-minio3-1 /bin/sh -c "truncate --size=10K /data{$((DATA_DRIVE))..$((DATA_DRIVE + 2))}/test-bucket/initial-data/$FILE/*/part.1")
-	WANT='{ "before": { "color": "red", "missing": 0, "corrupted": 3 }, "after": { "color": "green", "missing": 0, "corrupted": 0 }, "args": {"file": "'${FILE}'", "dir": "'${DIR}'"} }'
+	WANT='{ "before": { "color": "red", "missing": 0, "corrupted": 3 }, "after": { "color": "green", "missing": 0, "corrupted": 0 }, "args": {"file": "'${FILE}'", "dir": "'${DIR}'", "deep": true} }'
 	verify_resiliency_healing "${FUNCNAME[0]}" "${WANT}"
 
-	# Truncate four parts -- status becomes red (4 missing)
+	# Use a deep scan so the pre-heal color reflects the truncated parts instead of scanner timing.
 	OUTPUT=$(docker exec resiliency-minio4-1 /bin/sh -c "truncate --size=10K /data{$((DATA_DRIVE))..$((DATA_DRIVE + 3))}/test-bucket/initial-data/$FILE/*/part.1")
-	WANT='{ "before": { "color": "red", "missing": 0, "corrupted": 4 }, "after": { "color": "green", "missing": 0, "corrupted": 0 }, "args": {"file": "'${FILE}'", "dir": "'${DIR}'"} }'
+	WANT='{ "before": { "color": "red", "missing": 0, "corrupted": 4 }, "after": { "color": "green", "missing": 0, "corrupted": 0 }, "args": {"file": "'${FILE}'", "dir": "'${DIR}'", "deep": true} }'
 	verify_resiliency_healing "${FUNCNAME[0]}" "${WANT}"
 }
 
