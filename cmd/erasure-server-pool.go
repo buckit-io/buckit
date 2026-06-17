@@ -32,17 +32,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dustin/go-humanize"
-	"github.com/google/uuid"
-	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7/pkg/s3utils"
-	"github.com/buckit-io/minio-go/v7/pkg/set"
-	"github.com/buckit-io/minio-go/v7/pkg/tags"
 	"github.com/buckit-io/buckit/internal/bpool"
 	"github.com/buckit-io/buckit/internal/cachevalue"
 	"github.com/buckit-io/buckit/internal/config/storageclass"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7/pkg/s3utils"
+	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/buckit-io/minio-go/v7/pkg/tags"
+	"github.com/dustin/go-humanize"
+	"github.com/google/uuid"
 	"github.com/minio/pkg/v3/sync/errgroup"
 	"github.com/minio/pkg/v3/wildcard"
 	"github.com/minio/pkg/v3/workers"
@@ -1153,7 +1153,15 @@ func (z *erasureServerPools) DeleteObject(ctx context.Context, bucket string, ob
 		if _, ok := err.(InsufficientReadQuorum); ok {
 			return objInfo, InsufficientWriteQuorum{}
 		}
+		if opts.HasIfMatch && (isErrObjectNotFound(err) || isErrVersionNotFound(err)) {
+			return objInfo, PreConditionFailed{}
+		}
 		return objInfo, err
+	}
+
+	if opts.CheckPrecondFn != nil && opts.CheckPrecondFn(pinfo.ObjInfo) {
+		pinfo.ObjInfo.Name = decodeDirObject(object)
+		return pinfo.ObjInfo, PreConditionFailed{}
 	}
 
 	// Delete marker already present we are not going to create new delete markers.

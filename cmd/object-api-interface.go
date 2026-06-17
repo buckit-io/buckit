@@ -23,13 +23,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/buckit-io/buckit/internal/bucket/replication"
+	"github.com/buckit-io/buckit/internal/hash"
+	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/minio-go/v7/pkg/encrypt"
 	"github.com/buckit-io/minio-go/v7/pkg/tags"
-	"github.com/buckit-io/buckit/internal/hash"
-
-	"github.com/buckit-io/buckit/internal/bucket/replication"
-	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 )
 
 //go:generate msgp -file $GOFILE -io=false -tests=false -unexported=false
@@ -77,7 +76,7 @@ type ObjectOptions struct {
 	MaxParts            int                 // used in GetObjectAttributes. Signals how many parts we should return
 	PartNumberMarker    int                 // used in GetObjectAttributes. Signals the part number after which results should be returned
 	PartNumber          int                 // only useful in case of GetObject/HeadObject
-	CheckPrecondFn      CheckPreconditionFn // only set during GetObject/HeadObject/CopyObjectPart preconditional valuation
+	CheckPrecondFn      CheckPreconditionFn // only set when evaluating object preconditions
 	EvalMetadataFn      EvalMetadataFn      // only set for retention settings, meant to be used only when updating metadata in-place.
 	DeleteReplication   ReplicationState    // Represents internal replication state needed for Delete replication
 	Transition          TransitionOptions
