@@ -23,6 +23,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	xhttp "github.com/buckit-io/buckit/internal/http"
 	"github.com/klauspost/compress/gzhttp"
 )
 
@@ -130,6 +131,9 @@ func TestGetURLScheme(t *testing.T) {
 func TestTrackingResponseWriter(t *testing.T) {
 	rw := httptest.NewRecorder()
 	trw := &trackingResponseWriter{ResponseWriter: rw}
+	if _, ok := any(trw).(http.Flusher); !ok {
+		t.Fatal("trackingResponseWriter does not implement http.Flusher")
+	}
 	trw.WriteHeader(299)
 	if !trw.headerWritten {
 		t.Fatal("headerWritten was not set by WriteHeader call")
@@ -156,6 +160,35 @@ func TestTrackingResponseWriter(t *testing.T) {
 	// Check that Unwrap works
 	if trw.Unwrap() != rw {
 		t.Fatalf("Unwrap returned wrong result: %v", trw.Unwrap())
+	}
+}
+
+func TestTrackingResponseWriterFlush(t *testing.T) {
+	rw := httptest.NewRecorder()
+	trw := &trackingResponseWriter{ResponseWriter: rw}
+
+	trw.Flush()
+
+	if !trw.headerWritten {
+		t.Fatal("headerWritten was not set by Flush call")
+	}
+	if !rw.Flushed {
+		t.Fatal("Flush was not forwarded to the underlying response writer")
+	}
+}
+
+func TestTrackingResponseWriterFlushWrappedRecorder(t *testing.T) {
+	rw := httptest.NewRecorder()
+	rec := xhttp.NewResponseRecorder(rw)
+	trw := &trackingResponseWriter{ResponseWriter: rec}
+
+	xhttp.Flush(trw)
+
+	if !trw.headerWritten {
+		t.Fatal("headerWritten was not set by wrapped Flush call")
+	}
+	if !rw.Flushed {
+		t.Fatal("Flush was not forwarded through the wrapped response recorder")
 	}
 }
 
