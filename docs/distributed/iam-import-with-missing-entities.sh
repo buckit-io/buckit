@@ -39,6 +39,7 @@ sleep 30
 	group_search_base_dn=ou=swengg,dc=min,dc=io group_search_filter="(&(objectclass=groupOfNames)(member=%d))"
 
 ./mc admin service restart myminio --json
+sleep 5
 ./mc ready myminio
 ./mc admin cluster iam import myminio docs/distributed/samples/myminio-iam-info.zip
 sleep 10
@@ -86,6 +87,7 @@ sleep 30
 	group_search_base_dn=ou=hwengg,dc=min,dc=io group_search_filter="(&(objectclass=groupOfNames)(member=%d))"
 
 ./mc admin service restart myminio1 --json
+sleep 5
 ./mc ready myminio1
 ./mc admin cluster iam import myminio1 docs/distributed/samples/myminio-iam-info.zip
 sleep 10
