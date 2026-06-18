@@ -1,14 +1,24 @@
 #!/bin/sh
 # install-linux.sh — Linux native-package installer helper for buckit.
 #
-# Detects this host's package manager (dnf/yum/zypper, apt/dpkg, or apk),
-# downloads the matching .rpm/.deb/.apk for the latest stable release,
-# verifies its published SHA-256 checksum, and prints the exact command
-# to install it. It does NOT run the package manager for you — the final
-# install (which needs root) is left to you to review and run.
+# Detects this host's package manager (dnf/yum/zypper, apt/apt-get/dpkg, or
+# apk), downloads the matching .rpm/.deb/.apk for the latest stable release,
+# and verifies its published SHA-256 checksum.
+#
+# Modes:
+#   (default)   Print the install command and stop. Does NOT run the package
+#               manager — the final install (which needs root) is left to you
+#               to review and run.
+#   --install   Non-interactive: after a successful download and checksum
+#               verification, run the detected install command automatically.
+#               Intended for docs and automation.
 #
 # Usage:
+#   # Print-only (default):
 #   curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh
+#
+#   # Download, verify, and install automatically:
+#   curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh -s -- --install
 #
 # Environment overrides:
 #   BUCKIT_PAGES_BASE     gh-pages base URL
@@ -32,6 +42,25 @@ err() {
 
 info() {
 	echo "==> $*"
+}
+
+usage() {
+	cat <<'EOF'
+Usage: install-linux.sh [--install] [-h|--help]
+
+  (default)   download + verify the package, then print the install command
+  --install   download + verify, then run the install command automatically
+EOF
+}
+
+# run_install PKGFILE runs the detected install command on PKGFILE.
+# INSTALL_CMD holds fixed command words (none contain spaces or globs), so the
+# unquoted expansion below intentionally word-splits it into separate
+# arguments while PKGFILE stays a single quoted argument. This keeps execution
+# reliable in POSIX sh without resorting to eval.
+run_install() {
+	# shellcheck disable=SC2086
+	$INSTALL_CMD "$1"
 }
 
 # detect_arch sets ARCH to the Go-style arch tuple (amd64 / arm64) and
@@ -140,6 +169,19 @@ pkg_version() {
 }
 
 main() {
+	install_mode=0
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		--install) install_mode=1 ;;
+		-h | --help)
+			usage
+			exit 0
+			;;
+		*) err "unknown argument: $1 (try --help)" ;;
+		esac
+		shift
+	done
+
 	detect_arch
 	detect_pkg
 	info "platform: linux-$ARCH ($PKG)"
@@ -200,9 +242,16 @@ main() {
 	echo "Downloaded and verified:"
 	echo "  $pkgfile"
 	echo
-	echo "To install, run:"
-	echo "  $INSTALL_CMD \"$pkgfile\""
-	echo
+
+	if [ "$install_mode" -eq 1 ]; then
+		info "installing package"
+		echo "  $INSTALL_CMD \"$pkgfile\""
+		run_install "$pkgfile"
+	else
+		echo "To install, run:"
+		echo "  $INSTALL_CMD \"$pkgfile\""
+		echo
+	fi
 }
 
 main "$@"
