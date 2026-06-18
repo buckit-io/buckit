@@ -25,11 +25,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/buckit-io/minio-go/v7/pkg/encrypt"
 	"github.com/buckit-io/buckit/internal/crypto"
 	"github.com/buckit-io/buckit/internal/hash"
 	xhttp "github.com/buckit-io/buckit/internal/http"
+	"github.com/buckit-io/minio-go/v7/pkg/encrypt"
+	"github.com/google/uuid"
 )
 
 func getDefaultOpts(header http.Header, copySource bool, metadata map[string]string) (opts ObjectOptions, err error) {
@@ -286,6 +286,15 @@ func delOpts(ctx context.Context, r *http.Request, bucket, object string) (opts 
 	}
 
 	opts.DeletePrefix = deletePrefix
+	if ifMatch := r.Header.Get(xhttp.IfMatch); ifMatch != "" {
+		opts.HasIfMatch = true
+		opts.CheckPrecondFn = func(oi ObjectInfo) bool {
+			if oi.DeleteMarker {
+				return true
+			}
+			return !isETagEqual(oi.ETag, ifMatch)
+		}
+	}
 	opts.Versioned = globalBucketVersioningSys.PrefixEnabled(bucket, object)
 	// Objects matching prefixes should not leave delete markers,
 	// dramatically reduces namespace pollution while keeping the

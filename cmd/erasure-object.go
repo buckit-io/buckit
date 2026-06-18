@@ -2004,12 +2004,18 @@ func (er erasureObjects) DeleteObject(ctx context.Context, bucket, object string
 			}
 			tryDel = true // only for unversioned objects if there is write quorum
 		}
+		if opts.HasIfMatch && (isErrObjectNotFound(gerr) || isErrVersionNotFound(gerr)) {
+			return objInfo, PreConditionFailed{}
+		}
 		// For delete marker replication, versionID being replicated will not exist on disk
 		if opts.DeleteMarker {
 			versionFound = false
 		} else if !tryDel {
 			return objInfo, gerr
 		}
+	}
+	if gerr == nil && opts.CheckPrecondFn != nil && opts.CheckPrecondFn(goi) {
+		return goi, PreConditionFailed{}
 	}
 
 	if opts.EvalMetadataFn != nil {

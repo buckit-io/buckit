@@ -21,8 +21,8 @@ import (
 	"net"
 	"net/http"
 
-	consoleapi "github.com/buckit-io/console/api"
 	xhttp "github.com/buckit-io/buckit/internal/http"
+	consoleapi "github.com/buckit-io/console/api"
 	"github.com/minio/mux"
 	"github.com/minio/pkg/v3/wildcard"
 	"github.com/rs/cors"
@@ -443,7 +443,7 @@ func registerAPIRouter(router *mux.Router) {
 			Queries("notification", "")
 		// ListenNotification
 		router.Methods(http.MethodGet).
-			HandlerFunc(s3APIMiddleware(api.ListenNotificationHandler, noThrottleS3HFlag, traceHdrsS3HFlag)).
+			HandlerFunc(s3APIMiddleware(api.ListenNotificationHandler, noGZS3HFlag, noThrottleS3HFlag, traceHdrsS3HFlag)).
 			Queries("events", "{events:.*}")
 		// ResetBucketReplicationStatus - MinIO extension API
 		router.Methods(http.MethodGet).
@@ -631,7 +631,7 @@ func registerAPIRouter(router *mux.Router) {
 
 	// ListenNotification
 	apiRouter.Methods(http.MethodGet).Path(SlashSeparator).
-		HandlerFunc(s3APIMiddleware(api.ListenNotificationHandler, noThrottleS3HFlag, traceHdrsS3HFlag)).
+		HandlerFunc(s3APIMiddleware(api.ListenNotificationHandler, noGZS3HFlag, noThrottleS3HFlag, traceHdrsS3HFlag)).
 		Queries("events", "{events:.*}")
 
 	// ListBuckets

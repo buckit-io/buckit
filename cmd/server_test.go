@@ -34,11 +34,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dustin/go-humanize"
-	jwtgo "github.com/golang-jwt/jwt/v4"
+	xhttp "github.com/buckit-io/buckit/internal/http"
 	"github.com/buckit-io/minio-go/v7/pkg/set"
 	"github.com/buckit-io/minio-go/v7/pkg/signer"
-	xhttp "github.com/buckit-io/buckit/internal/http"
+	"github.com/dustin/go-humanize"
+	jwtgo "github.com/golang-jwt/jwt/v4"
 	"github.com/minio/pkg/v3/policy"
 )
 
@@ -770,10 +770,56 @@ func (s *TestSuiteCommon) TestDeleteObject(c *check) {
 	c.Assert(err, nil)
 	// Assert the HTTP response status code.
 	c.Assert(response.StatusCode, http.StatusOK)
+	etag := response.Header.Get(xhttp.ETag)
+	c.Assert(etag != "", true)
+
+	signedDeleteRequest := func(objectName string, headers map[string]string) (*http.Request, error) {
+		if s.signer == signerV2 {
+			return newTestSignedRequestV2(http.MethodDelete, getDeleteObjectURL(s.endPoint, bucketName, objectName),
+				0, nil, s.accessKey, s.secretKey, headers)
+		}
+		return newTestSignedRequestV4(http.MethodDelete, getDeleteObjectURL(s.endPoint, bucketName, objectName),
+			0, nil, s.accessKey, s.secretKey, headers)
+	}
+
+	// Delete with a wrong If-Match ETag should fail and leave the object in place.
+	request, err = signedDeleteRequest(objectName, map[string]string{xhttp.IfMatch: "\"wrong-etag\""})
+	c.Assert(err, nil)
+	response, err = s.client.Do(request)
+	c.Assert(err, nil)
+	c.Assert(response.StatusCode, http.StatusPreconditionFailed)
+
+	request, err = newTestSignedRequest(http.MethodHead, getHeadObjectURL(s.endPoint, bucketName, objectName),
+		0, nil, s.accessKey, s.secretKey, s.signer)
+	c.Assert(err, nil)
+	response, err = s.client.Do(request)
+	c.Assert(err, nil)
+	c.Assert(response.StatusCode, http.StatusOK)
+
+	// Delete of a missing object with If-Match wildcard should fail.
+	request, err = signedDeleteRequest("prefix/missing-conditional-object", map[string]string{xhttp.IfMatch: "*"})
+	c.Assert(err, nil)
+	response, err = s.client.Do(request)
+	c.Assert(err, nil)
+	c.Assert(response.StatusCode, http.StatusPreconditionFailed)
+
+	// Delete with If-Match wildcard should succeed when the object exists.
+	wildcardObject := "prefix/wildcard-object"
+	request, err = newTestSignedRequest(http.MethodPut, getPutObjectURL(s.endPoint, bucketName, wildcardObject),
+		0, nil, s.accessKey, s.secretKey, s.signer)
+	c.Assert(err, nil)
+	response, err = s.client.Do(request)
+	c.Assert(err, nil)
+	c.Assert(response.StatusCode, http.StatusOK)
+
+	request, err = signedDeleteRequest(wildcardObject, map[string]string{xhttp.IfMatch: "*"})
+	c.Assert(err, nil)
+	response, err = s.client.Do(request)
+	c.Assert(err, nil)
+	c.Assert(response.StatusCode, http.StatusNoContent)
 
 	// create HTTP request to delete the object.
-	request, err = newTestSignedRequest(http.MethodDelete, getDeleteObjectURL(s.endPoint, bucketName, objectName),
-		0, nil, s.accessKey, s.secretKey, s.signer)
+	request, err = signedDeleteRequest(objectName, map[string]string{xhttp.IfMatch: etag})
 	c.Assert(err, nil)
 	// execute the http request.
 	response, err = s.client.Do(request)
@@ -2128,7 +2174,7 @@ func (s *TestSuiteCommon) TestGetObjectLarge10MiB(c *check) {
 	1234567890,1234567890,1234567890,1234567890,1234567890,123"`
 	// Create 10MiB content where each line contains 1024 characters.
 	for i := range 10 * 1024 {
-		buffer.WriteString(fmt.Sprintf("[%05d] %s\n", i, line))
+		fmt.Fprintf(&buffer, "[%05d] %s\n", i, line)
 	}
 	putContent := buffer.String()
 
@@ -2190,7 +2236,7 @@ func (s *TestSuiteCommon) TestGetObjectLarge11MiB(c *check) {
 	1234567890,1234567890,1234567890,123`
 	// Create 11MiB content where each line contains 1024 characters.
 	for i := range 11 * 1024 {
-		buffer.WriteString(fmt.Sprintf("[%05d] %s\n", i, line))
+		fmt.Fprintf(&buffer, "[%05d] %s\n", i, line)
 	}
 	putMD5 := getMD5Hash(buffer.Bytes())
 
@@ -2341,7 +2387,7 @@ func (s *TestSuiteCommon) TestGetPartialObjectLarge11MiB(c *check) {
 	// Create 11MiB content where each line contains 1024
 	// characters.
 	for i := range 11 * 1024 {
-		buffer.WriteString(fmt.Sprintf("[%05d] %s\n", i, line))
+		fmt.Fprintf(&buffer, "[%05d] %s\n", i, line)
 	}
 	putContent := buffer.String()
 
@@ -2407,7 +2453,7 @@ func (s *TestSuiteCommon) TestGetPartialObjectLarge10MiB(c *check) {
 	1234567890,1234567890,1234567890,123`
 	// Create 10MiB content where each line contains 1024 characters.
 	for i := range 10 * 1024 {
-		buffer.WriteString(fmt.Sprintf("[%05d] %s\n", i, line))
+		fmt.Fprintf(&buffer, "[%05d] %s\n", i, line)
 	}
 
 	putContent := buffer.String()
