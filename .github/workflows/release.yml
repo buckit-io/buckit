@@ -205,7 +205,9 @@ jobs:
       - name: Publish install scripts
         run: |
           cp src/packaging/install-linux.sh pages/install-linux.sh
-          chmod +x pages/install-linux.sh
+          cp src/packaging/install-mac.sh pages/install-mac.sh
+          cp src/packaging/install-windows.ps1 pages/install-windows.ps1
+          chmod +x pages/install-linux.sh pages/install-mac.sh
 
       - name: Write self-update checksum files
         run: |

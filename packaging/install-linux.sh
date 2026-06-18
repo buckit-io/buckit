@@ -54,7 +54,7 @@ detect_sudo() {
 # requires a Linux host — native packages are Linux-only.
 detect_arch() {
 	os="$(uname -s)"
-	[ "$os" = "Linux" ] || err "native packages are Linux-only (detected '$os'). For macOS/Windows download a binary from $RELEASE_BASE"
+	[ "$os" = "Linux" ] || err "this installer is for Linux (detected '$os'). On macOS use install-mac.sh; on Windows use install-windows.ps1"
 
 	arch="$(uname -m)"
 	case "$arch" in
