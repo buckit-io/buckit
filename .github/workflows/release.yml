@@ -311,6 +311,32 @@ jobs:
               </section>
 
               <section class="panel">
+                <h2 class="section-title">Install</h2>
+                <p class="section-copy">One-line installers that download the right artifact for your platform, verify its SHA-256 checksum, and print the command to finish. They do not install for you — the privileged step is yours to review and run.</p>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>Platform</th><th>Command</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Linux</strong>rpm / deb / apk</td>
+                        <td><code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px">curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh</code></td>
+                      </tr>
+                      <tr>
+                        <td><strong>macOS</strong>Apple Silicon</td>
+                        <td><code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px">curl -fsSL https://buckit-io.github.io/buckit/install-mac.sh | sh</code></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Windows</strong>x86_64</td>
+                        <td><code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px">irm https://buckit-io.github.io/buckit/install-windows.ps1 | iex</code></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section class="panel">
                 <h2 class="section-title">Downloads</h2>
                 <p class="section-copy">Choose the binary for your OS and architecture. Each platform card includes the signed artifact, checksum, and minisign signature.</p>
                 <div class="cards">
