@@ -204,8 +204,8 @@ jobs:
 
       - name: Publish install scripts
         run: |
-          cp src/packaging/install-rpm.sh pages/install-rpm.sh
-          chmod +x pages/install-rpm.sh
+          cp src/packaging/install-linux.sh pages/install-linux.sh
+          chmod +x pages/install-linux.sh
 
       - name: Write self-update checksum files
         run: |

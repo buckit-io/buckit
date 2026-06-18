@@ -1,5 +1,5 @@
 #!/bin/sh
-# install-rpm.sh — Linux native-package installer helper for buckit.
+# install-linux.sh — Linux native-package installer helper for buckit.
 #
 # Detects this host's package manager (dnf/yum/zypper, apt/dpkg, or apk),
 # downloads the matching .rpm/.deb/.apk for the latest stable release,
@@ -8,7 +8,7 @@
 # install (which needs root) is left to you to review and run.
 #
 # Usage:
-#   curl -fsSL https://buckit-io.github.io/buckit/install-rpm.sh | sh
+#   curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh
 #
 # Environment overrides:
 #   BUCKIT_PAGES_BASE     gh-pages base URL
@@ -26,7 +26,7 @@ PAGES_BASE="${BUCKIT_PAGES_BASE:-https://buckit-io.github.io/buckit}"
 RELEASE_BASE="${BUCKIT_RELEASE_BASE:-https://github.com/buckit-io/buckit/releases/download}"
 
 err() {
-	echo "install-rpm.sh: $*" >&2
+	echo "install-linux.sh: $*" >&2
 	exit 1
 }
 
