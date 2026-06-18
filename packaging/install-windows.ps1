@@ -39,6 +39,13 @@ function Fetch-String($url) {
     return (Invoke-WebRequest -UseBasicParsing -Uri $url).Content
 }
 
+# Require Windows. $IsWindows is an automatic variable on PowerShell Core 6+
+# (where this script may run cross-platform); it is undefined on Windows
+# PowerShell 5.1, which only runs on Windows — so treat undefined as Windows.
+if (($null -ne $IsWindows) -and (-not $IsWindows)) {
+    throw "install-windows.ps1 is for Windows. On Linux use install-linux.sh; on macOS use install-mac.sh"
+}
+
 # Resolve the release tag: pinned BUCKIT_VERSION or the latest stable tag from
 # the gh-pages pointer (format: "<sha256>  buckit.exe.<tag>").
 $tag = [Environment]::GetEnvironmentVariable('BUCKIT_VERSION')
@@ -93,6 +100,8 @@ Write-Host ""
 Write-Host "Downloaded and verified:"
 Write-Host "  $exeFile"
 Write-Host ""
+$installDir = Join-Path $env:LOCALAPPDATA 'Programs\buckit'
 Write-Host "To install, move it onto your PATH, e.g.:"
-Write-Host "  Move-Item `"$exeFile`" `"$env:LOCALAPPDATA\Programs\buckit\buckit.exe`""
+Write-Host "  New-Item -ItemType Directory -Force -Path `"$installDir`" | Out-Null"
+Write-Host "  Move-Item `"$exeFile`" `"$installDir\buckit.exe`""
 Write-Host ""
