@@ -184,19 +184,29 @@ main() {
 	mkdir -p "$dldir"
 	pkgfile="$dldir/buckit.$PKG"
 
+	# Download to a temporary sibling and only move it into the predictable
+	# path after the checksum verifies. A failed or interrupted download then
+	# can never clobber an existing good package or leave a partial/unverified
+	# file at the path the printed install command references.
+	tmpfile="$(mktemp "$dldir/.buckit.$PKG.XXXXXX")" || err "could not create temp file in $dldir"
+	trap 'rm -f "$tmpfile"' EXIT
+
 	info "downloading $asset"
-	fetch_to "$download_url" "$pkgfile" || err "download failed: $download_url"
+	fetch_to "$download_url" "$tmpfile" || err "download failed: $download_url"
 
 	info "fetching published checksum"
 	want_sha="$(fetch "$download_url.sha256sum" | awk '{print $1}')" ||
 		err "could not fetch checksum at $download_url.sha256sum"
 	[ -n "$want_sha" ] || err "release checksum is empty"
 
-	got_sha="$(sha256_of "$pkgfile")"
+	got_sha="$(sha256_of "$tmpfile")"
 	if [ "$got_sha" != "$want_sha" ]; then
 		err "checksum mismatch (expected $want_sha, got $got_sha) — refusing to continue"
 	fi
 	info "sha256 verified"
+
+	mv -f "$tmpfile" "$pkgfile"
+	trap - EXIT
 
 	echo
 	echo "Downloaded and verified:"
