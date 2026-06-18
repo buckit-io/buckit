@@ -3,13 +3,12 @@
 #
 # Downloads the macOS (Apple Silicon) buckit binary for the latest stable
 # release to a predictable filename (buckit), verifies its published SHA-256
-# checksum, clears the macOS quarantine attribute, and prints the command to
-# move it onto your PATH. It does NOT install it for you — the final move
-# (which may need root) is left to you to review and run.
+# checksum, clears the macOS quarantine attribute, and leaves it in place so
+# you can run it directly. It does NOT install it onto your PATH for you.
 #
 # Usage:
 #   curl -fsSL https://buckit-io.github.io/buckit/install-mac.sh | sh
-#   sudo mv ./buckit /usr/local/bin/buckit   # or per the printed command
+#   ./buckit --help   # run it from where it was downloaded
 #
 # Environment overrides:
 #   BUCKIT_PAGES_BASE     gh-pages base URL
@@ -151,8 +150,10 @@ main() {
 	echo "Downloaded and verified:"
 	echo "  $binfile"
 	echo
-	echo "To install, move it onto your PATH, e.g.:"
-	echo "  sudo mv \"$binfile\" /usr/local/bin/buckit"
+	echo "Run it from here:"
+	echo "  \"$binfile\""
+	echo
+	echo "(Move it onto your PATH to call 'buckit' from anywhere.)"
 	echo
 }
 
