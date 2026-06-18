@@ -36,6 +36,20 @@ info() {
 	echo "==> $*"
 }
 
+# detect_sudo sets SUDO to the privilege-escalation prefix for install
+# commands: empty when already root, "sudo " when sudo is available, otherwise
+# empty with a warning (the printed command must then be run as root).
+detect_sudo() {
+	if [ "$(id -u)" -eq 0 ]; then
+		SUDO=""
+	elif command -v sudo >/dev/null 2>&1; then
+		SUDO="sudo "
+	else
+		SUDO=""
+		info "not running as root and sudo not found — run the install command below as root"
+	fi
+}
+
 # detect_arch sets ARCH to the Go-style arch tuple (amd64 / arm64) and
 # requires a Linux host — native packages are Linux-only.
 detect_arch() {
@@ -52,31 +66,32 @@ detect_arch() {
 
 # detect_pkg sets PKG (rpm|deb|apk) and INSTALL_CMD (the command prefix used
 # to install a local package file) based on the available package manager.
+# Requires SUDO to be set first (see detect_sudo).
 detect_pkg() {
 	if command -v dnf >/dev/null 2>&1; then
 		PKG="rpm"
-		INSTALL_CMD="sudo dnf install"
+		INSTALL_CMD="${SUDO}dnf install"
 	elif command -v yum >/dev/null 2>&1; then
 		PKG="rpm"
-		INSTALL_CMD="sudo yum install"
+		INSTALL_CMD="${SUDO}yum install"
 	elif command -v zypper >/dev/null 2>&1; then
 		PKG="rpm"
-		INSTALL_CMD="sudo zypper install"
+		INSTALL_CMD="${SUDO}zypper install"
 	elif command -v apt >/dev/null 2>&1; then
 		PKG="deb"
-		INSTALL_CMD="sudo apt install"
+		INSTALL_CMD="${SUDO}apt install"
 	elif command -v apt-get >/dev/null 2>&1; then
 		PKG="deb"
-		INSTALL_CMD="sudo apt-get install"
+		INSTALL_CMD="${SUDO}apt-get install"
 	elif command -v apk >/dev/null 2>&1; then
 		PKG="apk"
-		INSTALL_CMD="sudo apk add --allow-untrusted"
+		INSTALL_CMD="${SUDO}apk add --allow-untrusted"
 	elif command -v rpm >/dev/null 2>&1; then
 		PKG="rpm"
-		INSTALL_CMD="sudo rpm -i"
+		INSTALL_CMD="${SUDO}rpm -i"
 	elif command -v dpkg >/dev/null 2>&1; then
 		PKG="deb"
-		INSTALL_CMD="sudo dpkg -i"
+		INSTALL_CMD="${SUDO}dpkg -i"
 	else
 		err "no supported package manager found (need dnf/yum/zypper, apt/dpkg, or apk)"
 	fi
@@ -143,6 +158,7 @@ pkg_version() {
 
 main() {
 	detect_arch
+	detect_sudo
 	detect_pkg
 	info "platform: linux-$ARCH ($PKG)"
 
