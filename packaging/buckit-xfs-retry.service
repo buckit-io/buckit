@@ -1,0 +1,9 @@
+[Unit]
+Description=Disable XFS retry-on-error for Buckit data drives
+Documentation=https://github.com/buckit-io/buckit
+# Skip entirely on hosts that have no XFS filesystems.
+ConditionPathExists=/sys/fs/xfs
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/buckit/xfs-retry-settings.sh
