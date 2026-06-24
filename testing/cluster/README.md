@@ -148,6 +148,10 @@ Builds the cluster image and starts N nodes.
 5. Each container's entrypoint creates loopback XFS drives, sets the root SSH
    password, then hands off to systemd.
 
+With `--empty`, the same host and drive provisioning happens but the image does
+not include the `buckit` binary and no Buckit service is started. Use this
+when you want blank deployment hosts with a specific node and drive topology.
+
 **Example:**
 
 ```bash
@@ -156,6 +160,9 @@ Builds the cluster image and starts N nodes.
 
 # 8 nodes, Rocky Linux 9, 2 G drives, 512 M RAM each
 ./cluster.sh create --nodes 8 --image rockylinux:9 --drive-size 2G --memory 512M
+
+# Empty deployment cluster: 6 hosts with 8 drives each, no Buckit service
+./cluster.sh create --empty --nodes 6 --drives 8
 
 # Named cluster (useful when running multiple clusters in parallel)
 ./cluster.sh create --name my-test --nodes 4
@@ -211,6 +218,7 @@ Removes `Dockerfile`, `docker-compose.yml`, and `.state/`.
 | `--ssh-base-port PORT` | `2201` | First host port mapped to node SSH |
 | `--ssh-password PASS` | `buckitadmin` | Root password for SSH |
 | `--fast-get VALUE` | `0` | `BUCKIT_FAST_GET` value for Buckit nodes |
+| `--empty` | disabled | Create hosts and drives only; skip Buckit install/start |
 | `-N, --name NAME` | `buckit-test` | Compose project / cluster name |
 
 ### Port Allocation

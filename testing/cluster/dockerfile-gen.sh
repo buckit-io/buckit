@@ -5,6 +5,8 @@
 generate_dockerfile() {
 	local base_image="$1"
 	local dockerfile="$2"
+	local empty_cluster="${3:-0}"
+	local service_block
 
 	# Detect package manager from image name
 	local install_cmd
@@ -24,21 +26,8 @@ generate_dockerfile() {
 		;;
 	esac
 
-	cat >"$dockerfile" <<EOF
-FROM ${base_image}
-
-RUN ${install_cmd}
-
-RUN mkdir -p /var/run/sshd /etc/systemd/system/multi-user.target.wants \
- && if [ -f /lib/systemd/system/ssh.service ]; then ln -sf /lib/systemd/system/ssh.service /etc/systemd/system/multi-user.target.wants/ssh.service; fi \
- && if [ -f /usr/lib/systemd/system/sshd.service ]; then ln -sf /usr/lib/systemd/system/sshd.service /etc/systemd/system/multi-user.target.wants/sshd.service; fi \
- && if [ -f /etc/ssh/sshd_config ]; then sed -i 's/^#\\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config; fi \
- && if [ -f /etc/ssh/sshd_config ]; then sed -i 's/^#\\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config; fi \
- && if [ -f /etc/ssh/sshd_config ]; then sed -i 's/^UsePAM.*/UsePAM no/' /etc/ssh/sshd_config; fi \
- && if [ -f /etc/ssh/sshd_config ] && ! grep -q '^UsePAM ' /etc/ssh/sshd_config; then echo 'UsePAM no' >> /etc/ssh/sshd_config; fi
-
-RUN mkdir -p /var/lib/buckit-drives /data
-
+	if [ "$empty_cluster" -eq 0 ]; then
+		service_block=$(cat <<'EOF'
 COPY buckit /usr/local/bin/buckit
 RUN chmod +x /usr/local/bin/buckit \
  && printf '%s\n' \
@@ -58,6 +47,42 @@ RUN chmod +x /usr/local/bin/buckit \
     'WantedBy=multi-user.target' \
     > /etc/systemd/system/buckit.service \
  && ln -sf /etc/systemd/system/buckit.service /etc/systemd/system/multi-user.target.wants/buckit.service
+EOF
+)
+	else
+		service_block=$(cat <<'EOF'
+RUN printf '%s\n' \
+    '[Unit]' \
+    'Description=Buckit deployment host marker' \
+    '' \
+    '[Service]' \
+    'Type=oneshot' \
+    'ExecStart=/usr/bin/true' \
+    '' \
+    '[Install]' \
+    'WantedBy=multi-user.target' \
+    > /etc/systemd/system/buckit-empty.service \
+ && ln -sf /etc/systemd/system/buckit-empty.service /etc/systemd/system/multi-user.target.wants/buckit-empty.service
+EOF
+)
+	fi
+
+	cat >"$dockerfile" <<EOF
+FROM ${base_image}
+
+RUN ${install_cmd}
+
+RUN mkdir -p /var/run/sshd /etc/systemd/system/multi-user.target.wants \
+ && if [ -f /lib/systemd/system/ssh.service ]; then ln -sf /lib/systemd/system/ssh.service /etc/systemd/system/multi-user.target.wants/ssh.service; fi \
+ && if [ -f /usr/lib/systemd/system/sshd.service ]; then ln -sf /usr/lib/systemd/system/sshd.service /etc/systemd/system/multi-user.target.wants/sshd.service; fi \
+ && if [ -f /etc/ssh/sshd_config ]; then sed -i 's/^#\\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config; fi \
+ && if [ -f /etc/ssh/sshd_config ]; then sed -i 's/^#\\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config; fi \
+ && if [ -f /etc/ssh/sshd_config ]; then sed -i 's/^UsePAM.*/UsePAM no/' /etc/ssh/sshd_config; fi \
+ && if [ -f /etc/ssh/sshd_config ] && ! grep -q '^UsePAM ' /etc/ssh/sshd_config; then echo 'UsePAM no' >> /etc/ssh/sshd_config; fi
+
+RUN mkdir -p /var/lib/buckit-drives /data
+
+${service_block}
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

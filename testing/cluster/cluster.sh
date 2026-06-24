@@ -24,6 +24,7 @@ NETEM_JITTER="${NETEM_JITTER:-0ms}"
 MINIO_STORAGE_CLASS_STANDARD="${MINIO_STORAGE_CLASS_STANDARD:-}"
 MINIO_PROMETHEUS_AUTH_TYPE="${MINIO_PROMETHEUS_AUTH_TYPE:-public}"
 HOST_DRIVE_ROOT="${HOST_DRIVE_ROOT:-}"
+EMPTY_CLUSTER=0
 STATE_DIR="$SCRIPT_DIR/.state"
 
 usage() {
@@ -51,6 +52,7 @@ Options (create / expand):
   --netem-delay VALUE      Per-node egress netem base delay on eth0, e.g. 100us, 0.25ms, 1ms (default: $NETEM_DELAY)
   --netem-jitter VALUE     Per-node egress netem jitter on eth0, e.g. 8us, 0.1ms (default: $NETEM_JITTER)
   --host-drive-root DIR    Bind-mount per-node drive state under DIR instead of Docker named volumes
+  --empty                  Create deployment hosts and drives only; do not install/start Buckit
   -N, --name NAME          Cluster name (default: $CLUSTER_NAME)
   -h, --help               Show this help
 
@@ -117,6 +119,10 @@ parse_args() {
 		--host-drive-root)
 			HOST_DRIVE_ROOT="$2"
 			shift 2
+			;;
+		--empty)
+			EMPTY_CLUSTER=1
+			shift
 			;;
 		-N | --name)
 			CLUSTER_NAME="$2"
@@ -291,6 +297,7 @@ NETEM_JITTER=${NETEM_JITTER}
 MINIO_STORAGE_CLASS_STANDARD=${MINIO_STORAGE_CLASS_STANDARD}
 MINIO_PROMETHEUS_AUTH_TYPE=${MINIO_PROMETHEUS_AUTH_TYPE}
 HOST_DRIVE_ROOT=${HOST_DRIVE_ROOT}
+EMPTY_CLUSTER=${EMPTY_CLUSTER}
 EOF
 }
 
@@ -307,11 +314,16 @@ cmd_create() {
 	parse_args "$@"
 
 	echo "Creating cluster '${CLUSTER_NAME}': ${NODES} nodes, ${DRIVES} drives/node (${DRIVE_SIZE} each), image: ${IMAGE}"
+	if [ "$EMPTY_CLUSTER" -eq 1 ]; then
+		echo "  Mode: empty deployment cluster (hosts + drives only)"
+	fi
 
-	build_buckit_binary
+	if [ "$EMPTY_CLUSTER" -eq 0 ]; then
+		build_buckit_binary
+	fi
 
 	# Generate Dockerfile
-	generate_dockerfile "$IMAGE" "$SCRIPT_DIR/Dockerfile"
+	generate_dockerfile "$IMAGE" "$SCRIPT_DIR/Dockerfile" "$EMPTY_CLUSTER"
 
 	# Generate docker-compose.yml
 	generate_compose 1 "$NODES" "$NODES" "$SCRIPT_DIR/docker-compose.yml"
@@ -331,6 +343,9 @@ cmd_create() {
 	echo ""
 	echo "Cluster '${CLUSTER_NAME}' is up."
 	echo "  Nodes: ${NODES}"
+	if [ "$EMPTY_CLUSTER" -eq 1 ]; then
+		echo "  Buckit service: not installed (empty deployment cluster)"
+	fi
 	echo "  API ports: $((BASE_PORT))-$((BASE_PORT + (NODES - 1) * 2)) (even ports)"
 	echo "  Console ports: $((BASE_PORT + 1))-$((BASE_PORT + (NODES - 1) * 2 + 1)) (odd ports)"
 	echo "  SSH ports: ${SSH_BASE_PORT}-$((SSH_BASE_PORT + NODES - 1))"
@@ -345,12 +360,17 @@ cmd_expand() {
 	local new_total=$((old_nodes + add_nodes))
 
 	echo "Expanding cluster '${CLUSTER_NAME}': adding ${add_nodes} nodes (total: ${new_total})"
+	if [ "$EMPTY_CLUSTER" -eq 1 ]; then
+		echo "  Mode: empty deployment cluster (hosts + drives only)"
+	fi
 
-	build_buckit_binary
+	if [ "$EMPTY_CLUSTER" -eq 0 ]; then
+		build_buckit_binary
+	fi
 
 	# Regenerate everything with new total
 	NODES=$new_total
-	generate_dockerfile "$IMAGE" "$SCRIPT_DIR/Dockerfile"
+	generate_dockerfile "$IMAGE" "$SCRIPT_DIR/Dockerfile" "$EMPTY_CLUSTER"
 	generate_compose 1 "$new_total" "$new_total" "$SCRIPT_DIR/docker-compose.yml"
 	ensure_host_drive_dirs
 
