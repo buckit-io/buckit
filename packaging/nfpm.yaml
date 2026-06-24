@@ -29,6 +29,27 @@ contents:
       owner: root
       group: root
 
+  - src: ./packaging/xfs-retry-settings.sh
+    dst: /usr/local/lib/buckit/xfs-retry-settings.sh
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+
+  - src: ./packaging/buckit-xfs-retry.service
+    dst: /lib/systemd/system/buckit-xfs-retry.service
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+
+  - src: ./packaging/buckit-xfs-retry.timer
+    dst: /lib/systemd/system/buckit-xfs-retry.timer
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+
 scripts:
   postinstall: ./packaging/scripts/postinstall.sh
   postremove:  ./packaging/scripts/postremove.sh

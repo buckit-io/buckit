@@ -1,0 +1,14 @@
+[Unit]
+Description=Periodically disable XFS retry-on-error for Buckit data drives
+Documentation=https://github.com/buckit-io/buckit
+
+[Timer]
+# Re-apply shortly after boot and at a steady interval thereafter, so a
+# drive hot-swapped into a running node (whose fresh mount resets the
+# sysfs values to the kernel default) is corrected without a restart.
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target
