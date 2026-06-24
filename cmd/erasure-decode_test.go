@@ -26,8 +26,58 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buckit-io/buckit/internal/bpool"
 	"github.com/dustin/go-humanize"
 )
+
+// TestNewParallelReaderUsesPooledStashBuffer guards against regressing to the
+// bug where the pooled stash buffer was acquired and recycled but never wired
+// into parallelReader.buf, leaving Read to heap-allocate every shard buffer
+// lazily (see issue #11). It asserts the seeded shard views actually alias the
+// pooled buffer.
+func TestNewParallelReaderUsesPooledStashBuffer(t *testing.T) {
+	ctx := context.Background()
+	const dataBlocks, parityBlocks = 4, 4
+	erasure, err := NewErasure(ctx, dataBlocks, parityBlocks, int64(blockSizeV2))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Match production tuning (erasure-server-pool.go): width blockSizeV2,
+	// capacity blockSizeV2*2. For this balanced layout len(readers)*shardSize
+	// == blockSizeV2*2, so the stash buffer fits exactly and is used.
+	prev := globalBytePoolCap.Load()
+	t.Cleanup(func() { globalBytePoolCap.Store(prev) })
+	globalBytePoolCap.Store(bpool.NewBytePoolCap(8, blockSizeV2, blockSizeV2*2))
+
+	readers := make([]io.ReaderAt, dataBlocks+parityBlocks)
+	p := newParallelReader(readers, erasure, 0, int64(blockSizeV2))
+	t.Cleanup(p.Done)
+
+	if p.stashBuffer == nil {
+		t.Fatal("expected pooled stash buffer to be acquired, got nil")
+	}
+	if len(p.buf) != len(readers) {
+		t.Fatalf("buf length = %d, want %d", len(p.buf), len(readers))
+	}
+
+	shardSize := int(erasure.ShardSize())
+	// The seeded views span the stash buffer's full capacity, so alias-check
+	// against the cap-extended slice.
+	backing := p.stashBuffer[:cap(p.stashBuffer)]
+	for i := range p.buf {
+		if len(p.buf[i]) != shardSize {
+			t.Fatalf("buf[%d] length = %d, want shardSize %d (not wired to stash buffer)", i, len(p.buf[i]), shardSize)
+		}
+		// Writing through the pooled buffer must be visible through buf[i],
+		// proving buf[i] aliases the pool rather than being a fresh allocation.
+		sentinel := byte(i + 1)
+		backing[i*shardSize] = sentinel
+		if p.buf[i][0] != sentinel {
+			t.Fatalf("buf[%d] does not alias the pooled stash buffer", i)
+		}
+	}
+}
 
 func TestParallelReaderPreferReadersDoesNotDeadlock(t *testing.T) {
 	readers := make([]io.ReaderAt, 6)

@@ -69,9 +69,12 @@ func newParallelReader(readers []io.ReaderAt, e Erasure, offset, totalLength int
 		offset:        (offset / e.blockSize) * e.ShardSize(),
 		shardSize:     e.ShardSize(),
 		shardFileSize: e.ShardFileSize(totalLength),
-		buf:           make([][]byte, len(readers)),
-		readerToBuf:   r2b,
-		stashBuffer:   b,
+		// bufs is seeded with views into the pooled stash buffer when one was
+		// obtained above; otherwise its entries are nil and Read allocates
+		// shard buffers lazily as a fallback.
+		buf:         bufs,
+		readerToBuf: r2b,
+		stashBuffer: b,
 	}
 }
 
