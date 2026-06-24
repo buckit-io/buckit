@@ -37,7 +37,7 @@ declare -A devs=()
 # execute command substitutions. Supports one or more {start...end} groups
 # of non-negative, optionally zero-padded decimal integers. Any token with
 # an unsupported construct (hex, steps, reversed ranges, stray/nested braces,
-# non-integers) yields nothing — fail closed rather than mis-resolve.
+# non-integers) yields nothing — fail closed rather than resolve a wrong path.
 expand_token() {
 	local tok="$1" pre rest grp a b a_n b_n width i v
 	case "$tok" in
