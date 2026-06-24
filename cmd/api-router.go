@@ -237,7 +237,7 @@ func s3APIMiddleware(f http.HandlerFunc, flags ...s3HFlag) http.HandlerFunc {
 		// Skip wrapping with throttling middleware if specified.
 		throttledHandler := gzippedHandler
 		if !handlerFlags.has(noThrottleS3HFlag) {
-			throttledHandler = maxClients(throttledHandler)
+			throttledHandler = maxClients(handlerName, throttledHandler)
 		}
 
 		// Collect API stats using the API name got from reflection in

@@ -18,6 +18,8 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"math"
 	"net/http"
 	"os"
@@ -26,13 +28,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dustin/go-humanize"
 	"github.com/shirou/gopsutil/v3/mem"
 
 	"github.com/buckit-io/buckit/internal/config/api"
-	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/buckit-io/buckit/internal/mcontext"
 )
@@ -41,6 +43,8 @@ type apiConfig struct {
 	mu sync.RWMutex
 
 	requestsPool           chan struct{}
+	requestMemory          *requestMemoryGate
+	requestsCapacity       int
 	clusterDeadline        time.Duration
 	listQuorum             string
 	corsAllowOrigins       []string
@@ -62,7 +66,178 @@ type apiConfig struct {
 const (
 	cgroupV1MemLimitFile = "/sys/fs/cgroup/memory/memory.limit_in_bytes"
 	cgroupV2MemLimitFile = "/sys/fs/cgroup/memory.max"
+
+	requestMemoryBudgetPercent = 75
 )
+
+var errRequestMemoryUnderflow = errors.New("request memory gate accounting underflow")
+
+type requestMemoryGate struct {
+	used atomic.Uint64
+
+	budget       uint64
+	readCost     uint64
+	writeCost    uint64
+	copyCost     uint64
+	metadataCost uint64
+}
+
+func newRequestMemoryGate(maxSetDrives int, legacy bool) *requestMemoryGate {
+	// Keep request buffers below the Go memory limit target. MemLimit is already
+	// based on available memory, so this second fraction reserves headroom for
+	// metadata, HTTP/TLS buffers, goroutine stacks, and other runtime allocations.
+	budget := (globalServerCtxt.MemLimit * requestMemoryBudgetPercent) / 100
+	if budget == 0 {
+		budget = blockSizeV2
+	}
+
+	// These costs intentionally mirror the current erasure read/write buffer
+	// reservations. GET normally holds one 2MiB pooled buffer. Non-inline PUTs
+	// reserve one 2MiB streaming bitrot writer
+	// buffer per erasure-set drive, plus encode and readahead buffers. Small or
+	// inline writes are charged conservatively at the non-inline cost because
+	// this middleware cannot reliably know the final object layout. Keep this
+	// table in sync with erasure-decode.go, erasure-object.go, and
+	// bitrot-streaming.go.
+	readCost := uint64(blockSizeV2 * 2)
+	writeCost := uint64(maxSetDrives+3) * blockSizeV2 * 2
+	metadataCost := uint64(blockSizeV2)
+	if legacy {
+		readCost += blockSizeV1 * 2
+		writeCost += blockSizeV1 * 2
+		metadataCost += blockSizeV1
+	}
+
+	return &requestMemoryGate{
+		budget:       budget,
+		readCost:     readCost,
+		writeCost:    writeCost,
+		copyCost:     readCost + writeCost,
+		metadataCost: metadataCost,
+	}
+}
+
+func (g *requestMemoryGate) TryAcquire(cost uint64) bool {
+	if g == nil {
+		return true
+	}
+	if cost == 0 {
+		cost = g.metadataCost
+	}
+
+	for {
+		used := g.used.Load()
+		// Always allow the first request through, even if its estimated cost is
+		// larger than the budget. This preserves forward progress on small-memory
+		// hosts or unusually wide erasure sets.
+		if used != 0 && (cost > g.budget || used > g.budget-cost) {
+			return false
+		}
+		if g.used.CompareAndSwap(used, used+cost) {
+			return true
+		}
+	}
+}
+
+func (g *requestMemoryGate) Release(cost uint64) {
+	if g == nil {
+		return
+	}
+	if cost == 0 {
+		cost = g.metadataCost
+	}
+
+	for {
+		used := g.used.Load()
+		if cost > used {
+			bugLogIf(context.Background(), errRequestMemoryUnderflow)
+			return
+		}
+		if g.used.CompareAndSwap(used, used-cost) {
+			return
+		}
+	}
+}
+
+func (g *requestMemoryGate) capacity(cost uint64) uint64 {
+	if g == nil {
+		return 0
+	}
+	if cost == 0 {
+		cost = g.metadataCost
+	}
+	if cost == 0 {
+		return 1
+	}
+	capacity := g.budget / cost
+	if capacity == 0 {
+		return 1
+	}
+	return capacity
+}
+
+func (g *requestMemoryGate) remainingCapacity(cost uint64) uint64 {
+	if g == nil {
+		return 0
+	}
+	if cost == 0 {
+		cost = g.metadataCost
+	}
+	if cost == 0 {
+		return 1
+	}
+	used := g.used.Load()
+	if used >= g.budget {
+		return 0
+	}
+	return (g.budget - used) / cost
+}
+
+func (g *requestMemoryGate) requestCost(api string) uint64 {
+	if g == nil {
+		return 0
+	}
+
+	switch api {
+	case "GetObject", "GetObjectLambda", "SelectObjectContent":
+		return g.readCost
+	case "PutObject", "PutObjectPart", "PutObjectExtract", "PostPolicyBucket":
+		return g.writeCost
+	case "CopyObject", "CopyObjectPart":
+		return g.copyCost
+	case "CompleteMultipartUpload", "NewMultipartUpload", "AbortMultipartUpload",
+		"DeleteObject", "DeleteMultipleObjects",
+		"GetObjectACL", "PutObjectACL",
+		"GetObjectTagging", "PutObjectTagging", "DeleteObjectTagging",
+		"GetObjectRetention", "PutObjectRetention",
+		"GetObjectLegalHold", "PutObjectLegalHold",
+		"GetObjectAttributes", "HeadObject",
+		"GetBucketLocation", "GetBucketPolicy", "GetBucketLifecycle",
+		"GetBucketEncryption", "GetBucketObjectLockConfig",
+		"GetBucketReplicationConfig", "GetBucketVersioning",
+		"GetBucketNotification", "ResetBucketReplicationStatus",
+		"GetBucketACL", "PutBucketACL", "GetBucketCors", "PutBucketCors",
+		"DeleteBucketCors", "GetBucketWebsite", "GetBucketAccelerate",
+		"GetBucketRequestPayment", "GetBucketLogging", "GetBucketTagging",
+		"DeleteBucketWebsite", "DeleteBucketTagging", "GetBucketPolicyStatus",
+		"PutBucketLifecycle", "PutBucketReplicationConfig",
+		"PutBucketEncryption", "PutBucketPolicy", "PutBucketObjectLockConfig",
+		"PutBucketTagging", "PutBucketVersioning", "PutBucketNotification",
+		"ResetBucketReplicationStart", "PutBucket", "HeadBucket",
+		"DeleteBucketPolicy", "DeleteBucketReplicationConfig",
+		"DeleteBucketLifecycle", "DeleteBucketEncryption", "DeleteBucket",
+		"GetBucketReplicationMetricsV2", "GetBucketReplicationMetrics",
+		"ValidateBucketReplicationCreds",
+		"ListObjectParts", "ListMultipartUploads", "ListObjectsV1",
+		"ListObjectsV2", "ListObjectsV2M", "ListObjectVersions",
+		"ListObjectVersionsM", "ListBuckets":
+		return g.metadataCost
+	default:
+		// Unknown S3 APIs are charged conservatively so new write-heavy handlers
+		// do not bypass memory admission until this table is updated.
+		return g.writeCost
+	}
+}
 
 func cgroupMemLimit() (limit uint64) {
 	buf, err := os.ReadFile(cgroupV2MemLimitFile)
@@ -123,43 +298,35 @@ func (t *apiConfig) init(cfg api.Config, setDriveCounts []int, legacy bool) {
 	}
 	t.corsAllowOrigins = corsAllowOrigin
 
-	var apiRequestsMaxPerNode int
 	if cfg.RequestsMax <= 0 {
 		maxSetDrives := slices.Max(setDriveCounts)
+		t.requestMemory = newRequestMemoryGate(maxSetDrives, legacy)
+		t.requestsPool = nil
+		t.requestsCapacity = int(t.requestMemory.capacity(t.requestMemory.readCost))
 
-		// Returns 75% of max memory allowed
-		maxMem := globalServerCtxt.MemLimit
-
-		// max requests per node is calculated as
-		// total_ram / ram_per_request
-		blockSize := xioutil.LargeBlock + xioutil.SmallBlock
-		if legacy {
-			// ram_per_request is (1MiB+32KiB) * driveCount \
-			//    + 2 * 10MiB (default erasure block size v1) + 2 * 1MiB (default erasure block size v2)
-			apiRequestsMaxPerNode = int(maxMem / uint64(maxSetDrives*blockSize+int(blockSizeV1*2+blockSizeV2*2)))
-		} else {
-			// ram_per_request is (1MiB+32KiB) * driveCount \
-			//    + 2 * 1MiB (default erasure block size v2)
-			apiRequestsMaxPerNode = int(maxMem / uint64(maxSetDrives*blockSize+int(blockSizeV2*2)))
+		if globalIsDistErasure {
+			logger.Info("Configured API request memory budget per node: %d bytes", t.requestMemory.budget)
 		}
 	} else {
-		apiRequestsMaxPerNode = cfg.RequestsMax
+		apiRequestsMaxPerNode := cfg.RequestsMax
 		if n := totalNodeCount(); n > 0 {
 			apiRequestsMaxPerNode /= n
 		}
-	}
 
-	if globalIsDistErasure {
-		logger.Info("Configured max API requests per node based on available memory: %d", apiRequestsMaxPerNode)
-	}
+		if globalIsDistErasure {
+			logger.Info("Configured max API requests per node: %d", apiRequestsMaxPerNode)
+		}
 
-	if cap(t.requestsPool) != apiRequestsMaxPerNode {
-		// Only replace if needed.
-		// Existing requests will use the previous limit,
-		// but new requests will use the new limit.
-		// There will be a short overlap window,
-		// but this shouldn't last long.
-		t.requestsPool = make(chan struct{}, apiRequestsMaxPerNode)
+		if cap(t.requestsPool) != apiRequestsMaxPerNode {
+			// Only replace if needed.
+			// Existing requests will use the previous limit,
+			// but new requests will use the new limit.
+			// There will be a short overlap window,
+			// but this shouldn't last long.
+			t.requestsPool = make(chan struct{}, apiRequestsMaxPerNode)
+		}
+		t.requestMemory = nil
+		t.requestsCapacity = apiRequestsMaxPerNode
 	}
 	listQuorum := cfg.ListQuorum
 	if listQuorum == "" {
@@ -292,7 +459,7 @@ func (t *apiConfig) getRequestsPoolCapacity() int {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
-	return cap(t.requestsPool)
+	return t.requestsCapacity
 }
 
 func (t *apiConfig) getRequestsPool() chan struct{} {
@@ -306,8 +473,15 @@ func (t *apiConfig) getRequestsPool() chan struct{} {
 	return t.requestsPool
 }
 
+func (t *apiConfig) getRequestMemoryGate() *requestMemoryGate {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	return t.requestMemory
+}
+
 // maxClients throttles the S3 API calls
-func maxClients(f http.HandlerFunc) http.HandlerFunc {
+func maxClients(api string, f http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		globalHTTPStats.incS3RequestsIncoming()
 
@@ -326,6 +500,39 @@ func maxClients(f http.HandlerFunc) http.HandlerFunc {
 		}
 
 		globalHTTPStats.addRequestsInQueue(1)
+		gate := globalAPIConfig.getRequestMemoryGate()
+		if gate != nil {
+			if tc, ok := r.Context().Value(mcontext.ContextTraceKey).(*mcontext.TraceCtxt); ok {
+				tc.FuncName = "s3.MaxClients"
+			}
+
+			cost := gate.requestCost(api)
+			w.Header().Set("X-RateLimit-Limit", strconv.FormatUint(gate.capacity(cost), 10))
+			w.Header().Set("X-RateLimit-Remaining", strconv.FormatUint(gate.remainingCapacity(cost), 10))
+
+			ctx := r.Context()
+			if !gate.TryAcquire(cost) {
+				globalHTTPStats.addRequestsInQueue(-1)
+				if contextCanceled(ctx) {
+					w.WriteHeader(499)
+					return
+				}
+				writeErrorResponse(ctx, w,
+					errorCodes.ToAPIErr(ErrTooManyRequests),
+					r.URL)
+				return
+			}
+			defer gate.Release(cost)
+
+			globalHTTPStats.addRequestsInQueue(-1)
+			if contextCanceled(ctx) {
+				w.WriteHeader(499)
+				return
+			}
+			f.ServeHTTP(w, r)
+			return
+		}
+
 		pool := globalAPIConfig.getRequestsPool()
 		if pool == nil {
 			globalHTTPStats.addRequestsInQueue(-1)
