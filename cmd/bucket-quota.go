@@ -24,9 +24,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/cachevalue"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/madmin-go/v3"
 )
 
 // BucketQuotaSys - map of bucket and quota configuration.
@@ -92,7 +92,7 @@ func parseBucketQuota(bucket string, data []byte) (quotaCfg *madmin.BucketQuota,
 	}
 	if !quotaCfg.IsValid() {
 		if quotaCfg.Type == "fifo" {
-			internalLogIf(GlobalContext, errors.New("Detected older 'fifo' quota config, 'fifo' feature is removed and not supported anymore. Please clear your quota configs using 'mc quota clear alias/bucket' and use 'mc ilm add' for expiration of objects"), logger.WarningKind)
+			internalLogIf(GlobalContext, errors.New("Detected older 'fifo' quota config, 'fifo' feature is removed and not supported anymore. Please clear your quota configs using 'bm quota clear alias/bucket' and use 'bm ilm add' for expiration of objects"), logger.WarningKind)
 			return quotaCfg, fmt.Errorf("invalid quota type 'fifo'")
 		}
 		return quotaCfg, fmt.Errorf("Invalid quota config %#v", quotaCfg)

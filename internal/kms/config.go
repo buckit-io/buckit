@@ -358,11 +358,11 @@ func IsPresent() (bool, error) {
 
 	switch {
 	case kmsPresent && kesPresent:
-		return false, errors.New("kms: configuration for MinIO KMS and MinIO KES is present")
+		return false, errors.New("kms: configuration for Buckit KMS and Buckit KES is present")
 	case kmsPresent && staticKeyPresent:
-		return false, errors.New("kms: configuration for MinIO KMS and static KMS key is present")
+		return false, errors.New("kms: configuration for Buckit KMS and static KMS key is present")
 	case kesPresent && staticKeyPresent:
-		return false, errors.New("kms: configuration for MinIO KES and static KMS key is present")
+		return false, errors.New("kms: configuration for Buckit KES and static KMS key is present")
 	}
 
 	// Next, we check that all required configuration for the concrete
@@ -375,16 +375,16 @@ func IsPresent() (bool, error) {
 		return false, nil // No KMS config present
 	case kmsPresent:
 		if !isPresent(EnvKMSEndpoint) {
-			return false, fmt.Errorf("kms: incomplete configuration for MinIO KMS: missing '%s'", EnvKMSEndpoint)
+			return false, fmt.Errorf("kms: incomplete configuration for Buckit KMS: missing '%s'", EnvKMSEndpoint)
 		}
 		if !isPresent(EnvKMSEnclave) {
-			return false, fmt.Errorf("kms: incomplete configuration for MinIO KMS: missing '%s'", EnvKMSEnclave)
+			return false, fmt.Errorf("kms: incomplete configuration for Buckit KMS: missing '%s'", EnvKMSEnclave)
 		}
 		if !isPresent(EnvKMSDefaultKey) {
-			return false, fmt.Errorf("kms: incomplete configuration for MinIO KMS: missing '%s'", EnvKMSDefaultKey)
+			return false, fmt.Errorf("kms: incomplete configuration for Buckit KMS: missing '%s'", EnvKMSDefaultKey)
 		}
 		if !isPresent(EnvKMSAPIKey) {
-			return false, fmt.Errorf("kms: incomplete configuration for MinIO KMS: missing '%s'", EnvKMSAPIKey)
+			return false, fmt.Errorf("kms: incomplete configuration for Buckit KMS: missing '%s'", EnvKMSAPIKey)
 		}
 		return true, nil
 	case staticKeyPresent:
@@ -394,24 +394,24 @@ func IsPresent() (bool, error) {
 		return true, nil
 	case kesPresent:
 		if !isPresent(EnvKESEndpoint) {
-			return false, fmt.Errorf("kms: incomplete configuration for MinIO KES: missing '%s'", EnvKESEndpoint)
+			return false, fmt.Errorf("kms: incomplete configuration for Buckit KES: missing '%s'", EnvKESEndpoint)
 		}
 		if !isPresent(EnvKESDefaultKey) {
-			return false, fmt.Errorf("kms: incomplete configuration for MinIO KES: missing '%s'", EnvKESDefaultKey)
+			return false, fmt.Errorf("kms: incomplete configuration for Buckit KES: missing '%s'", EnvKESDefaultKey)
 		}
 
 		if isPresent(EnvKESClientKey, EnvKESClientCert, EnvKESClientPassword) {
 			if isPresent(EnvKESAPIKey) {
-				return false, fmt.Errorf("kms: invalid configuration for MinIO KES: '%s' and client certificate is present", EnvKESAPIKey)
+				return false, fmt.Errorf("kms: invalid configuration for Buckit KES: '%s' and client certificate is present", EnvKESAPIKey)
 			}
 			if !isPresent(EnvKESClientCert) {
-				return false, fmt.Errorf("kms: incomplete configuration for MinIO KES: missing '%s'", EnvKESClientCert)
+				return false, fmt.Errorf("kms: incomplete configuration for Buckit KES: missing '%s'", EnvKESClientCert)
 			}
 			if !isPresent(EnvKESClientKey) {
-				return false, fmt.Errorf("kms: incomplete configuration for MinIO KES: missing '%s'", EnvKESClientKey)
+				return false, fmt.Errorf("kms: incomplete configuration for Buckit KES: missing '%s'", EnvKESClientKey)
 			}
 		} else if !isPresent(EnvKESAPIKey) {
-			return false, errors.New("kms: incomplete configuration for MinIO KES: missing authentication method")
+			return false, errors.New("kms: incomplete configuration for Buckit KES: missing authentication method")
 		}
 		return true, nil
 	}

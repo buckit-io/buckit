@@ -32,9 +32,6 @@ import (
 	"github.com/buckit-io/buckit/internal/ioutil"
 	"google.golang.org/api/googleapi"
 
-	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7"
-	"github.com/buckit-io/minio-go/v7/pkg/tags"
 	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/buckit-io/buckit/internal/bucket/lifecycle"
 	"github.com/buckit-io/buckit/internal/bucket/replication"
@@ -42,6 +39,9 @@ import (
 	"github.com/buckit-io/buckit/internal/crypto"
 	"github.com/buckit-io/buckit/internal/kms"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7"
+	"github.com/buckit-io/minio-go/v7/pkg/tags"
 
 	objectlock "github.com/buckit-io/buckit/internal/bucket/object/lock"
 	"github.com/buckit-io/buckit/internal/bucket/versioning"
@@ -1358,7 +1358,7 @@ var errorCodes = errorCodeMap{
 	},
 	ErrAdminNoSuchUserLDAPWarn: {
 		Code:           "XMinioAdminNoSuchUser",
-		Description:    "The specified user does not exist. If you meant a user in LDAP, use `mc idp ldap`",
+		Description:    "The specified user does not exist. If you meant a user in LDAP, use `bm idp ldap`",
 		HTTPStatusCode: http.StatusNotFound,
 	},
 	ErrAdminNoSuchGroup: {

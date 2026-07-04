@@ -31,13 +31,13 @@ import (
 	"strings"
 	"time"
 
-	elasticsearch7 "github.com/elastic/go-elasticsearch/v7"
-	"github.com/minio/highwayhash"
 	"github.com/buckit-io/buckit/internal/event"
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/buckit-io/buckit/internal/once"
 	"github.com/buckit-io/buckit/internal/store"
+	elasticsearch7 "github.com/elastic/go-elasticsearch/v7"
+	"github.com/minio/highwayhash"
 	xnet "github.com/minio/pkg/v3/net"
 	"github.com/pkg/errors"
 )
@@ -331,7 +331,7 @@ func (target *ElasticsearchTarget) checkAndInitClient(ctx context.Context) error
 		return errors.New("unable to determine support status of ES (should not happen)")
 
 	case ESSDeprecated:
-		return errors.New("there is no currently deprecated version of ES in MinIO")
+		return errors.New("there is no currently deprecated version of ES in Buckit")
 
 	case ESSSupported:
 		target.client = clientV7

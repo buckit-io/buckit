@@ -40,7 +40,7 @@ func logOnceIf(ctx context.Context, err error, id string, errKind ...any) {
 }
 
 // ErrTargetsOffline - Indicates single/multiple target failures.
-var ErrTargetsOffline = errors.New("one or more targets are offline. Please use `mc admin info --json` to check the offline targets")
+var ErrTargetsOffline = errors.New("one or more targets are offline. Please use `bm admin info --json` to check the offline targets")
 
 // TestSubSysLambdaTargets - tests notification targets of given subsystem
 func TestSubSysLambdaTargets(ctx context.Context, cfg config.Config, subSys string, transport *http.Transport) error {

@@ -36,13 +36,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/coreos/go-systemd/v22/daemon"
-	"github.com/dustin/go-humanize"
-	"github.com/minio/cli"
-	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7"
-	"github.com/buckit-io/minio-go/v7/pkg/credentials"
-	"github.com/buckit-io/minio-go/v7/pkg/set"
 	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/buckit-io/buckit/internal/bucket/bandwidth"
 	"github.com/buckit-io/buckit/internal/color"
@@ -53,6 +46,13 @@ import (
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7"
+	"github.com/buckit-io/minio-go/v7/pkg/credentials"
+	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/coreos/go-systemd/v22/daemon"
+	"github.com/dustin/go-humanize"
+	"github.com/minio/cli"
 	"github.com/minio/pkg/v3/certs"
 	"github.com/minio/pkg/v3/env"
 	"gopkg.in/yaml.v2"
@@ -597,7 +597,7 @@ func initServerConfig(ctx context.Context, newObject ObjectLayer) error {
 
 		// These messages only meant primarily for distributed setup, so only log during distributed setup.
 		if globalIsDistErasure {
-			logger.Info("Waiting for all MinIO sub-systems to be initialize...")
+			logger.Info("Waiting for all Buckit sub-systems to be initialize...")
 		}
 
 		// Upon success migrating the config, initialize all sub-systems
@@ -607,13 +607,13 @@ func initServerConfig(ctx context.Context, newObject ObjectLayer) error {
 			// All successful return.
 			if globalIsDistErasure {
 				// These messages only meant primarily for distributed setup, so only log during distributed setup.
-				logger.Info("All MinIO sub-systems initialized successfully in %s", time.Since(t1))
+				logger.Info("All Buckit sub-systems initialized successfully in %s", time.Since(t1))
 			}
 			return nil
 		}
 
 		if configRetriableErrors(err) {
-			logger.Info("Waiting for all MinIO sub-systems to be initialized.. possible cause (%v)", err)
+			logger.Info("Waiting for all Buckit sub-systems to be initialized.. possible cause (%v)", err)
 			time.Sleep(time.Duration(r.Float64() * float64(5*time.Second)))
 			continue
 		}
@@ -1161,7 +1161,7 @@ func serverMain(ctx *cli.Context) {
 			Transport: globalRemoteTargetTransport,
 			Region:    region,
 		})
-		logger.FatalIf(err, "Unable to initialize MinIO client")
+		logger.FatalIf(err, "Unable to initialize Buckit client")
 	})
 
 	go bootstrapTrace("startResourceMetricsCollection", func() {

@@ -44,10 +44,6 @@ import (
 	"github.com/minio/mux"
 	"github.com/valyala/bytebufferpool"
 
-	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7"
-	"github.com/buckit-io/minio-go/v7/pkg/set"
-	"github.com/buckit-io/minio-go/v7/pkg/tags"
 	"github.com/buckit-io/buckit/internal/auth"
 	sse "github.com/buckit-io/buckit/internal/bucket/encryption"
 	objectlock "github.com/buckit-io/buckit/internal/bucket/object/lock"
@@ -62,6 +58,10 @@ import (
 	"github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/buckit/internal/kms"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7"
+	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/buckit-io/minio-go/v7/pkg/tags"
 	"github.com/minio/pkg/v3/policy"
 	"github.com/minio/pkg/v3/sync/errgroup"
 )
@@ -1757,7 +1757,7 @@ func (api objectAPIHandlers) DeleteBucketHandler(w http.ResponseWriter, r *http.
 
 	if globalDNSConfig != nil {
 		if err := globalDNSConfig.Delete(bucket); err != nil {
-			dnsLogIf(ctx, fmt.Errorf("Unable to delete bucket DNS entry %w, please delete it manually, bucket on MinIO no longer exists", err))
+			dnsLogIf(ctx, fmt.Errorf("Unable to delete bucket DNS entry %w, please delete it manually, bucket on Buckit no longer exists", err))
 			writeErrorResponse(ctx, w, toAPIError(ctx, err), r.URL)
 			return
 		}

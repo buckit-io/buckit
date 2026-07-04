@@ -35,11 +35,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dustin/go-humanize"
-	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7"
-	"github.com/buckit-io/minio-go/v7/pkg/encrypt"
-	"github.com/buckit-io/minio-go/v7/pkg/tags"
 	"github.com/buckit-io/buckit/internal/amztime"
 	"github.com/buckit-io/buckit/internal/bucket/bandwidth"
 	objectlock "github.com/buckit-io/buckit/internal/bucket/object/lock"
@@ -53,6 +48,11 @@ import (
 	"github.com/buckit-io/buckit/internal/kms"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/buckit-io/buckit/internal/once"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7"
+	"github.com/buckit-io/minio-go/v7/pkg/encrypt"
+	"github.com/buckit-io/minio-go/v7/pkg/tags"
+	"github.com/dustin/go-humanize"
 	"github.com/tinylib/msgp/msgp"
 	"github.com/zeebo/xxh3"
 )
@@ -2240,7 +2240,7 @@ func (p *ReplicationPool) queueReplicaTask(ri ReplicateObjectInfo) {
 		case "fast":
 			replLogOnceIf(GlobalContext, fmt.Errorf("Unable to keep up with incoming traffic"), string(replicationSubsystem), logger.WarningKind)
 		case "slow":
-			replLogOnceIf(GlobalContext, fmt.Errorf("Unable to keep up with incoming traffic - we recommend increasing replication priority with `mc admin config set api replication_priority=auto`"), string(replicationSubsystem), logger.WarningKind)
+			replLogOnceIf(GlobalContext, fmt.Errorf("Unable to keep up with incoming traffic - we recommend increasing replication priority with `bm admin config set api replication_priority=auto`"), string(replicationSubsystem), logger.WarningKind)
 		default:
 			maxWorkers = min(maxWorkers, WorkerMaxLimit)
 			if p.ActiveWorkers() < maxWorkers {
@@ -2297,7 +2297,7 @@ func (p *ReplicationPool) queueReplicaDeleteTask(doi DeletedObjectReplicationInf
 		case "fast":
 			replLogOnceIf(GlobalContext, fmt.Errorf("Unable to keep up with incoming deletes"), string(replicationSubsystem), logger.WarningKind)
 		case "slow":
-			replLogOnceIf(GlobalContext, fmt.Errorf("Unable to keep up with incoming deletes - we recommend increasing replication priority with `mc admin config set api replication_priority=auto`"), string(replicationSubsystem), logger.WarningKind)
+			replLogOnceIf(GlobalContext, fmt.Errorf("Unable to keep up with incoming deletes - we recommend increasing replication priority with `bm admin config set api replication_priority=auto`"), string(replicationSubsystem), logger.WarningKind)
 		default:
 			maxWorkers = min(maxWorkers, WorkerMaxLimit)
 			if p.ActiveWorkers() < maxWorkers {
