@@ -144,7 +144,7 @@ func printServerCommonMsg(apiEndpoints []string) {
 
 // Prints startup message for Object API access, prints link to our SDK documentation.
 func printObjectAPIMsg() {
-	logger.Startup(color.Blue("\nDocs: ") + "https://buckit-io.github.io/docs")
+	logger.Startup(color.Blue("\nDocs: ") + "https://buckit.sh/docs/")
 }
 
 func printLambdaTargets() {
