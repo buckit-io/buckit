@@ -28,9 +28,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/minio-go/v7/pkg/set"
-	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/minio/pkg/v3/env"
 )
 
@@ -595,7 +595,7 @@ func LookupSite(siteKV KVS, regionKV KVS) (s Site, err error) {
 			// Since the region sub-system cannot be (re)set as it
 			// is legacy, we return an error to tell the user to
 			// reset the region via the new command.
-			err = Errorf("could not load region from legacy configuration as it was invalid - use 'mc admin config set myminio site region=myregion name=myname' to set a region and name (%v)", err)
+			err = Errorf("could not load region from legacy configuration as it was invalid - use 'bm admin config set mybuckit site region=myregion name=myname' to set a region and name (%v)", err)
 			return s, err
 		}
 
@@ -648,7 +648,7 @@ func CheckValidKeys(subSys string, kv KVS, validKVS KVS, deprecatedKeys ...strin
 	}
 	if len(nkv) > 0 {
 		return Errorf(
-			"found invalid keys (%s) for '%s' sub-system, use 'mc admin config reset myminio %s' to fix invalid keys", nkv.String(), subSys, subSys)
+			"found invalid keys (%s) for '%s' sub-system, use 'bm admin config reset mybuckit %s' to fix invalid keys", nkv.String(), subSys, subSys)
 	}
 	return nil
 }
@@ -1092,7 +1092,7 @@ func (c Config) CheckValidKeys(subSys string, deprecatedKeys []string) error {
 		}
 		if len(invalidKV) > 0 {
 			return Errorf(
-				"found invalid keys (%s) for '%s:%s' sub-system, use 'mc admin config reset myminio %s:%s' to fix invalid keys",
+				"found invalid keys (%s) for '%s:%s' sub-system, use 'bm admin config reset mybuckit %s:%s' to fix invalid keys",
 				invalidKV.String(), subSys, tgt, subSys, tgt)
 		}
 	}

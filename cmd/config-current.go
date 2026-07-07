@@ -27,7 +27,6 @@ import (
 
 	"github.com/buckit-io/buckit/internal/config/browser"
 
-	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/buckit/internal/config"
 	"github.com/buckit-io/buckit/internal/config/api"
 	"github.com/buckit-io/buckit/internal/config/batch"
@@ -52,6 +51,7 @@ import (
 	"github.com/buckit-io/buckit/internal/crypto"
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/madmin-go/v3"
 	"github.com/minio/pkg/v3/env"
 )
 
@@ -389,7 +389,7 @@ func validateSubSysConfig(ctx context.Context, s config.Config, subSys string, o
 		}
 		// callhome cannot be enabled if license is not registered yet, throw an error.
 		if cfg.Enabled() && !globalSubnetConfig.Registered() {
-			return errors.New("Deployment is not registered with SUBNET. Please register the deployment via 'mc license register ALIAS'")
+			return errors.New("Deployment is not registered with SUBNET. Please register the deployment via 'bm license register ALIAS'")
 		}
 	case config.DriveSubSys:
 		if _, err := drive.LookupConfig(s[config.DriveSubSys][config.Default]); err != nil {

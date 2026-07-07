@@ -67,7 +67,7 @@ var errNoSuchUser = errors.New("Specified user does not exist")
 
 // error returned by IAM when a use a builtin IDP command when they could mean
 // to use a LDAP command.
-var errNoSuchUserLDAPWarn = errors.New("Specified user does not exist. If you meant a user in LDAP please use command under `mc idp ldap`")
+var errNoSuchUserLDAPWarn = errors.New("Specified user does not exist. If you meant a user in LDAP please use command under `bm idp ldap`")
 
 // error returned when service account is not found
 var errNoSuchServiceAccount = errors.New("Specified service account does not exist")

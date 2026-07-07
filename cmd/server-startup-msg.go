@@ -59,9 +59,9 @@ func printStartupMessage(apiEndpoints []string, err error) {
 	// Prints credential, region and browser access.
 	printServerCommonMsg(strippedAPIEndpoints)
 
-	// Prints `mc` cli configuration message chooses
+	// Prints `bm` cli configuration message chooses
 	// first endpoint as default.
-	printCLIAccessMsg(strippedAPIEndpoints[0], "myminio")
+	printCLIAccessMsg(strippedAPIEndpoints[0], "mybuckit")
 
 	// Prints documentation message.
 	printObjectAPIMsg()
@@ -184,12 +184,12 @@ func printCLIAccessMsg(endPoint string, alias string) {
 	// Get saved credentials.
 	cred := globalActiveCred
 
-	const mcQuickStartGuide = "https://buckit-io.github.io/docs"
+	const bmQuickStartGuide = "https://buckit.sh/docs/reference/bm-cli"
 
-	// Configure 'mc', following block prints platform specific information for minio client.
+	// Configure `bm`, following block prints platform specific information for the Buckit client.
 	if color.IsTerminal() && (!globalServerCtxt.Anonymous && globalAPIConfig.permitRootAccess()) {
-		logger.Startup(color.Blue("\nCLI: ") + mcQuickStartGuide)
-		mcMessage := fmt.Sprintf("$ mc alias set '%s' '%s' '%s' '%s'", alias,
+		logger.Startup(color.Blue("\nCLI: ") + bmQuickStartGuide)
+		mcMessage := fmt.Sprintf("$ bm alias set '%s' '%s' '%s' '%s'", alias,
 			endPoint, cred.AccessKey, cred.SecretKey)
 		logger.Startup(fmt.Sprintf(getFormatStr(len(mcMessage), 3), mcMessage))
 	}

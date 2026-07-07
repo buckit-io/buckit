@@ -30,13 +30,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dchest/siphash"
-	"github.com/google/uuid"
+	"github.com/buckit-io/buckit/internal/dsync"
+	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/minio-go/v7/pkg/set"
 	"github.com/buckit-io/minio-go/v7/pkg/tags"
-	"github.com/buckit-io/buckit/internal/dsync"
-	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/dchest/siphash"
+	"github.com/google/uuid"
 	"github.com/minio/pkg/v3/console"
 	"github.com/minio/pkg/v3/sync/errgroup"
 	"github.com/puzpuzpuz/xsync/v3"
@@ -1051,7 +1051,7 @@ func (s *erasureSets) HealFormat(ctx context.Context, dryRun bool) (res madmin.H
 
 	if !reflect.DeepEqual(s.format, refFormat) {
 		// Format is corrupted and unrecognized by the running instance.
-		healingLogIf(ctx, fmt.Errorf("Unable to heal the newly replaced drives due to format.json inconsistencies, please engage MinIO support for further assistance: %w",
+		healingLogIf(ctx, fmt.Errorf("Unable to heal the newly replaced drives due to format.json inconsistencies, please engage Buckit support for further assistance: %w",
 			errCorruptedFormat))
 		return res, errCorruptedFormat
 	}

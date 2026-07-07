@@ -40,7 +40,7 @@ const (
 // Upload given file content (payload) to specified URL
 func (c Config) Upload(reqURL string, filename string, payload []byte) (string, error) {
 	if !c.Registered() {
-		return "", errors.New("Deployment is not registered with SUBNET. Please register the deployment via 'mc license register ALIAS'")
+		return "", errors.New("Deployment is not registered with SUBNET. Please register the deployment via 'bm license register ALIAS'")
 	}
 
 	var body bytes.Buffer
@@ -97,7 +97,7 @@ func (c Config) submitPost(r *http.Request) (string, error) {
 // Post submit 'payload' to specified URL
 func (c Config) Post(reqURL string, payload any) (string, error) {
 	if !c.Registered() {
-		return "", errors.New("Deployment is not registered with SUBNET. Please register the deployment via 'mc license register ALIAS'")
+		return "", errors.New("Deployment is not registered with SUBNET. Please register the deployment via 'bm license register ALIAS'")
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {

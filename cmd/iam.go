@@ -33,8 +33,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7/pkg/set"
 	"github.com/buckit-io/buckit/internal/arn"
 	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/buckit-io/buckit/internal/color"
@@ -48,6 +46,8 @@ import (
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	"github.com/buckit-io/buckit/internal/jwt"
 	"github.com/buckit-io/buckit/internal/logger"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7/pkg/set"
 	"github.com/minio/pkg/v3/env"
 	"github.com/minio/pkg/v3/ldap"
 	"github.com/minio/pkg/v3/policy"
@@ -390,7 +390,7 @@ func (sys *IAMSys) Init(ctx context.Context, objAPI ObjectLayer, etcdClient *etc
 		if err := saveIAMFormat(retryCtx, sys.store); err != nil {
 			if configRetriableErrors(err) {
 				retryInterval := time.Duration(r.Float64() * float64(time.Second))
-				logger.Info("Waiting for all MinIO IAM sub-system to be initialized.. possible cause (%v) (retrying in %s)", err, retryInterval)
+				logger.Info("Waiting for all Buckit IAM sub-system to be initialized.. possible cause (%v) (retrying in %s)", err, retryInterval)
 				time.Sleep(retryInterval)
 				continue
 			}
@@ -410,7 +410,7 @@ func (sys *IAMSys) Init(ctx context.Context, objAPI ObjectLayer, etcdClient *etc
 		if err := sys.Load(retryCtx, true); err != nil {
 			if configRetriableErrors(err) {
 				retryInterval := time.Duration(r.Float64() * float64(time.Second))
-				logger.Info("Waiting for all MinIO IAM sub-system to be initialized.. possible cause (%v) (retrying in %s)", err, retryInterval)
+				logger.Info("Waiting for all Buckit IAM sub-system to be initialized.. possible cause (%v) (retrying in %s)", err, retryInterval)
 				time.Sleep(retryInterval)
 				continue
 			}

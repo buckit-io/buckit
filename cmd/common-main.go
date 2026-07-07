@@ -37,25 +37,25 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dustin/go-humanize"
-	fcolor "github.com/fatih/color"
-	"github.com/go-openapi/loads"
-	"github.com/inconshreveable/mousetrap"
-	dns2 "github.com/miekg/dns"
-	"github.com/buckit-io/console/api/operations"
-	consoleapi "github.com/buckit-io/console/api"
-	consoleoauth2 "github.com/buckit-io/console/pkg/auth/idp/oauth2"
-	consoleCerts "github.com/buckit-io/console/pkg/certs"
-	"github.com/minio/cli"
-	"github.com/minio/kms-go/kes"
-	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7"
-	"github.com/buckit-io/minio-go/v7/pkg/set"
 	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/buckit-io/buckit/internal/color"
 	"github.com/buckit-io/buckit/internal/config"
 	"github.com/buckit-io/buckit/internal/kms"
 	"github.com/buckit-io/buckit/internal/logger"
+	consoleapi "github.com/buckit-io/console/api"
+	"github.com/buckit-io/console/api/operations"
+	consoleoauth2 "github.com/buckit-io/console/pkg/auth/idp/oauth2"
+	consoleCerts "github.com/buckit-io/console/pkg/certs"
+	"github.com/buckit-io/madmin-go/v3"
+	"github.com/buckit-io/minio-go/v7"
+	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/dustin/go-humanize"
+	fcolor "github.com/fatih/color"
+	"github.com/go-openapi/loads"
+	"github.com/inconshreveable/mousetrap"
+	dns2 "github.com/miekg/dns"
+	"github.com/minio/cli"
+	"github.com/minio/kms-go/kes"
 	"github.com/minio/pkg/v3/certs"
 	"github.com/minio/pkg/v3/console"
 	"github.com/minio/pkg/v3/env"
@@ -327,7 +327,7 @@ func checkUpdate(mode string) {
 		return
 	}
 
-	logger.Info(prepareUpdateMessage("Run `mc admin update ALIAS`", lrTime.Sub(currentReleaseTime)))
+	logger.Info(prepareUpdateMessage("Run `bm admin update ALIAS`", lrTime.Sub(currentReleaseTime)))
 }
 
 func newConfigDir(dir string, dirSet bool, getDefaultDir func() string) (*ConfigDir, error) {
@@ -787,7 +787,7 @@ func serverHandleEnvVars() {
 				// Checking if the IP is a DNS entry.
 				addrs, err := globalDNSCache.LookupHost(GlobalContext, endpoint)
 				if err != nil {
-					logger.FatalIf(err, "Unable to initialize MinIO server with [%s] invalid entry found in MINIO_PUBLIC_IPS", endpoint)
+					logger.FatalIf(err, "Unable to initialize Buckit server with [%s] invalid entry found in MINIO_PUBLIC_IPS", endpoint)
 				}
 				for _, addr := range addrs {
 					domainIPs.Add(addr)
@@ -818,14 +818,14 @@ func serverHandleEnvVars() {
 	// Check all error conditions first
 	//nolint:gocritic
 	if !env.IsSet(config.EnvRootUser) && env.IsSet(config.EnvRootPassword) {
-		logger.Fatal(config.ErrMissingEnvCredentialRootUser(nil), "Unable to start MinIO")
+		logger.Fatal(config.ErrMissingEnvCredentialRootUser(nil), "Unable to start Buckit")
 	} else if env.IsSet(config.EnvRootUser) && !env.IsSet(config.EnvRootPassword) {
-		logger.Fatal(config.ErrMissingEnvCredentialRootPassword(nil), "Unable to start MinIO")
+		logger.Fatal(config.ErrMissingEnvCredentialRootPassword(nil), "Unable to start Buckit")
 	} else if !env.IsSet(config.EnvRootUser) && !env.IsSet(config.EnvRootPassword) {
 		if !env.IsSet(config.EnvAccessKey) && env.IsSet(config.EnvSecretKey) {
-			logger.Fatal(config.ErrMissingEnvCredentialAccessKey(nil), "Unable to start MinIO")
+			logger.Fatal(config.ErrMissingEnvCredentialAccessKey(nil), "Unable to start Buckit")
 		} else if env.IsSet(config.EnvAccessKey) && !env.IsSet(config.EnvSecretKey) {
-			logger.Fatal(config.ErrMissingEnvCredentialSecretKey(nil), "Unable to start MinIO")
+			logger.Fatal(config.ErrMissingEnvCredentialSecretKey(nil), "Unable to start Buckit")
 		}
 	}
 

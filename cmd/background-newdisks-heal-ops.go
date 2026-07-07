@@ -30,10 +30,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dustin/go-humanize"
+	"github.com/buckit-io/buckit/internal/config"
 	"github.com/buckit-io/madmin-go/v3"
 	"github.com/buckit-io/minio-go/v7/pkg/set"
-	"github.com/buckit-io/buckit/internal/config"
+	"github.com/dustin/go-humanize"
 	"github.com/minio/pkg/v3/env"
 )
 
@@ -453,7 +453,7 @@ func healFreshDisk(ctx context.Context, z *erasureServerPools, endpoint Endpoint
 		tracker = initHealingTracker(disk, mustGetUUID())
 	}
 
-	healingLogEvent(ctx, "Healing drive '%s' - 'mc admin heal alias/ --verbose' to check the current status.", endpoint)
+	healingLogEvent(ctx, "Healing drive '%s' - 'bm admin heal alias/ --verbose' to check the current status.", endpoint)
 
 	buckets, _ := z.ListBuckets(ctx, BucketOptions{})
 	// Buckets data are dispersed in multiple pools/sets, make
