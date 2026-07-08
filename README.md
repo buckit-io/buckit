@@ -1,138 +1,277 @@
-# Buckit Quickstart Guide
+# Buckit
 
-[![license](https://img.shields.io/badge/license-AGPL%20V3-blue)](https://github.com/buckit-io/buckit/blob/master/LICENSE)
+Website: <https://buckit.sh>
 
-Buckit is a high-performance, S3-compatible object storage solution released under the GNU AGPL v3.0 license.
-Designed for speed and scalability, it powers AI/ML, analytics, and data-intensive workloads with industry-leading performance.
+Buckit is a high-performance, S3-compatible object storage server written in Go.
+It provides an S3 API endpoint for buckets and objects, an embedded browser
+console, and distributed erasure-coded storage for multi-node deployments.
 
-- S3 API Compatible – Seamless integration with existing S3 tools
-- Built for AI & Analytics – Optimized for large-scale data pipelines
-- High Performance – Ideal for demanding storage workloads.
+The server binary is `buckit`. The companion operator CLI is
+[`bm`](https://github.com/buckit-io/bm), the Buckit Manager.
 
-This README provides instructions for building Buckit from source and deploying onto baremetal hardware.
+Join the Buckit community on Discord: <https://discord.gg/8BDBVDPqp>.
 
-## Buckit is Open Source Software
+> [!NOTE]
+> Buckit is an independent project derived from the AGPLv3-licensed
+> [MinIO](https://github.com/minio/minio) project, whose upstream repository
+> was archived on April 25, 2026. Buckit is not affiliated with or endorsed by
+> MinIO, Inc.
 
-We designed Buckit as Open Source software for the Open Source software community. We encourage the community to remix, redesign, and reshare Buckit under the terms of the AGPLv3 license.
+## What Buckit Provides
 
-All usage of Buckit in your application stack requires validation against AGPLv3 obligations, which include but are not limited to the release of modified code to the community from which you have benefited. Any commercial/proprietary usage of the AGPLv3 software, including repackaging or reselling services/features, is done at your own risk.
+- S3-compatible object storage for existing S3 SDKs and tools.
+- Standalone single-node mode for development and small deployments.
+- Distributed erasure-coded mode for production clusters.
+- Browser console for basic object and administrative workflows.
+- Admin APIs used by `bm` for cluster discovery, health, and operations.
+- AGPLv3-licensed source code.
 
-The AGPLv3 provides no obligation by any party to support, maintain, or warranty the original or any modified work.
-All support is provided on a best-effort basis through Github.
+## Quickstart
 
-## Source-Only Distribution
+Build and run a local Buckit server:
 
-**Important:** The Buckit community edition is distributed as source code only.
+```sh
+make build
+mkdir -p /tmp/buckit-data
+./buckit server /tmp/buckit-data --console-address :9001
+```
 
-### Installing Latest Buckit Community Edition
+The S3 API listens on `http://127.0.0.1:9000`.
+The console listens on `http://127.0.0.1:9001`.
 
-To use Buckit community edition, you have two options:
+Default development credentials are:
 
-1. **Install from source** using `go install github.com/buckit-io/buckit@latest` (recommended)
-2. **Build a Docker image** from the provided Dockerfile
+```text
+Access key: buckitadmin
+Secret key: buckitadmin
+```
 
-See the sections below for detailed instructions on each method.
+For any non-throwaway deployment, set explicit root credentials before starting
+the server:
 
-### Legacy Binary Releases
+```sh
+export MINIO_ROOT_USER=myadmin
+export MINIO_ROOT_PASSWORD=mysecretpassword
+./buckit server /data --console-address :9001
+```
 
-Historical pre-compiled binary releases remain available for reference but are no longer maintained:
+The root credential environment variable names remain `MINIO_ROOT_USER` and
+`MINIO_ROOT_PASSWORD` for compatibility with the storage engine and existing
+deployment tooling.
 
-- GitHub Releases: https://github.com/buckit-io/buckit/releases
+## Install Buckit
 
-**These legacy binaries will not receive updates.** We strongly recommend using source builds for access to the latest features, bug fixes, and security updates.
+### Build From Source
 
-## Install from Source
+Buckit requires Go 1.25 or newer. If Go is not installed, download and install
+it from the official Go installation page: <https://go.dev/doc/install>.
 
-Use the following commands to compile and run a standalone Buckit server from source.
-If you do not have a working Golang environment, please follow [How to install Golang](https://golang.org/doc/install). Minimum version required is [go1.25](https://golang.org/dl/#stable)
+```sh
+git clone https://github.com/buckit-io/buckit.git
+cd buckit
+make build
+```
+
+The build writes `./buckit`.
+
+You can also install directly with Go:
 
 ```sh
 go install github.com/buckit-io/buckit@latest
 ```
 
-You can alternatively run `go build` and use the `GOOS` and `GOARCH` environment variables to control the OS and architecture target.
-For example:
-
-```
-env GOOS=linux GOARCH=arm64 go build -tags kqueue
-```
-
-Start Buckit by running `buckit server PATH` where `PATH` is any empty folder on your local filesystem.
-
-The Buckit deployment starts using default root credentials `buckitadmin:buckitadmin`.
-You can test the deployment using the Buckit Console, an embedded web-based object browser built into Buckit Server.
-Point a web browser running on the host machine to <http://127.0.0.1:9000> and log in with the root credentials.
-You can use the Browser to create buckets, upload objects, and browse the contents of the Buckit server.
-
-You can also connect using any S3-compatible tool, such as the Buckit Client `mc` commandline tool:
+When building manually, include the `kqueue` build tag:
 
 ```sh
-mc alias set local http://localhost:9000 buckitadmin buckitadmin
-mc admin info local
+go build -tags kqueue -trimpath --ldflags "$(go run buildscripts/gen-ldflags.go)" -o buckit
 ```
 
-> [!NOTE]
-> Production environments using compiled-from-source Buckit binaries do so at their own risk.
-> The AGPLv3 license provides no warranties nor liabilities for any such usage.
+### Linux Packages
+
+Linux release packages are available as `.deb`, `.rpm`, and `.apk` artifacts.
+The helper script downloads the package for the current system, verifies its
+SHA-256 checksum, and prints the package-manager command to run:
+
+```sh
+curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh
+```
 
 ## Build Docker Image
 
-You can use the `docker build .` command to build a Docker image on your local host machine.
-You must first [build Buckit](#install-from-source) and ensure the `buckit` binary exists in the project root.
+Buckit publishes container images for normal Docker usage. To build a custom
+image, use the release workflow or adapt the root `Dockerfile` for your own
+artifact pipeline.
 
-The following command builds the Docker image using the default `Dockerfile` in the root project directory with the repository and image tag `buckit:latest`
-
-```sh
-docker build -t buckit:latest .
-```
-
-Use `docker image ls` to confirm the image exists in your local repository.
-You can run the server using standard Docker invocation:
+Run the published image:
 
 ```sh
-docker run -p 9000:9000 -p 9001:9001 buckit:latest server /data --console-address :9001
+docker run -p 9000:9000 -p 9001:9001 \
+  -v "$HOME/buckit-data:/data" \
+  ghcr.io/buckit-io/buckit:latest server /data --console-address :9001
 ```
 
-Complete documentation for building Docker containers, managing custom images, or loading images into orchestration platforms is out of scope for this documentation.
-You can modify the `Dockerfile` and `dockerscripts/docker-entrypoint.sh` as-needed to reflect your specific image requirements.
-
-## Install using Helm Charts
-
-There are two paths for installing Buckit onto Kubernetes infrastructure:
-
-- Use the [Buckit Operator](https://github.com/buckit-io/operator)
-- Use the community-maintained [Helm charts](https://github.com/buckit-io/buckit/tree/master/helm/minio)
-
-## Test Buckit Connectivity
-
-### Test using Buckit Console
-
-Buckit Server comes with an embedded web based object browser.
-Point your web browser to <http://127.0.0.1:9000> to ensure your server has started successfully.
-
-> [!NOTE]
-> Buckit runs console on random port by default, if you wish to choose a specific port use `--console-address` to pick a specific interface and port.
-
-### Test using Buckit Client `mc`
-
-`mc` provides a modern alternative to UNIX commands like ls, cat, cp, mirror, diff etc. It supports filesystems and Amazon S3 compatible cloud storage services.
-
-The following commands set a local alias, validate the server information, create a bucket, copy data to that bucket, and list the contents of the bucket.
+Run with explicit credentials:
 
 ```sh
-mc alias set local http://localhost:9000 buckitadmin buckitadmin
-mc admin info
-mc mb data
-mc cp ~/Downloads/mydata data/
-mc ls data/
+docker run -p 9000:9000 -p 9001:9001 \
+  -e MINIO_ROOT_USER=myadmin \
+  -e MINIO_ROOT_PASSWORD=mysecretpassword \
+  -v "$HOME/buckit-data:/data" \
+  ghcr.io/buckit-io/buckit:latest server /data --console-address :9001
 ```
 
-## Contribute to Buckit Project
+## Use Buckit With `bm`
 
-Please follow Buckit [Contributor's Guide](https://github.com/buckit-io/buckit/blob/master/CONTRIBUTING.md) for guidance on making new contributions to the repository.
+`bm` is the Buckit Manager CLI for Buckit and S3-compatible object storage.
+It provides object commands such as `ls`, `cp`, `cat`, `mirror`, and `rm`, plus
+Buckit administration and cluster-management workflows.
 
-## License
+Install `bm` on macOS or Linux:
 
-- Buckit source is licensed under the [GNU AGPLv3](https://github.com/buckit-io/buckit/blob/master/LICENSE).
-- Buckit [documentation](https://buckit-io.github.io/docs) is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+```sh
+curl -fsSL https://buckit-io.github.io/bm/install.sh | sh
+bm --help
+```
+
+Install `bm` on Windows PowerShell:
+
+```powershell
+irm https://buckit-io.github.io/bm/install.ps1 | iex
+bm --help
+```
+
+Add an alias for a local Buckit server:
+
+```sh
+bm alias set local http://localhost:9000 buckitadmin buckitadmin
+bm admin info local
+```
+
+Create a bucket and copy data:
+
+```sh
+bm mb local/mydata
+bm cp --recursive ./mydata/ local/mydata/
+bm ls local/mydata
+```
+
+Read, mirror, and remove objects:
+
+```sh
+bm cat local/mydata/object.txt
+bm mirror ./mydata local/mydata
+bm rm local/mydata/object.txt
+```
+
+Use `--dry-run` before large or recursive remove operations:
+
+```sh
+bm rm --recursive --dry-run local/mydata
+```
+
+Common `bm` commands:
+
+| Command | Purpose |
+| --- | --- |
+| `bm alias set` | Add or update a Buckit or S3-compatible endpoint alias. |
+| `bm admin info` | Show deployment information and verify connectivity. |
+| `bm ls` | List buckets, prefixes, objects, or local files. |
+| `bm mb` | Create a bucket or local directory. |
+| `bm cp` | Copy files or objects. |
+| `bm cat` | Print file or object contents. |
+| `bm mirror` | Synchronize local and object storage paths. |
+| `bm rm` | Remove files or objects. |
+| `bm version` | Manage bucket versioning. |
+| `bm retention` | Manage object retention. |
+| `bm legalhold` | Manage object legal holds. |
+| `bm tag` | Manage object tags. |
+| `bm ilm` | Manage lifecycle rules and tiers. |
+| `bm replicate` | Manage bucket replication. |
+| `bm update` | Update the `bm` binary. |
+
+Full `bm` CLI documentation: <https://buckit.sh/docs/reference/bm-cli>
+
+## Buckit Manager Web
+
+`bm` also ships Buckit Manager Web, a local web UI for deploying and managing
+Buckit clusters.
+
+Start it with:
+
+```sh
+bm web
+```
+
+By default, Buckit Manager opens at `http://127.0.0.1:9443/`.
+
+Use Buckit Manager Web to:
+
+- Prepare a local single-node Buckit deployment on macOS or Windows.
+- Deploy a managed Buckit cluster on one or more Linux servers over SSH.
+- Import an existing Buckit or MinIO cluster.
+- Monitor cluster health, nodes, pools, and drives.
+- Run supported cluster and node operations.
+
+Buckit Manager documentation:
+<https://buckit.sh/docs/administration/buckit-manager>
+
+## Distributed Server Mode
+
+For distributed deployments, run the same `buckit server` command on every
+participating node with a shared set of drive endpoints and identical root
+credentials.
+
+Example pattern:
+
+```sh
+export MINIO_ROOT_USER=myadmin
+export MINIO_ROOT_PASSWORD=mysecretpassword
+
+buckit server \
+  http://node{1...4}.example.com/data{1...4} \
+  --console-address :9001
+```
+
+For new production clusters, prefer `bm web` so host discovery, disk selection,
+preflight checks, service setup, and generated credentials are handled by the
+manager instead of hand-written shell commands.
+
+## Development
+
+Common repository commands:
+
+```sh
+make build
+make install
+make test
+make lint
+make verifiers
+go generate ./...
+make check-gen
+```
+
+Build and test commands must include the `kqueue` tag when run manually:
+
+```sh
+CGO_ENABLED=0 go test -v -tags kqueue,dev ./...
+```
+
+Generated files ending in `_gen.go` or `_string.go` must be regenerated and
+committed when their source types change.
+
+## License and Support
+
+Buckit is licensed under the
+[GNU AGPLv3](https://github.com/buckit-io/buckit/blob/master/LICENSE).
+
+All usage must comply with AGPLv3 obligations. The license provides no warranty,
+liability, or support obligation. Community support is available through GitHub
+and the Buckit Discord community:
+<https://discord.gg/8BDBVDPqp>.
+
+See also:
+
+- [Contributor Guide](https://github.com/buckit-io/buckit/blob/master/CONTRIBUTING.md)
 - [License Compliance](https://github.com/buckit-io/buckit/blob/master/COMPLIANCE.md)
+- [Buckit Manager CLI](https://github.com/buckit-io/bm)
+- [Buckit Discord](https://discord.gg/8BDBVDPqp)
