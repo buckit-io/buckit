@@ -156,8 +156,6 @@ These need access to the GitHub org, Docker Hub, and a local machine with
 - Add an SBOM step (`anchore/sbom-action`) and attach it to the GitHub Release.
   Commonly requested for AGPL-licensed infrastructure software.
 - Add `cosign` image signing (independent of minisign binary signing).
-- Publish Helm chart index updates from the same workflow (there is already a
-  `helm-reindex.sh` at the repo root).
 - Rename `MINIO_*` env variables in `dockerscripts/docker-entrypoint.sh` to
   `BUCKIT_*` (separate rebrand task, not release-process).
 

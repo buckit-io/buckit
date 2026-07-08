@@ -17,7 +17,6 @@ Buckit also supports multi-cluster, multi-site federation similar to AWS regions
   - [Installing Spark](https://docs.hortonworks.com/HDPDocuments/HDP3/HDP-3.0.1/installing-spark/content/installing_spark.html)
 - Install Buckit Distributed Server using one of the guides below.
   - [Deployment based on Kubernetes](https://buckit-io.github.io/docs/community/minio-object-store/operations/deployments/kubernetes.html)
-  - [Deployment based on Buckit Helm Chart](https://github.com/helm/charts/tree/master/stable/minio)
 
 ## **3. Configure Hadoop, Spark, Hive to use Buckit**
 

@@ -1,82 +1,157 @@
-# Buckit Contribution Guide [![Slack](https://slack.min.io/slack?type=svg)](https://slack.min.io) [![Docker Pulls](https://img.shields.io/docker/pulls/minio/minio.svg?maxAge=604800)](https://hub.docker.com/r/minio/minio/)
+# Buckit Contribution Guide
 
-``Buckit`` community welcomes your contribution. To make the process as seamless as possible, we recommend you read this contribution guide.
+Buckit welcomes contributions that improve the server, documentation, tests,
+packaging, and operator experience.
 
-## Development Workflow
+Join the Buckit community on Discord if you want to discuss a change before
+opening a pull request: <https://discord.gg/8BDBVDPqp>.
 
-Start by forking the Buckit GitHub repository, make changes in a branch and then send a pull request. We encourage pull requests to discuss code changes. Here are the steps in details:
+Please follow the [Code of Conduct](code_of_conduct.md) when participating in
+project spaces.
 
-### Setup your Buckit GitHub Repository
+## Development Setup
 
-Fork [Buckit upstream](https://github.com/buckit-io/buckit/fork) source repository to your own personal repository. Copy the URL of your Buckit fork (you will need it for the `git clone` command below).
+Buckit requires Go 1.25 or newer. If Go is not installed, download and install
+it from the official Go installation page: <https://go.dev/doc/install>.
+
+Clone the repository and build the server:
 
 ```sh
-git clone https://github.com/buckit-io/buckit
+git clone https://github.com/buckit-io/buckit.git
 cd buckit
 make build
-ls ./buckit
+./buckit --version
 ```
 
-### Set up git remote as ``upstream``
+The built server binary is `./buckit`.
+
+## Contribution Workflow
+
+1. Fork <https://github.com/buckit-io/buckit>.
+2. Clone your fork locally.
+3. Add the upstream repository as a remote.
+4. Create a branch for your change.
+5. Make the smallest coherent change that solves the issue.
+6. Add or update tests and documentation as needed.
+7. Run the relevant verification commands.
+8. Open a pull request.
+
+Example:
 
 ```sh
-$ cd buckit
-$ git remote add upstream https://github.com/buckit-io/buckit
-$ git fetch upstream
-$ git merge upstream/master
-...
+git clone https://github.com/YOUR_GITHUB_USER/buckit.git
+cd buckit
+git remote add upstream https://github.com/buckit-io/buckit.git
+git fetch upstream
+git checkout -b my-change upstream/master
 ```
 
-### Create your feature branch
+Keep your branch current with upstream:
 
-Before making code changes, make sure you create a separate branch for these changes
-
-```
-git checkout -b my-new-feature
-```
-
-### Test Buckit server changes
-
-After your code changes, make sure
-
-- To add test cases for the new code. If you have questions about how to do it, please ask on our [Slack](https://slack.min.io) channel.
-- To run `make verifiers`
-- To squash your commits into a single commit. `git rebase -i`. It's okay to force update your pull request.
-- To run `make test` and `make build` completes.
-
-### Commit changes
-
-After verification, commit your changes. This is a [great post](https://chris.beams.io/posts/git-commit/) on how to write useful commit messages
-
-```
-git commit -am 'Add some feature'
+```sh
+git fetch upstream
+git rebase upstream/master
 ```
 
-### Push to the branch
+## Verification
 
-Push your locally committed changes to the remote origin (your fork)
+Run the smallest useful test set while developing, then run the full relevant
+checks before opening a pull request.
 
+Build:
+
+```sh
+make build
 ```
-git push origin my-new-feature
+
+Run verifiers:
+
+```sh
+make verifiers
 ```
 
-### Create a Pull Request
+Run unit tests:
 
-Pull requests can be created via GitHub. Refer to [this document](https://help.github.com/articles/creating-a-pull-request/) for detailed steps on how to create a pull request. After a Pull Request gets peer reviewed and approved, it will be merged.
+```sh
+make test
+```
 
-## FAQs
+Manual `go test` commands must include the `kqueue` build tag. Use the `dev`
+tag for tests that require it:
 
-### How does ``Buckit`` manage dependencies?
+```sh
+CGO_ENABLED=0 go test -v -tags kqueue,dev ./...
+```
 
-``Buckit`` uses `go mod` to manage its dependencies.
+Run a focused test:
 
-- Run `go get foo/bar` in the source folder to add the dependency to `go.mod` file.
+```sh
+CGO_ENABLED=0 go test -v -tags kqueue,dev -run TestFoo ./cmd/
+```
 
-To remove a dependency
+Run IAM-specific tests:
 
-- Edit your code and remove the import reference.
-- Run `go mod tidy` in the source folder to remove dependency from `go.mod` file.
+```sh
+MINIO_API_REQUESTS_MAX=10000 CGO_ENABLED=0 go test -timeout 15m -tags kqueue,dev -v -run TestIAM* ./cmd
+```
 
-### What are the coding guidelines for Buckit?
+## Generated Code
 
-``Buckit`` is fully conformant with Golang style. Refer: [Effective Go](https://github.com/golang/go/wiki/CodeReviewComments) article from Golang project. If you observe offending code, please feel free to send a pull request or ping us on [Slack](https://slack.min.io).
+Files ending in `_gen.go` are generated by `msgp`. Files ending in
+`_string.go` are generated by `stringer`.
+
+After changing source types or annotations used by generated code, run:
+
+```sh
+go generate ./...
+make check-gen
+```
+
+Generated files must be committed with the source change.
+
+## Dependencies
+
+Buckit uses Go modules.
+
+Add or update a dependency:
+
+```sh
+go get example.com/module@version
+go mod tidy
+```
+
+Remove a dependency by deleting the imports and then running:
+
+```sh
+go mod tidy
+```
+
+Commit `go.mod` and `go.sum` changes when they are part of your change.
+
+## Coding Guidelines
+
+- Follow standard Go style and the guidance in
+  <https://go.dev/wiki/CodeReviewComments>.
+- Keep changes focused. Avoid mixing refactors, formatting-only edits, and
+  behavior changes in one pull request.
+- Preserve existing storage formats and compatibility unless the change
+  explicitly migrates them.
+- Include tests for behavior changes and regression fixes.
+- Run `gofumpt` and `goimports` formatting through the configured lint flow.
+
+## Pull Requests
+
+Use clear commit messages and pull request descriptions. Explain:
+
+- What changed.
+- Why the change is needed.
+- How it was tested.
+- Any compatibility or migration impact.
+
+Pull requests are reviewed on GitHub. Address review feedback with follow-up
+commits; maintainers may squash commits when merging.
+
+## License
+
+By contributing to Buckit, you agree that your contribution is licensed under
+the repository's AGPLv3 license.
