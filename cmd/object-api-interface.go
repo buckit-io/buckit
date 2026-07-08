@@ -27,8 +27,8 @@ import (
 	"github.com/buckit-io/buckit/internal/hash"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7/pkg/encrypt"
-	"github.com/buckit-io/minio-go/v7/pkg/tags"
+	"github.com/buckit-io/buckit-go/v7/pkg/encrypt"
+	"github.com/buckit-io/buckit-go/v7/pkg/tags"
 )
 
 //go:generate msgp -file $GOFILE -io=false -tests=false -unexported=false

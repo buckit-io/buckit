@@ -21,7 +21,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/buckit-io/buckit-go/v7/pkg/set"
 )
 
 const (

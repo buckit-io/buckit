@@ -33,7 +33,7 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
-	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/buckit-io/buckit-go/v7/pkg/set"
 	"github.com/buckit-io/buckit/internal/config"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/buckit-io/buckit/internal/mountinfo"

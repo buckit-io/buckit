@@ -33,7 +33,7 @@ import (
 
 	"github.com/buckit-io/buckit/internal/grid"
 	"github.com/buckit-io/buckit/internal/logger"
-	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/buckit-io/buckit-go/v7/pkg/set"
 	"github.com/minio/pkg/v3/env"
 )
 

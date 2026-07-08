@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/buckit-io/buckit-go/v7/pkg/set"
 	"github.com/buckit-io/buckit/internal/config"
 	cfgldap "github.com/buckit-io/buckit/internal/config/identity/ldap"
 	"github.com/buckit-io/buckit/internal/config/identity/openid"

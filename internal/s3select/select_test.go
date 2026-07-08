@@ -29,7 +29,7 @@ import (
 	"testing"
 
 	"github.com/klauspost/cpuid/v2"
-	"github.com/buckit-io/minio-go/v7"
+	"github.com/buckit-io/buckit-go/v7"
 	"github.com/minio/simdjson-go"
 )
 

@@ -28,7 +28,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/buckit-io/minio-go/v7"
+	"github.com/buckit-io/buckit-go/v7"
 	objectlock "github.com/buckit-io/buckit/internal/bucket/object/lock"
 	"github.com/buckit-io/buckit/internal/bucket/replication"
 	xhttp "github.com/buckit-io/buckit/internal/http"

@@ -45,7 +45,7 @@ import (
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/buckit/internal/logger"
-	"github.com/buckit-io/minio-go/v7/pkg/s3utils"
+	"github.com/buckit-io/buckit-go/v7/pkg/s3utils"
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/s2"
 	"github.com/klauspost/readahead"

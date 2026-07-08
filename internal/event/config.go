@@ -25,7 +25,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/buckit-io/buckit-go/v7/pkg/set"
 )
 
 // ValidateFilterRuleValue - checks if given value is filter rule value or not.

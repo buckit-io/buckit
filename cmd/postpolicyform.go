@@ -29,8 +29,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/buckit-io/minio-go/v7/pkg/encrypt"
-	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/buckit-io/buckit-go/v7/pkg/encrypt"
+	"github.com/buckit-io/buckit-go/v7/pkg/set"
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	"github.com/buckit-io/buckit/internal/s3select/jstream"
 )

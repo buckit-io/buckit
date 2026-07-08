@@ -87,12 +87,14 @@ github.com/beevik/ntp v1.4.3/go.mod h1:Unr8Zg+2dRn7d8bHFuehIMSvvUYssHMxW3Q5Nx4RW
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
+github.com/buckit-io/buckit-go/v7 v7.0.0 h1:EmdKh2WEx7LVUJJDrDjRqB+J1fe8Y/3niMSgPpXlLW4=
+github.com/buckit-io/buckit-go/v7 v7.0.0/go.mod h1:kgvGo5Zx9aQGSeEHL5crOkXAegZa85mYpLtoARaZXaI=
 github.com/buckit-io/console v0.0.0-20260524020438-f8ce35f8fcdb h1:YH2cALyX0Tbp/b8GmpmmZPrahKkpVCxRRzjwu6ikB2I=
 github.com/buckit-io/console v0.0.0-20260524020438-f8ce35f8fcdb/go.mod h1:GgsXfq7rswezKPDIsuOqpVNF0JRgAH8jzEYVucUMZ2U=
 github.com/buckit-io/madmin-go/v3 v3.0.0-20260522015421-d3ce3b5623dd h1:y0upUBPrm+m6pfjNUpX2jLoXuf9OLq4cvzxopRl9yfk=
 github.com/buckit-io/madmin-go/v3 v3.0.0-20260522015421-d3ce3b5623dd/go.mod h1:ZlUSfGY7ftzLbs44+SFFxO1EjOerkvpOsIms8KYpw/Y=
-github.com/buckit-io/minio-go/v7 v7.0.0-20260518233947-e88e1acf1753 h1:YFtyExFNjiy/6XadzLpFQhtNs/+0Wg5fMvkmAUsbGDc=
-github.com/buckit-io/minio-go/v7 v7.0.0-20260518233947-e88e1acf1753/go.mod h1:BUumMMePR4aDa45CPH58IDH3oVJFNBr6s+Afk6zkLFA=
+github.com/buckit-io/madmin-go/v3 v3.0.0 h1:Z3AGQ6H483GWifpKNNGCyyDDYCU14JFfyovwB7KpT0c=
+github.com/buckit-io/madmin-go/v3 v3.0.0/go.mod h1:p35rieUNcIUjd3Gyy3UX7zuZ6M5xAtM1Ob34QUovrHg=
 github.com/buger/jsonparser v1.1.2 h1:frqHqw7otoVbk5M8LlE/L7HTnIq2v9RX6EJ48i9AxJk=
 github.com/buger/jsonparser v1.1.2/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx27UK13J/0=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
@@ -586,6 +588,8 @@ github.com/prometheus/procfs v0.16.1 h1:hZ15bTNuirocR6u0JZ6BAHHmwS1p8B4P6MRqxtzM
 github.com/prometheus/procfs v0.16.1/go.mod h1:teAbpZRB1iIAJYREa1LsoWUXykVXA1KlTmWl8x/U+Is=
 github.com/prometheus/prom2json v1.4.2 h1:PxCTM+Whqi/eykO1MKsEL0p/zMpxp9ybpsmdFamw6po=
 github.com/prometheus/prom2json v1.4.2/go.mod h1:zuvPm7u3epZSbXPWHny6G+o8ETgu6eAK3oPr6yFkRWE=
+github.com/prometheus/prom2json v1.5.0 h1:WIcAOjLE1x476W3dUlmTL6E/e98CgVGuwwYusl6MPP8=
+github.com/prometheus/prom2json v1.5.0/go.mod h1:xPp6KDhCA30btxmqEfg/K3DAwgTIkp7TJKi4+7jaYd8=
 github.com/prometheus/prometheus v0.311.3 h1:3IrVxQv6v5i/ZCGi6OrYeBhtCwaPTn6Z3DYruXoYm3M=
 github.com/prometheus/prometheus v0.311.3/go.mod h1:gjsCxTKtHO1Q8T9333u1s+lUR1OjPyM7ruuGH8RvVyo=
 github.com/puzpuzpuz/xsync/v3 v3.5.1 h1:GJYJZwO6IdxN/IKbneznS6yPkVC+c3zyY/j19c++5Fg=

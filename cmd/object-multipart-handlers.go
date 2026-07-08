@@ -31,9 +31,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/buckit-io/minio-go/v7"
-	"github.com/buckit-io/minio-go/v7/pkg/encrypt"
-	"github.com/buckit-io/minio-go/v7/pkg/tags"
+	"github.com/buckit-io/buckit-go/v7"
+	"github.com/buckit-io/buckit-go/v7/pkg/encrypt"
+	"github.com/buckit-io/buckit-go/v7/pkg/tags"
 	"github.com/buckit-io/buckit/internal/amztime"
 	sse "github.com/buckit-io/buckit/internal/bucket/encryption"
 	objectlock "github.com/buckit-io/buckit/internal/bucket/object/lock"

@@ -47,7 +47,7 @@ import (
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7/pkg/tags"
+	"github.com/buckit-io/buckit-go/v7/pkg/tags"
 	"github.com/klauspost/readahead"
 	"github.com/minio/pkg/v3/mimedb"
 	"github.com/minio/pkg/v3/sync/errgroup"

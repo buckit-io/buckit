@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/buckit-io/minio-go/v7/pkg/signer"
+	"github.com/buckit-io/buckit-go/v7/pkg/signer"
 	"github.com/buckit-io/buckit/internal/auth"
 	"github.com/buckit-io/buckit/internal/config"
 	"github.com/buckit-io/buckit/internal/config/lambda"

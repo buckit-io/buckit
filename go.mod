@@ -21,9 +21,9 @@ require (
 	github.com/IBM/sarama v1.45.1
 	github.com/alecthomas/participle v0.7.1
 	github.com/beevik/ntp v1.4.3
+	github.com/buckit-io/buckit-go/v7 v7.0.0
 	github.com/buckit-io/console v0.0.0-20260524020438-f8ce35f8fcdb
-	github.com/buckit-io/madmin-go/v3 v3.0.0-20260522015421-d3ce3b5623dd
-	github.com/buckit-io/minio-go/v7 v7.0.0-20260518233947-e88e1acf1753
+	github.com/buckit-io/madmin-go/v3 v3.0.0
 	github.com/buger/jsonparser v1.1.2
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cheggaaa/pb v1.0.29
@@ -248,7 +248,7 @@ require (
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/posener/complete v1.2.3 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
-	github.com/prometheus/prom2json v1.4.2 // indirect
+	github.com/prometheus/prom2json v1.5.0 // indirect
 	github.com/prometheus/prometheus v0.311.3 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rjeczalik/notify v0.9.3 // indirect

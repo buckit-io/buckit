@@ -59,9 +59,9 @@ import (
 	"github.com/buckit-io/buckit/internal/kms"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7"
-	"github.com/buckit-io/minio-go/v7/pkg/set"
-	"github.com/buckit-io/minio-go/v7/pkg/tags"
+	"github.com/buckit-io/buckit-go/v7"
+	"github.com/buckit-io/buckit-go/v7/pkg/set"
+	"github.com/buckit-io/buckit-go/v7/pkg/tags"
 	"github.com/minio/pkg/v3/policy"
 	"github.com/minio/pkg/v3/sync/errgroup"
 )

@@ -29,8 +29,8 @@ import (
 
 	"github.com/klauspost/compress/gzhttp"
 	"github.com/lithammer/shortuuid/v4"
-	miniogo "github.com/buckit-io/minio-go/v7"
-	"github.com/buckit-io/minio-go/v7/pkg/credentials"
+	miniogo "github.com/buckit-io/buckit-go/v7"
+	"github.com/buckit-io/buckit-go/v7/pkg/credentials"
 	"github.com/minio/mux"
 	"github.com/minio/pkg/v3/policy"
 

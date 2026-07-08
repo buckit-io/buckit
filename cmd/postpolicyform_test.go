@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	minio "github.com/buckit-io/minio-go/v7"
+	minio "github.com/buckit-io/buckit-go/v7"
 	xhttp "github.com/buckit-io/buckit/internal/http"
 )
 

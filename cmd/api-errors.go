@@ -40,8 +40,8 @@ import (
 	"github.com/buckit-io/buckit/internal/kms"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7"
-	"github.com/buckit-io/minio-go/v7/pkg/tags"
+	"github.com/buckit-io/buckit-go/v7"
+	"github.com/buckit-io/buckit-go/v7/pkg/tags"
 
 	objectlock "github.com/buckit-io/buckit/internal/bucket/object/lock"
 	"github.com/buckit-io/buckit/internal/bucket/versioning"

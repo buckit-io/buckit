@@ -30,7 +30,7 @@ import (
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
-	"github.com/buckit-io/minio-go/v7/pkg/tags"
+	"github.com/buckit-io/buckit-go/v7/pkg/tags"
 	"github.com/buckit-io/buckit/internal/crypto"
 	xhttp "github.com/buckit-io/buckit/internal/http"
 	"github.com/buckit-io/buckit/internal/kms"

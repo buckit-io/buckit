@@ -25,7 +25,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/buckit-io/buckit-go/v7/pkg/set"
 	"github.com/buckit-io/buckit/internal/config"
 	"github.com/buckit-io/buckit/internal/logger"
 	xnet "github.com/minio/pkg/v3/net"

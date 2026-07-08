@@ -33,7 +33,7 @@ import (
 	"net/http"
 	"os"
 
-	cr "github.com/buckit-io/minio-go/v7/pkg/credentials"
+	cr "github.com/buckit-io/buckit-go/v7/pkg/credentials"
 	cmd "github.com/buckit-io/buckit/cmd"
 )
 

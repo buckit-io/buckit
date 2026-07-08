@@ -24,7 +24,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/buckit-io/buckit-go/v7/pkg/set"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"

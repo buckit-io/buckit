@@ -47,7 +47,7 @@ import (
 	"github.com/buckit-io/buckit/internal/jwt"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/minio-go/v7/pkg/set"
+	"github.com/buckit-io/buckit-go/v7/pkg/set"
 	"github.com/minio/pkg/v3/env"
 	"github.com/minio/pkg/v3/ldap"
 	"github.com/minio/pkg/v3/policy"
