@@ -13,9 +13,8 @@ Join the Buckit community on Discord: <https://discord.gg/8BDBVDPqp>.
 
 > [!NOTE]
 > Buckit is an independent project derived from the AGPLv3-licensed
-> [MinIO](https://github.com/minio/minio) project, whose upstream repository
-> was archived on April 25, 2026. Buckit is not affiliated with or endorsed by
-> MinIO, Inc.
+> [MinIO](https://github.com/minio/minio) project.
+> Buckit is not affiliated with or endorsed by MinIO, Inc.
 
 ## What Buckit Provides
 
