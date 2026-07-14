@@ -9,6 +9,9 @@ from collections import Counter
 
 ALLOWED_OSVS = {
     "GO-2026-5662",
+    # Reported at the golang.org/x/crypto module level; Buckit imports ssh,
+    # blake2b, chacha20, and sha3, with no direct openpgp call path.
+    "GO-2026-5932",
 }
 
 
