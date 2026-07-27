@@ -98,8 +98,8 @@ manager instead of hand-written shell commands.
 
 ## Install Buckit
 
-For bare-metal deployment instructions, see the
-[Bare Metal Deployment Guide](https://buckit.sh/docs/operations/deployments/baremetal-deploy-server).
+For detailed installation instructions, see the
+[Deployment Guide](https://buckit.sh/docs/operations/deployments/baremetal-deploy-server).
 
 ### Linux Packages (recommended)
 
