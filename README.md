@@ -23,9 +23,6 @@ console, and distributed erasure-coded storage for multi-node deployments.
   <img src=".github/web-console.gif" alt="Buckit web console">
 </p>
 
-The server binary is `buckit`. The companion operator CLI is
-[`bm`](https://github.com/buckit-io/bm), the Buckit Manager.
-
 Join the Buckit community on Discord: <https://discord.gg/8BDBVDPqp>.
 
 > [!NOTE]
