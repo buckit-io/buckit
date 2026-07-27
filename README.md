@@ -15,10 +15,13 @@
   </a>
 </p>
 
-Buckit is a high-performance, S3-compatible object storage server written in Go.
-It provides an S3 API endpoint for buckets and objects, an embedded browser
-console, and distributed erasure-coded storage for multi-node deployments. For
-quick guided installation, see the [Getting Started video](https://buckit.sh/#getting-started)
+Buckit is an open-source, S3-compatible object storage system you run on your
+own commodity servers. It gives your applications an Amazon S3-style API while
+keeping your data under your control, and it can scale from a small setup to
+hundreds of petabytes. Teams use Buckit when they want S3-like storage without
+sending all data to a public cloud or paying cloud storage bills at scale.
+
+For quick guided installation, see the [Getting Started video](https://buckit.sh/#getting-started)
 or read the [documentation](https://buckit.sh/docs) to learn more.
 
 <p align="center">
