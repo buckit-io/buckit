@@ -98,6 +98,19 @@ manager instead of hand-written shell commands.
 
 ## Install Buckit
 
+For bare-metal deployment instructions, see the
+[Bare Metal Deployment Guide](https://buckit.sh/docs/operations/deployments/baremetal-deploy-server).
+
+### Linux Packages (recommended)
+
+Linux release packages are available as `.deb`, `.rpm`, and `.apk` artifacts.
+The helper script downloads the package for the current system, verifies its
+SHA-256 checksum, and prints the package-manager command to run:
+
+```sh
+curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh
+```
+
 ### Build From Source
 
 Buckit requires Go 1.25 or newer. If Go is not installed, download and install
@@ -121,16 +134,6 @@ When building manually, include the `kqueue` build tag:
 
 ```sh
 go build -tags kqueue -trimpath --ldflags "$(go run buildscripts/gen-ldflags.go)" -o buckit
-```
-
-### Linux Packages
-
-Linux release packages are available as `.deb`, `.rpm`, and `.apk` artifacts.
-The helper script downloads the package for the current system, verifies its
-SHA-256 checksum, and prints the package-manager command to run:
-
-```sh
-curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh
 ```
 
 ## Build Docker Image
