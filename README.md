@@ -23,12 +23,12 @@ console, and distributed erasure-coded storage for multi-node deployments.
   <img src=".github/web-console.gif" alt="Buckit web console">
 </p>
 
-Join the Buckit community on Discord: <https://discord.gg/8BDBVDPqp>.
-
 > [!NOTE]
 > Buckit is an independent project derived from the AGPLv3-licensed
 > [MinIO](https://github.com/minio/minio) project.
 > Buckit is not affiliated with or endorsed by MinIO, Inc.
+
+Join the Buckit community on Discord: <https://discord.gg/8BDBVDPqp>.
 
 ## What Buckit Provides
 
