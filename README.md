@@ -18,8 +18,8 @@
 Buckit is a high-performance, S3-compatible object storage server written in Go.
 It provides an S3 API endpoint for buckets and objects, an embedded browser
 console, and distributed erasure-coded storage for multi-node deployments. For
-quick guided installation, see the [Getting Started video](https://buckit.sh/#getting-started).
-Read the [Buckit documentation](https://buckit.sh/docs) to learn more.
+quick guided installation, see the [Getting Started video](https://buckit.sh/#getting-started)
+or read the [documentation](https://buckit.sh/docs) to learn more.
 
 <p align="center">
   <img src=".github/web-console.gif" alt="Buckit web console">
