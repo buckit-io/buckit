@@ -39,6 +39,12 @@ or read the [documentation](https://buckit.sh/docs) to learn more.
 - CLI tool for admin and object automation.
 - Web-based cluster and node management.
 
+## How Buckit Works Internally
+
+- [Architecture](https://buckit.sh/docs/operations/concepts/architecture)
+- [Erasure Coding](https://buckit.sh/docs/operations/concepts/erasure-coding)
+- [Availability and Resiliency](https://buckit.sh/docs/operations/concepts/availability-and-resiliency)
+
 ## Quickstart
 
 Build and run a local Buckit server:
