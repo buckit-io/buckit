@@ -33,9 +33,9 @@ console, and distributed erasure-coded storage for multi-node deployments.
 - S3-compatible object storage for existing S3 SDKs and tools.
 - Standalone single-node mode for development and small deployments.
 - Distributed erasure-coded mode for production clusters.
-- Browser console for basic object and administrative workflows.
-- Admin APIs used by `bm` for cluster discovery, health, and operations.
-- AGPLv3-licensed source code.
+- Browser console for object and storage workflows.
+- CLI tool for admin and object automation.
+- Web-based cluster and node management.
 
 ## Quickstart
 
