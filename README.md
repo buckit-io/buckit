@@ -1,30 +1,27 @@
 # Buckit
 
-Website: <https://buckit.sh>
-
-Buckit is a high-performance, S3-compatible object storage server written in Go.
-It provides an S3 API endpoint for buckets and objects, an embedded browser
-console, and distributed erasure-coded storage for multi-node deployments.
-
-![Buckit web console](https://scrollful.s3.us-east-1.amazonaws.com/videos/web-console.gif)
-
 <p align="center">
-  <a href="https://buckit.sh">
-    <img src="https://img.shields.io/badge/Website-buckit.sh-111827?logo=googlechrome&logoColor=white" alt="Buckit website">
-  </a>
-  <a href="https://discord.gg/8BDBVDPqp">
-    <img src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white" alt="Join Buckit on Discord">
-  </a>
   <a href="https://github.com/buckit-io/buckit/actions/workflows/go-cross.yml">
     <img src="https://github.com/buckit-io/buckit/actions/workflows/go-cross.yml/badge.svg" alt="Build status">
   </a>
   <a href="https://github.com/buckit-io/buckit/actions/workflows/vulncheck.yml">
     <img src="https://github.com/buckit-io/buckit/actions/workflows/vulncheck.yml/badge.svg" alt="Vulnerability check">
   </a>
-  <a href="https://github.com/buckit-io/buckit/blob/master/LICENSE">
-    <img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="AGPL-3.0 license">
+  <a href="https://buckit.sh">
+    <img src="https://img.shields.io/badge/Website-buckit.sh-111827?logo=googlechrome&logoColor=white" alt="Buckit website">
+  </a>
+  <a href="https://discord.gg/8BDBVDPqp">
+    <img src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white" alt="Join Buckit on Discord">
   </a>
 </p>
+
+Website: <https://buckit.sh>
+
+Buckit is a high-performance, S3-compatible object storage server written in Go.
+It provides an S3 API endpoint for buckets and objects, an embedded browser
+console, and distributed erasure-coded storage for multi-node deployments.
+
+![Buckit web console](.github/web-console.gif)
 
 The server binary is `buckit`. The companion operator CLI is
 [`bm`](https://github.com/buckit-io/bm), the Buckit Manager.
