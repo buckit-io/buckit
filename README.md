@@ -15,13 +15,13 @@
   </a>
 </p>
 
-Website: <https://buckit.sh>
-
 Buckit is a high-performance, S3-compatible object storage server written in Go.
 It provides an S3 API endpoint for buckets and objects, an embedded browser
 console, and distributed erasure-coded storage for multi-node deployments.
 
-![Buckit web console](.github/web-console.gif)
+<p align="center">
+  <img src=".github/web-console.gif" alt="Buckit web console">
+</p>
 
 The server binary is `buckit`. The companion operator CLI is
 [`bm`](https://github.com/buckit-io/bm), the Buckit Manager.
