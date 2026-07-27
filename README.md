@@ -1,4 +1,4 @@
-# Buckit
+# Buckit Object Storage
 
 <p align="center">
   <a href="https://github.com/buckit-io/buckit/actions/workflows/go-cross.yml">
