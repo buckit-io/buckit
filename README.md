@@ -28,8 +28,6 @@ console, and distributed erasure-coded storage for multi-node deployments.
 > [MinIO](https://github.com/minio/minio) project.
 > Buckit is not affiliated with or endorsed by MinIO, Inc.
 
-Join the Buckit community on Discord: <https://discord.gg/8BDBVDPqp>.
-
 ## What Buckit Provides
 
 - S3-compatible object storage for existing S3 SDKs and tools.
