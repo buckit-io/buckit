@@ -137,6 +137,8 @@ docker run -p 9000:9000 -p 9001:9001 \
 It provides object commands such as `ls`, `cp`, `cat`, `mirror`, and `rm`, plus
 Buckit administration and cluster-management workflows.
 
+See the [`bm` GitHub repository](https://github.com/buckit-io/bm).
+
 Install `bm` on macOS or Linux:
 
 ```sh
