@@ -42,12 +42,6 @@ or read the [documentation](https://buckit.sh/docs) to learn more.
 - CLI tool for admin and object automation.
 - Web-based cluster and node management.
 
-## How Buckit Works Internally
-
-- [Architecture](https://buckit.sh/docs/operations/concepts/architecture)
-- [Erasure Coding](https://buckit.sh/docs/operations/concepts/erasure-coding)
-- [Availability and Resiliency](https://buckit.sh/docs/operations/concepts/availability-and-resiliency)
-
 ## Quickstart
 
 Build and run a local Buckit server:
@@ -80,6 +74,27 @@ export MINIO_ROOT_PASSWORD=mysecretpassword
 The root credential environment variable names remain `MINIO_ROOT_USER` and
 `MINIO_ROOT_PASSWORD` for compatibility with the storage engine and existing
 deployment tooling.
+
+## Distributed Server Mode
+
+For distributed deployments, run the same `buckit server` command on every
+participating node with a shared set of drive endpoints and identical root
+credentials.
+
+Example pattern:
+
+```sh
+export MINIO_ROOT_USER=myadmin
+export MINIO_ROOT_PASSWORD=mysecretpassword
+
+buckit server \
+  http://node{1...4}.example.com/data{1...4} \
+  --console-address :9001
+```
+
+For new production clusters, prefer `bm web` so host discovery, disk selection,
+preflight checks, service setup, and generated credentials are handled by the
+manager instead of hand-written shell commands.
 
 ## Install Buckit
 
@@ -239,26 +254,11 @@ Use Buckit Manager Web to:
 Buckit Manager documentation:
 <https://buckit.sh/docs/administration/buckit-manager>
 
-## Distributed Server Mode
+## How Buckit Works Internally
 
-For distributed deployments, run the same `buckit server` command on every
-participating node with a shared set of drive endpoints and identical root
-credentials.
-
-Example pattern:
-
-```sh
-export MINIO_ROOT_USER=myadmin
-export MINIO_ROOT_PASSWORD=mysecretpassword
-
-buckit server \
-  http://node{1...4}.example.com/data{1...4} \
-  --console-address :9001
-```
-
-For new production clusters, prefer `bm web` so host discovery, disk selection,
-preflight checks, service setup, and generated credentials are handled by the
-manager instead of hand-written shell commands.
+- [Architecture](https://buckit.sh/docs/operations/concepts/architecture)
+- [Erasure Coding](https://buckit.sh/docs/operations/concepts/erasure-coding)
+- [Availability and Resiliency](https://buckit.sh/docs/operations/concepts/availability-and-resiliency)
 
 ## Development
 
