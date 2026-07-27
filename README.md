@@ -277,8 +277,7 @@ Buckit is licensed under the
 
 All usage must comply with AGPLv3 obligations. The license provides no warranty,
 liability, or support obligation. Community support is available through GitHub
-and the Buckit Discord community:
-<https://discord.gg/8BDBVDPqp>.
+and the [Buckit Discord community](https://discord.gg/8BDBVDPqp).
 
 See also:
 
