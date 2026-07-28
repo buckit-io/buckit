@@ -44,6 +44,10 @@ or read the [documentation](https://buckit.sh/docs) to learn more.
 
 ## Quickstart
 
+> [!NOTE]
+> This quickstart runs Buckit manually. For a production service deployment,
+> follow the [Getting Started guide](https://buckit.sh/#getting-started).
+
 Build and run a local Buckit server:
 
 ```sh
