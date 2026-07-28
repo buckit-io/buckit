@@ -92,7 +92,7 @@ buckit server \
   --console-address :9001
 ```
 
-For new production clusters, prefer `bm web` so host discovery, disk selection,
+For new production clusters, prefer [`bm web`](https://github.com/buckit-io/buckit#buckit-manager-web) so host discovery, disk selection,
 preflight checks, service setup, and generated credentials are handled by the
 manager instead of hand-written shell commands.
 
