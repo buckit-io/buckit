@@ -10,7 +10,7 @@
   <a href="https://buckit.sh">
     <img src="https://img.shields.io/badge/Website-buckit.sh-111827?logo=googlechrome&logoColor=white" alt="Buckit website">
   </a>
-  <a href="https://discord.gg/tHpSUnaAMq">
+  <a href="https://discord.gg/v5utBPpsGu">
     <img src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white" alt="Join Buckit on Discord">
   </a>
 </p>
@@ -297,11 +297,11 @@ Buckit is licensed under the
 
 All usage must comply with AGPLv3 obligations. The license provides no warranty,
 liability, or support obligation. Community support is available through GitHub
-and the [Buckit Discord community](https://discord.gg/tHpSUnaAMq).
+and the [Buckit Discord community](https://discord.gg/v5utBPpsGu).
 
 See also:
 
 - [Contributor Guide](https://github.com/buckit-io/buckit/blob/master/CONTRIBUTING.md)
 - [License Compliance](https://github.com/buckit-io/buckit/blob/master/COMPLIANCE.md)
 - [Buckit Manager CLI](https://github.com/buckit-io/bm)
-- [Buckit Discord](https://discord.gg/tHpSUnaAMq)
+- [Buckit Discord](https://discord.gg/v5utBPpsGu)
