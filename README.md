@@ -1,3 +1,8 @@
+> [!NOTE]
+> Buckit is an independent project derived from the discontinued open source
+> [MinIO](https://github.com/minio/minio) project. Buckit is not affiliated
+> with or endorsed by MinIO, Inc.
+
 # Buckit Object Storage
 
 <p align="center">
@@ -21,32 +26,34 @@ keeping your data under your control, and it can scale from a small setup to
 hundreds of petabytes. Teams use Buckit when they want S3-like storage without
 sending all data to a public cloud or paying cloud storage bills at scale.
 
-For quick guided installation, see the [Getting Started video](https://buckit.sh/#getting-started)
-or read the [documentation](https://buckit.sh/docs) to learn more.
-
 <p align="center">
   <img src=".github/web-console.gif" alt="Buckit web console">
 </p>
 
-> [!NOTE]
-> Buckit is an independent project derived from the AGPLv3-licensed
-> [MinIO](https://github.com/minio/minio) project.
-> Buckit is not affiliated with or endorsed by MinIO, Inc.
+## Learn More
+
+<a href="https://buckit.sh/#showcase-video" target="_blank" rel="noopener noreferrer">Watch demo videos</a><br>
+<a href="https://buckit.sh/#getting-started" target="_blank" rel="noopener noreferrer">Getting Started</a><br>
+<a href="https://buckit.sh/#faq" target="_blank" rel="noopener noreferrer">FAQ</a><br>
+<a href="https://buckit.sh/docs" target="_blank" rel="noopener noreferrer">Documentation</a><br>
+<a href="https://buckit.sh/blog/why-i-forked-minio-to-keep-it-open-and-made-it-faster" target="_blank" rel="noopener noreferrer">Blog: Why I Forked MinIO to Keep It Open, and Made It Faster</a>
 
 ## What Buckit Provides
 
-- S3-compatible object storage for existing S3 SDKs and tools.
+- S3-compatible object storage server working with existing S3 SDKs and tools.
 - Standalone single-node mode for development and small deployments.
-- Distributed erasure-coded mode for production clusters.
-- Browser console for object and storage workflows.
+- Distributed cluster mode supporting hundreds of petabytes.
+- Browser console for bucket and object management.
 - CLI tool for admin and object automation.
 - Web-based cluster and node management.
 
 ## Quickstart
 
 > [!NOTE]
-> This quickstart runs Buckit manually. For a production service deployment,
-> follow the [Getting Started guide](https://buckit.sh/#getting-started).
+> This quickstart demonstrates building and running the Buckit server manually
+> for learning purposes.
+> For real-world service deployments, follow the
+> [Getting Started guide](https://buckit.sh/#getting-started).
 
 Build and run a local Buckit server:
 
