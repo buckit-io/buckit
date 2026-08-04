@@ -25,6 +25,10 @@ set -eu
 PAGES_BASE="${BUCKIT_PAGES_BASE:-https://buckit-io.github.io/buckit}"
 RELEASE_BASE="${BUCKIT_RELEASE_BASE:-https://github.com/buckit-io/buckit/releases/download}"
 
+# Set by resolve_release.
+TAG=""
+POINTER_SHA=""
+
 err() {
 	echo "install-mac.sh: $*" >&2
 	exit 1
@@ -32,6 +36,33 @@ err() {
 
 info() {
 	echo "==> $*"
+}
+
+# validate_tag rejects anything that is not a plain release identifier. Both
+# the pinned BUCKIT_VERSION and the pointer-resolved tag go through this, so a
+# value like '../../evil' cannot reach the download URL as path traversal.
+validate_tag() {
+	case "$1" in
+	RELEASE.?*) ;;
+	*) err "unexpected release tag '$1' (expected RELEASE.*)" ;;
+	esac
+	# Only the characters real release tags use. Rejects '/', whitespace,
+	# control characters, and URL delimiters such as '?' and '#'.
+	case "$1" in
+	*[!A-Za-z0-9._-]*) err "release tag '$1' contains unsupported characters" ;;
+	esac
+}
+
+# normalize_sha lowercases a hex digest and requires exactly 64 hex characters,
+# so a truncated or malformed checksum record can never be compared as if it
+# were a valid digest. Echoes the normalized digest.
+normalize_sha() {
+	_sha="$(printf '%s' "$1" | tr 'ABCDEF' 'abcdef')"
+	case "$_sha" in
+	"" | *[!0-9a-f]*) err "malformed sha256 digest: '$1'" ;;
+	esac
+	[ "${#_sha}" -eq 64 ] || err "malformed sha256 digest: '$1'"
+	printf '%s' "$_sha"
 }
 
 # detect_platform requires macOS on Apple Silicon — the only published darwin
@@ -69,51 +100,66 @@ fetch_to() {
 	fi
 }
 
-# sha256_of FILE -> hex digest on stdout
+# sha256_of FILE -> normalized hex digest on stdout. The hash utility runs on
+# its own rather than inside a pipeline, so a failure surfaces instead of being
+# masked by the exit status of a downstream parser.
 sha256_of() {
 	if command -v sha256sum >/dev/null 2>&1; then
-		sha256sum "$1" | awk '{print $1}'
+		_hash_out="$(sha256sum "$1")" || err "sha256sum failed on $1"
 	elif command -v shasum >/dev/null 2>&1; then
-		shasum -a 256 "$1" | awk '{print $1}'
+		_hash_out="$(shasum -a 256 "$1")" || err "shasum failed on $1"
 	else
 		err "need sha256sum or shasum to verify the download"
 	fi
+	normalize_sha "$(printf '%s\n' "$_hash_out" | awk 'NR==1{print $1}')"
 }
 
-# resolve_tag echoes the release tag to install, either the pinned
-# BUCKIT_VERSION or the latest stable tag from the gh-pages pointer.
-resolve_tag() {
+# resolve_release sets TAG, and POINTER_SHA when the release was resolved from
+# the gh-pages pointer. A pinned BUCKIT_VERSION leaves POINTER_SHA empty: the
+# pointer only ever describes the latest release, so it cannot vouch for an
+# arbitrary pinned version.
+resolve_release() {
 	if [ -n "${BUCKIT_VERSION:-}" ]; then
-		echo "$BUCKIT_VERSION"
+		validate_tag "$BUCKIT_VERSION"
+		TAG="$BUCKIT_VERSION"
+		POINTER_SHA=""
 		return
 	fi
 
 	pointer_url="$PAGES_BASE/server/buckit/release/darwin-$ARCH/buckit.sha256sum"
 	# Pointer format: "<sha256>  buckit.<tag>"
 	pointer="$(fetch "$pointer_url")" || err "could not fetch release pointer at $pointer_url"
-	name="$(echo "$pointer" | awk '{print $2}')"
-	tag="${name#buckit.}"
-	case "$tag" in
-	RELEASE.*) ;;
+
+	name="$(printf '%s\n' "$pointer" | awk 'NR==1{print $2}')"
+	case "$name" in
+	buckit.*) ;;
 	*) err "unexpected release pointer payload: $pointer" ;;
 	esac
-	echo "$tag"
+
+	TAG="${name#buckit.}"
+	validate_tag "$TAG"
+	POINTER_SHA="$(normalize_sha "$(printf '%s\n' "$pointer" | awk 'NR==1{print $1}')")"
 }
 
 main() {
 	detect_platform
 	info "platform: darwin-$ARCH"
 
-	tag="$(resolve_tag)"
-	[ -n "$tag" ] || err "could not resolve a release tag"
-	info "release: $tag"
+	resolve_release
+	[ -n "$TAG" ] || err "could not resolve a release tag"
+	info "release: $TAG"
 
-	asset="buckit-darwin-$ARCH.$tag"
-	download_url="$RELEASE_BASE/$tag/$asset"
+	asset="buckit-darwin-$ARCH.$TAG"
+	download_url="$RELEASE_BASE/$TAG/$asset"
 
 	dldir="${BUCKIT_DOWNLOAD_DIR:-.}"
 	mkdir -p "$dldir"
 	binfile="$dldir/buckit"
+
+	# Refuse to run when the destination is a directory. 'mv' would move the
+	# temp file inside it and the script would report success while leaving
+	# nothing runnable at the path it prints.
+	[ ! -d "$binfile" ] || err "$binfile is a directory — remove it or set BUCKIT_DOWNLOAD_DIR"
 
 	# Download to a temporary sibling and only move it into the predictable
 	# path after the checksum verifies, so a failed or interrupted download
@@ -126,9 +172,25 @@ main() {
 	fetch_to "$download_url" "$tmpfile" || err "download failed: $download_url"
 
 	info "fetching published checksum"
-	want_sha="$(fetch "$download_url.sha256sum" | awk '{print $1}')" ||
+	# Capture the payload first: piping the fetch straight into a parser would
+	# hide a failed transfer behind the parser's exit status.
+	checksum_payload="$(fetch "$download_url.sha256sum")" ||
 		err "could not fetch checksum at $download_url.sha256sum"
-	[ -n "$want_sha" ] || err "release checksum is empty"
+	release_sha="$(normalize_sha "$(printf '%s\n' "$checksum_payload" | awk 'NR==1{print $1}')")"
+
+	# The binary and the checksum beside it come from the same origin, so that
+	# digest alone only proves the download was not corrupted in transit. The
+	# gh-pages pointer publishes the same digest from a separate origin;
+	# when it is available, require the two to agree before trusting either.
+	if [ -n "$POINTER_SHA" ]; then
+		if [ "$POINTER_SHA" != "$release_sha" ]; then
+			err "published digests disagree (pages $POINTER_SHA, release $release_sha) — refusing to continue"
+		fi
+		want_sha="$POINTER_SHA"
+		info "sha256 cross-checked against the release pointer"
+	else
+		want_sha="$release_sha"
+	fi
 
 	got_sha="$(sha256_of "$tmpfile")"
 	if [ "$got_sha" != "$want_sha" ]; then
