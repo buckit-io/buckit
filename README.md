@@ -48,8 +48,8 @@ sending all data to a public cloud or paying cloud storage bills at scale.
   upload, IAM-style policies.
 - **Single binary** — no control plane, external database, or runtime
   dependencies.
-- **Single node to petabytes** — the same binary for one machine or a
-  multi-node cluster.
+- **Standalone or distributed** — the same binary either way; clusters scale to
+  petabytes.
 - **Site and bucket replication** — one-way, two-way, and multi-site
   active-active.
 - **Operations toolkit** — browser console, `mc` CLI, web-based cluster
