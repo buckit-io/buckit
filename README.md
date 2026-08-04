@@ -45,11 +45,11 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 ## What Buckit Provides
 
 - **S3-compatible object storage** — works with existing S3 SDKs and tools.
-- **Single binary** — one executable per node, with no external dependencies.
 - **Standalone mode** — single-node for development and small setups.
 - **Distributed mode** — multi-node clusters supporting hundreds of petabytes.
 - **Replication** — keep remote sites in sync for high availability and
   disaster recovery.
+- **Single binary** — one executable per node, with no external dependencies.
 - **Browser console** — bucket and object management for end users.
 - **Operations toolkit** — CLI for admin and object automation, web-based
   cluster and node management.
