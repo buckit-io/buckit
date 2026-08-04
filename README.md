@@ -30,8 +30,7 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 > **Already running MinIO?** Buckit is a drop-in replacement. Swap one binary
 > and start it exactly the same way.
 >
-> Read [MinIO to Buckit: Swap One File, Nothing Else](https://buckit.sh/blog/minio-to-buckit-swap-one-file),
-> or jump straight to the [migration guide](https://buckit.sh/docs/operations/deployments/baremetal-migrate-from-minio).
+> Read [MinIO to Buckit: Swap One File, Nothing Else](https://buckit.sh/blog/minio-to-buckit-swap-one-file).
 
 <p align="center">
   <img src=".github/web-console.gif" alt="Buckit web console">
