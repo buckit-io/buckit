@@ -44,12 +44,18 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 
 ## What Buckit Provides
 
-- S3-compatible object storage server working with existing S3 SDKs and tools.
-- Standalone single-node mode for development and small deployments.
-- Distributed cluster mode supporting hundreds of petabytes.
-- Browser console for bucket and object management.
-- CLI tool for admin and object automation.
-- Web-based cluster and node management.
+- **S3-compatible API** — existing S3 SDKs and tools, presigned URLs, multipart
+  upload, and IAM-style policies.
+- **Single binary** — one executable per node, with no control plane, external
+  database, or runtime dependencies.
+- **Single node to petabytes** — the same binary runs a one-machine deployment
+  or a multi-node cluster across hundreds of drives.
+- **Site and bucket replication** — one-way, two-way, and multi-site
+  active-active, configured per bucket or across an entire deployment.
+- **Operations toolkit** — browser console, `mc` CLI, and web-based cluster and
+  node management.
+- **Single-trip GET read path** — combines the metadata and data round trips
+  into one, cutting GET response time by roughly 15%.
 
 ## Quickstart
 
