@@ -48,8 +48,8 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 - **Single binary** — one executable per node, with no external dependencies.
 - **Standalone mode** — single-node for development and small setups.
 - **Distributed mode** — multi-node clusters supporting hundreds of petabytes.
-- **Replication** — keep one or more remote sites in sync for disaster
-  recovery, at site or bucket level.
+- **Replication** — keep remote sites in sync for high availability and
+  disaster recovery.
 - **Browser console** — bucket and object management.
 - **Operations toolkit** — CLI for admin and object automation, web-based
   cluster and node management.
