@@ -26,12 +26,6 @@ keeping your data under your control, and it can scale from a small setup to
 hundreds of petabytes. Teams use Buckit when they want S3-like storage without
 sending all data to a public cloud or paying cloud storage bills at scale.
 
-> [!TIP]
-> **Already running MinIO?** Buckit is a drop-in replacement. Swap one binary
-> and start it exactly the same way.
->
-> Read [MinIO to Buckit: Swap One File, Nothing Else](https://buckit.sh/blog/minio-to-buckit-swap-one-file).
-
 <p align="center">
   <img src=".github/web-console.gif" alt="Buckit web console">
 </p>
@@ -52,6 +46,12 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 - Browser console for bucket and object management.
 - CLI tool for admin and object automation.
 - Web-based cluster and node management.
+
+> [!TIP]
+> **Already running MinIO?** Buckit is a drop-in replacement. Swap one binary
+> and start it exactly the same way.
+>
+> Read [MinIO to Buckit: Swap One File, Nothing Else](https://buckit.sh/blog/minio-to-buckit-swap-one-file).
 
 ## Quickstart
 
