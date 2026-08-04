@@ -59,63 +59,40 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 
 ## Quickstart
 
-> [!NOTE]
-> This quickstart demonstrates building and running the Buckit server manually
-> for learning purposes.
-> For real-world service deployments, follow the
-> [Getting Started guide](https://buckit.sh/#getting-started).
-
-Build and run a local Buckit server:
+One command gets you a running server:
 
 ```sh
-make build
-mkdir -p /tmp/buckit-data
-./buckit server /tmp/buckit-data --console-address :9001
+docker run -p 9000:9000 -p 9001:9001 -v "$HOME/buckit-data:/data" \
+  ghcr.io/buckit-io/buckit:latest server /data --console-address :9001
 ```
 
-The S3 API listens on `http://127.0.0.1:9000`.
-The console listens on `http://127.0.0.1:9001`.
+The S3 API listens on `http://127.0.0.1:9000` and the console on
+`http://127.0.0.1:9001`. Sign in with `buckitadmin` / `buckitadmin`.
 
-Default development credentials are:
+### A whole cluster is one command too
 
-```text
-Access key: buckitadmin
-Secret key: buckitadmin
+```sh
+buckit server http://node{1...4}.example.com/data{1...4}
 ```
 
-For any non-throwaway deployment, set explicit root credentials before starting
-the server:
+That single line describes the entire deployment: four servers, four drives
+each, sixteen drives in all. Run it unchanged on every node. There is no
+coordinator process to stand up, no config file to distribute, and no external
+database to operate.
+
+Set root credentials on every node before starting, and keep them identical
+across the cluster:
 
 ```sh
 export MINIO_ROOT_USER=myadmin
 export MINIO_ROOT_PASSWORD=mysecretpassword
-./buckit server /data --console-address :9001
 ```
 
-The root credential environment variable names remain `MINIO_ROOT_USER` and
-`MINIO_ROOT_PASSWORD` for compatibility with the storage engine and existing
-deployment tooling.
+The variable names keep the `MINIO_` prefix so existing deployment tooling
+works unchanged.
 
-## Distributed Server Mode
-
-For distributed deployments, run the same `buckit server` command on every
-participating node with a shared set of drive endpoints and identical root
-credentials.
-
-Example pattern:
-
-```sh
-export MINIO_ROOT_USER=myadmin
-export MINIO_ROOT_PASSWORD=mysecretpassword
-
-buckit server \
-  http://node{1...4}.example.com/data{1...4} \
-  --console-address :9001
-```
-
-For new production clusters, prefer [`bm web`](https://github.com/buckit-io/buckit#buckit-manager-web) so host discovery, disk selection,
-preflight checks, service setup, and generated credentials are handled by the
-manager instead of hand-written shell commands.
+For production clusters, [`bm web`](#buckit-manager-web) handles host
+discovery, drive selection, preflight checks, and service setup for you.
 
 ## Install Buckit
 
