@@ -168,13 +168,7 @@ When building manually, include the `kqueue` build tag:
 go build -tags kqueue -trimpath --ldflags "$(go run buildscripts/gen-ldflags.go)" -o buckit
 ```
 
-## Build Docker Image
-
-Buckit publishes container images for normal Docker usage. To build a custom
-image, use the release workflow or adapt the root `Dockerfile` for your own
-artifact pipeline.
-
-Run the published image:
+## Run with Docker
 
 ```sh
 docker run -p 9000:9000 -p 9001:9001 \
@@ -182,7 +176,7 @@ docker run -p 9000:9000 -p 9001:9001 \
   ghcr.io/buckit-io/buckit:latest server /data --console-address :9001
 ```
 
-Run with explicit credentials:
+With explicit credentials:
 
 ```sh
 docker run -p 9000:9000 -p 9001:9001 \
@@ -191,6 +185,13 @@ docker run -p 9000:9000 -p 9001:9001 \
   -v "$HOME/buckit-data:/data" \
   ghcr.io/buckit-io/buckit:latest server /data --console-address :9001
 ```
+
+The same image is published to `ghcr.io/buckit-io/buckit` and
+`docker.io/buckitio/buckit`. For production, pin a release tag instead of
+`latest`.
+
+To build a custom image, use the release workflow or adapt the root
+`Dockerfile` for your own artifact pipeline.
 
 ## Use Buckit With `bm`
 
