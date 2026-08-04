@@ -38,14 +38,22 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 <a href="https://buckit.sh/docs" target="_blank" rel="noopener noreferrer">Documentation</a><br>
 <a href="https://buckit.sh/blog/why-i-forked-minio-to-keep-it-open-and-made-it-faster" target="_blank" rel="noopener noreferrer">Blog: Why I Forked MinIO to Keep It Open, and Made It Faster</a>
 
+> [!TIP]
+> **Already running MinIO?** Buckit is a drop-in replacement. Read
+> [MinIO to Buckit: Swap One File, Nothing Else](https://buckit.sh/blog/minio-to-buckit-swap-one-file).
+
 ## What Buckit Provides
 
-- S3-compatible object storage server working with existing S3 SDKs and tools.
-- Standalone single-node mode for development and small deployments.
-- Distributed cluster mode supporting hundreds of petabytes.
-- Browser console for bucket and object management.
-- CLI tool for admin and object automation.
-- Web-based cluster and node management.
+- **S3-compatible object storage** — works with existing S3 SDKs and tools.
+- **Standalone mode** — single-node for small setups or homelabs.
+- **Distributed mode** — multi-node clusters supporting hundreds of petabytes.
+- **Replication** — keep remote sites in sync for high availability and
+  disaster recovery.
+- **Single binary** — one executable per node, with no external dependencies.
+- **Browser console** — self-service bucket and object management for end
+  users.
+- **Operations toolkit** — CLI for admin and object automation, web-based
+  cluster and node management.
 
 ## Quickstart
 
