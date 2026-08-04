@@ -26,6 +26,14 @@ keeping your data under your control, and it can scale from a small setup to
 hundreds of petabytes. Teams use Buckit when they want S3-like storage without
 sending all data to a public cloud or paying cloud storage bills at scale.
 
+> [!TIP]
+> **Already running MinIO?** Buckit is a dead simple drop-in replacement. Swap
+> one binary and start it exactly the same way. Your drives, buckets, users, and
+> configuration all stay as they are, and nothing is copied or converted.
+>
+> Read [MinIO to Buckit: Swap One File, Nothing Else](https://buckit.sh/blog/minio-to-buckit-swap-one-file),
+> or jump straight to the [migration guide](https://buckit.sh/docs/operations/deployments/baremetal-migrate-from-minio).
+
 <p align="center">
   <img src=".github/web-console.gif" alt="Buckit web console">
 </p>
@@ -36,6 +44,7 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 <a href="https://buckit.sh/#getting-started" target="_blank" rel="noopener noreferrer">Getting Started</a><br>
 <a href="https://buckit.sh/#faq" target="_blank" rel="noopener noreferrer">FAQ</a><br>
 <a href="https://buckit.sh/docs" target="_blank" rel="noopener noreferrer">Documentation</a><br>
+<a href="https://buckit.sh/blog/minio-to-buckit-swap-one-file" target="_blank" rel="noopener noreferrer">Blog: MinIO to Buckit: Swap One File, Nothing Else</a><br>
 <a href="https://buckit.sh/blog/why-i-forked-minio-to-keep-it-open-and-made-it-faster" target="_blank" rel="noopener noreferrer">Blog: Why I Forked MinIO to Keep It Open, and Made It Faster</a>
 
 ## What Buckit Provides
