@@ -44,7 +44,7 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 
 ## What Buckit Provides
 
-- **S3-compatible API** — works with existing S3 SDKs and tools.
+- **S3-compatible object storage** — works with existing S3 SDKs and tools.
 - **Single binary** — one executable per node, with no external dependencies.
 - **Standalone mode** — single-node for development and small setups.
 - **Distributed mode** — multi-node clusters supporting hundreds of petabytes.
