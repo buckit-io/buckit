@@ -45,16 +45,14 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 ## What Buckit Provides
 
 - **S3-compatible API** — works with existing S3 SDKs and tools.
-- **Single binary** — one executable per node, with no control plane or
-  external dependencies.
-- **Standalone mode** — single-node deployments for development and small
-  setups.
+- **Single binary** — one executable per node, with no external dependencies.
+- **Standalone mode** — single-node for development and small setups.
 - **Distributed mode** — multi-node clusters supporting hundreds of petabytes.
 - **Replication** — site and bucket level, including two-way and multi-site
   active-active.
 - **Browser console** — bucket and object management.
-- **CLI** — admin and object automation.
-- **Cluster manager** — web-based cluster and node management.
+- **Operations toolkit** — CLI for admin and object automation, web-based
+  cluster and node management.
 
 ## Quickstart
 
