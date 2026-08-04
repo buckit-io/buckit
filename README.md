@@ -38,6 +38,12 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 <a href="https://buckit.sh/docs" target="_blank" rel="noopener noreferrer">Documentation</a><br>
 <a href="https://buckit.sh/blog/why-i-forked-minio-to-keep-it-open-and-made-it-faster" target="_blank" rel="noopener noreferrer">Blog: Why I Forked MinIO to Keep It Open, and Made It Faster</a>
 
+> [!TIP]
+> **Already running MinIO?** Buckit is a drop-in replacement. Swap one binary
+> and start it exactly the same way.
+>
+> Read [MinIO to Buckit: Swap One File, Nothing Else](https://buckit.sh/blog/minio-to-buckit-swap-one-file).
+
 ## What Buckit Provides
 
 - S3-compatible object storage server working with existing S3 SDKs and tools.
@@ -46,12 +52,6 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 - Browser console for bucket and object management.
 - CLI tool for admin and object automation.
 - Web-based cluster and node management.
-
-> [!TIP]
-> **Already running MinIO?** Buckit is a drop-in replacement. Swap one binary
-> and start it exactly the same way.
->
-> Read [MinIO to Buckit: Swap One File, Nothing Else](https://buckit.sh/blog/minio-to-buckit-swap-one-file).
 
 ## Quickstart
 
