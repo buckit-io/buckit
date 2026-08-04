@@ -205,9 +205,10 @@ jobs:
       - name: Publish install scripts
         run: |
           cp src/packaging/install-linux.sh pages/install-linux.sh
+          cp src/packaging/install-linux-binary.sh pages/install-linux-binary.sh
           cp src/packaging/install-mac.sh pages/install-mac.sh
           cp src/packaging/install-windows.ps1 pages/install-windows.ps1
-          chmod +x pages/install-linux.sh pages/install-mac.sh
+          chmod +x pages/install-linux.sh pages/install-linux-binary.sh pages/install-mac.sh
 
       - name: Write self-update checksum files
         run: |
@@ -322,6 +323,10 @@ jobs:
                       <tr>
                         <td><strong>Linux</strong>rpm / deb / apk</td>
                         <td><code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px">curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh</code></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Linux</strong>standalone binary</td>
+                        <td><code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px">curl -fsSL https://buckit-io.github.io/buckit/install-linux-binary.sh | sh</code></td>
                       </tr>
                       <tr>
                         <td><strong>macOS</strong>Apple Silicon</td>

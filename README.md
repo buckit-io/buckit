@@ -122,6 +122,17 @@ SHA-256 checksum, and prints the package-manager command to run:
 curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh
 ```
 
+### Linux Standalone Binary
+
+To run the server without a package or a systemd service — for example when
+taking over an existing deployment that is started by hand — download the
+binary on its own. The helper script verifies its SHA-256 checksum and leaves
+an executable `buckit` in the current directory:
+
+```sh
+curl -fsSL https://buckit-io.github.io/buckit/install-linux-binary.sh | sh
+```
+
 ### Build From Source
 
 Buckit requires Go 1.25 or newer. If Go is not installed, download and install
