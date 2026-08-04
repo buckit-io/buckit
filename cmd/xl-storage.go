@@ -253,7 +253,16 @@ func newXLStorage(ep Endpoint, cleanUp bool) (s *xlStorage, err error) {
 	s.fsType = info.FSType
 
 	if rootDrive {
-		return s, errDriveIsRoot
+		// A drive on the root filesystem can fill '/' and take the whole host
+		// down, so a distributed deployment refuses to use one: the operator
+		// has other drives available and a misconfigured node is worth
+		// catching. A single-node deployment is routinely pointed at a plain
+		// directory for evaluation, development, or a homelab, where refusing
+		// to start is the wrong trade. Warn there and continue.
+		if globalIsDistErasure {
+			return s, errDriveIsRoot
+		}
+		logger.Info("Drive %s is on the root filesystem. Filling it can bring down the host; use a separate mount for anything you care about.", s.drivePath)
 	}
 
 	// Sanitize before setting it
