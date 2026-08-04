@@ -50,7 +50,8 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 - **Replication** — keep remote sites in sync for high availability and
   disaster recovery.
 - **Single binary** — one executable per node, with no external dependencies.
-- **Browser console** — bucket and object management for end users.
+- **Browser console** — self-service bucket and object management for end
+  users.
 - **Operations toolkit** — CLI for admin and object automation, web-based
   cluster and node management.
 
