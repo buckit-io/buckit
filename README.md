@@ -39,10 +39,8 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 <a href="https://buckit.sh/blog/why-i-forked-minio-to-keep-it-open-and-made-it-faster" target="_blank" rel="noopener noreferrer">Blog: Why I Forked MinIO to Keep It Open, and Made It Faster</a>
 
 > [!TIP]
-> **Already running MinIO?** Buckit is a drop-in replacement. Swap one binary
-> and start it exactly the same way.
->
-> Read [MinIO to Buckit: Swap One File, Nothing Else](https://buckit.sh/blog/minio-to-buckit-swap-one-file).
+> **Already running MinIO?** Buckit is a drop-in replacement. Read
+> [MinIO to Buckit: Swap One File, Nothing Else](https://buckit.sh/blog/minio-to-buckit-swap-one-file).
 
 ## What Buckit Provides
 
