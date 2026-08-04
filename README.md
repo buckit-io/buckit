@@ -50,7 +50,7 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 - **Distributed mode** — multi-node clusters supporting hundreds of petabytes.
 - **Replication** — keep remote sites in sync for high availability and
   disaster recovery.
-- **Browser console** — bucket and object management.
+- **Browser console** — bucket and object management for end users.
 - **Operations toolkit** — CLI for admin and object automation, web-based
   cluster and node management.
 
