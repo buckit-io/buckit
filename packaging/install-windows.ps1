@@ -43,7 +43,7 @@ function Fetch-String($url) {
 # (where this script may run cross-platform); it is undefined on Windows
 # PowerShell 5.1, which only runs on Windows — so treat undefined as Windows.
 if (($null -ne $IsWindows) -and (-not $IsWindows)) {
-    throw "install-windows.ps1 is for Windows. On Linux use install-linux.sh; on macOS use install-mac.sh"
+    throw "install-windows.ps1 is for Windows. On Linux or macOS use install-binary.sh"
 }
 
 # Resolve the release tag: pinned BUCKIT_VERSION or the latest stable tag from

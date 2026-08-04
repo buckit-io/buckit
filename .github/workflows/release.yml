@@ -205,10 +205,15 @@ jobs:
       - name: Publish install scripts
         run: |
           cp src/packaging/install-linux.sh pages/install-linux.sh
-          cp src/packaging/install-linux-binary.sh pages/install-linux-binary.sh
-          cp src/packaging/install-mac.sh pages/install-mac.sh
+          cp src/packaging/install-binary.sh pages/install-binary.sh
           cp src/packaging/install-windows.ps1 pages/install-windows.ps1
-          chmod +x pages/install-linux.sh pages/install-linux-binary.sh pages/install-mac.sh
+          # install-binary.sh replaced the per-platform binary installers.
+          # Publish it under the old names too so URLs already in the wild,
+          # in docs, and in the blog keep working.
+          cp src/packaging/install-binary.sh pages/install-linux-binary.sh
+          cp src/packaging/install-binary.sh pages/install-mac.sh
+          chmod +x pages/install-linux.sh pages/install-binary.sh \
+            pages/install-linux-binary.sh pages/install-mac.sh
 
       - name: Write self-update checksum files
         run: |
