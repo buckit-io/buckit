@@ -59,16 +59,24 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 
 ## Quickstart
 
-Download the server and run it. No toolchain, no container runtime:
+No toolchain and no container runtime required.
+
+**1. Download the server.** The script verifies the published checksum and
+leaves a `buckit` executable in the current directory:
 
 ```sh
 curl -fsSL https://buckit-io.github.io/buckit/install-linux-binary.sh | sh
-./buckit server /tmp/buckit-data --console-address :9001
 ```
 
 On macOS use `install-mac.sh`, on Windows `install-windows.ps1`. See
 [Install Buckit](#install-buckit) for packages and other options, or
 [Run with Docker](#run-with-docker) for a container.
+
+**2. Start it.**
+
+```sh
+./buckit server /tmp/buckit-data --console-address :9001
+```
 
 The S3 API listens on `http://127.0.0.1:9000` and the console on
 `http://127.0.0.1:9001`. Sign in with `buckitadmin` / `buckitadmin`.
