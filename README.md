@@ -70,11 +70,8 @@ and verify using the web UI.
 ### 1. Download the server
 
 ```sh
-# Linux
-curl -fsSL https://buckit-io.github.io/buckit/install-linux-binary.sh | sh
-
-# macOS
-curl -fsSL https://buckit-io.github.io/buckit/install-mac.sh | sh
+# Linux or macOS
+curl -fsSL https://buckit-io.github.io/buckit/install-binary.sh | sh
 
 # Windows PowerShell
 irm https://buckit-io.github.io/buckit/install-windows.ps1 | iex
