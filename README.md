@@ -194,17 +194,16 @@ Buckit administration and cluster-management workflows.
 
 See the [`bm` GitHub repository](https://github.com/buckit-io/bm).
 
-Install `bm` on macOS or Linux:
+Install it:
 
 ```sh
+# Linux or macOS
 curl -fsSL https://buckit-io.github.io/bm/install.sh | sh
-bm --help
-```
 
-Install `bm` on Windows PowerShell:
+# Windows PowerShell
+# irm https://buckit-io.github.io/bm/install.ps1 | iex
 
-```powershell
-irm https://buckit-io.github.io/bm/install.ps1 | iex
+# Confirm the install
 bm --help
 ```
 
