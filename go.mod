@@ -2,10 +2,6 @@ module github.com/buckit-io/buckit
 
 go 1.25.0
 
-// Keep in sync with github.com/prometheus/prometheus: newer go-openapi/testify
-// releases dropped assert/yaml, which is still imported by go-openapi test deps.
-replace github.com/go-openapi/testify/v2 => github.com/go-openapi/testify/v2 v2.0.2
-
 // Install tools using 'go install tool'.
 tool (
 	github.com/tinylib/msgp
@@ -176,6 +172,8 @@ require (
 	github.com/go-openapi/swag/stringutils v0.25.4 // indirect
 	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
+	github.com/go-openapi/testify/enable/yaml/v2 v2.6.0 // indirect
+	github.com/go-openapi/testify/v2 v2.6.0 // indirect
 	github.com/go-openapi/validate v0.25.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
