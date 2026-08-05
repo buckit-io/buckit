@@ -92,9 +92,11 @@ the console on 9001.
 ### 3. Create a bucket and upload a file using CLI
 
 ```sh
-# Install the bm client. On Windows PowerShell:
-#   irm https://buckit-io.github.io/bm/install.ps1 | iex
+# Install the bm client on Linux or macOS
 curl -fsSL https://buckit-io.github.io/bm/install.sh | sh
+
+# Windows PowerShell
+irm https://buckit-io.github.io/bm/install.ps1 | iex
 
 # bm installs to ~/.local/bin; skip this if that is already on your PATH
 export PATH="$HOME/.local/bin:$PATH"
