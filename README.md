@@ -136,8 +136,8 @@ buckit server \
 
 For new production clusters, use the
 [guided deployment wizard](https://buckit.sh/#getting-started) instead of
-hand-written shell commands. It handles host discovery, drive selection,
-preflight checks, service setup, and credential generation for you.
+hand-written shell commands. It handles node deployment and configuration for
+the cluster.
 
 ## Install Buckit
 
