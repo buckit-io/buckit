@@ -94,11 +94,17 @@ The S3 API listens on port 9000 and the console on 9001.
 # Install the bm client. On Windows PowerShell:
 #   irm https://buckit-io.github.io/bm/install.ps1 | iex
 curl -fsSL https://buckit-io.github.io/bm/install.sh | sh
+
+# bm lands in ~/.local/bin, so put it on your PATH
 export PATH="$HOME/.local/bin:$PATH"
 
-# Point it at the server, then create a bucket and upload a file
+# Point bm at the server, naming this connection "local"
 bm alias set local http://localhost:9000 buckitadmin buckitadmin
+
+# Create a bucket called "mydata"
 bm mb local/mydata
+
+# Upload a file into it
 bm cp ./hello.txt local/mydata/
 ```
 
