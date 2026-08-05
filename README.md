@@ -141,7 +141,7 @@ the cluster.
 
 ## Install Buckit
 
-For detailed installation instructions, see the
+To install a production release, see the
 [Deployment Guide](https://buckit.sh/docs/operations/deployments/baremetal-deploy-server).
 
 ### Build From Source
