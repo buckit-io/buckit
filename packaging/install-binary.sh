@@ -1,13 +1,19 @@
 #!/bin/sh
-# install-mac.sh — macOS installer helper for buckit.
+# install-binary.sh — standalone-binary installer helper for buckit.
 #
-# Downloads the macOS (Apple Silicon) buckit binary for the latest stable
-# release to a predictable filename (buckit), verifies its published SHA-256
-# checksum, clears the macOS quarantine attribute, and leaves it in place so
-# you can run it directly. It does NOT install it onto your PATH for you.
+# Downloads the buckit binary for this host (Linux or macOS) for the latest
+# stable release to a predictable filename (buckit), verifies its published
+# SHA-256 checksum, and leaves it in place so you can run it directly. It does
+# NOT install it onto your PATH, and it does NOT register a service.
+#
+# On Linux, for a package-managed install with a systemd service, use
+# install-linux.sh instead, which downloads the .deb/.rpm/.apk for this host.
+#
+# Also published as install-linux-binary.sh and install-mac.sh, the per-platform
+# names this script replaced. Those URLs serve this same script.
 #
 # Usage:
-#   curl -fsSL https://buckit-io.github.io/buckit/install-mac.sh | sh
+#   curl -fsSL https://buckit-io.github.io/buckit/install-binary.sh | sh
 #   ./buckit --help   # run it from where it was downloaded
 #
 # Environment overrides:
@@ -30,12 +36,33 @@ TAG=""
 POINTER_SHA=""
 
 err() {
-	echo "install-mac.sh: $*" >&2
+	echo "install-binary.sh: $*" >&2
 	exit 1
 }
 
 info() {
 	echo "==> $*"
+}
+
+# detect_platform sets OS and ARCH to the Go-style tuple naming the published
+# release assets, and validates the architecture against what is published for
+# that platform: Linux ships amd64 and arm64, macOS ships Apple Silicon only.
+detect_platform() {
+	uname_s="$(uname -s)"
+	case "$uname_s" in
+	Linux) OS="linux" ;;
+	Darwin) OS="darwin" ;;
+	*) err "this installer is for Linux and macOS (detected '$uname_s'). On Windows use install-windows.ps1" ;;
+	esac
+
+	uname_m="$(uname -m)"
+	case "$OS:$uname_m" in
+	linux:x86_64 | linux:amd64) ARCH="amd64" ;;
+	linux:aarch64 | linux:arm64) ARCH="arm64" ;;
+	darwin:arm64 | darwin:aarch64) ARCH="arm64" ;;
+	darwin:x86_64 | darwin:amd64) err "unsupported architecture '$uname_m'. Only Apple Silicon (arm64) builds are published for macOS." ;;
+	*) err "unsupported architecture '$uname_m' on $OS." ;;
+	esac
 }
 
 # validate_tag rejects anything that is not a plain release identifier. Both
@@ -63,19 +90,6 @@ normalize_sha() {
 	esac
 	[ "${#_sha}" -eq 64 ] || err "malformed sha256 digest: '$1'"
 	printf '%s' "$_sha"
-}
-
-# detect_platform requires macOS on Apple Silicon — the only published darwin
-# build — and sets ARCH accordingly.
-detect_platform() {
-	os="$(uname -s)"
-	[ "$os" = "Darwin" ] || err "this installer is for macOS (detected '$os'). On Linux use install-linux.sh; on Windows use install-windows.ps1"
-
-	arch="$(uname -m)"
-	case "$arch" in
-	arm64 | aarch64) ARCH="arm64" ;;
-	*) err "unsupported architecture '$arch'. Only Apple Silicon (arm64) builds are published." ;;
-	esac
 }
 
 # fetch URL -> stdout
@@ -126,7 +140,7 @@ resolve_release() {
 		return
 	fi
 
-	pointer_url="$PAGES_BASE/server/buckit/release/darwin-$ARCH/buckit.sha256sum"
+	pointer_url="$PAGES_BASE/server/buckit/release/$OS-$ARCH/buckit.sha256sum"
 	# Pointer format: "<sha256>  buckit.<tag>"
 	pointer="$(fetch "$pointer_url")" || err "could not fetch release pointer at $pointer_url"
 
@@ -143,13 +157,13 @@ resolve_release() {
 
 main() {
 	detect_platform
-	info "platform: darwin-$ARCH"
+	info "platform: $OS-$ARCH"
 
 	resolve_release
 	[ -n "$TAG" ] || err "could not resolve a release tag"
 	info "release: $TAG"
 
-	asset="buckit-darwin-$ARCH.$TAG"
+	asset="buckit-$OS-$ARCH.$TAG"
 	download_url="$RELEASE_BASE/$TAG/$asset"
 
 	dldir="${BUCKIT_DOWNLOAD_DIR:-.}"
@@ -199,9 +213,10 @@ main() {
 	info "sha256 verified"
 
 	chmod 0755 "$tmpfile"
+
 	# Clear the quarantine attribute so Gatekeeper doesn't block the unsigned
-	# binary on first run.
-	if command -v xattr >/dev/null 2>&1; then
+	# binary on first run. macOS only; harmless to skip elsewhere.
+	if [ "$OS" = "darwin" ] && command -v xattr >/dev/null 2>&1; then
 		xattr -d com.apple.quarantine "$tmpfile" 2>/dev/null || true
 	fi
 
