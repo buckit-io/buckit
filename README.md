@@ -264,6 +264,10 @@ Full `bm` CLI documentation: <https://buckit.sh/docs/reference/bm-cli>
 `bm` also ships Buckit Manager Web, a local web UI for deploying and managing
 Buckit clusters.
 
+<p align="center">
+  <img src=".github/buckit-manager-web.png" alt="Buckit Manager Web showing a four-node cluster with health, capacity, and per-node status">
+</p>
+
 Start it with:
 
 ```sh
