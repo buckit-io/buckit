@@ -157,18 +157,6 @@ make build
 
 The build writes `./buckit`.
 
-You can also install directly with Go:
-
-```sh
-go install github.com/buckit-io/buckit@latest
-```
-
-When building manually, include the `kqueue` build tag:
-
-```sh
-go build -tags kqueue -trimpath --ldflags "$(go run buildscripts/gen-ldflags.go)" -o buckit
-```
-
 ## Run with Docker
 
 ```sh
