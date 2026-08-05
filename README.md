@@ -144,7 +144,7 @@ the cluster.
 To install a production release, see the
 [Deployment Guide](https://buckit.sh/docs/operations/deployments/baremetal-deploy-server).
 
-### Build From Source
+## Build From Source
 
 Buckit requires Go 1.25 or newer. If Go is not installed, download and install
 it from the official Go installation page: <https://go.dev/doc/install>.
