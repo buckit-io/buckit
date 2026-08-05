@@ -60,41 +60,62 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 ## Quickstart
 
 > [!NOTE]
-> This quickstart demonstrates building and running the Buckit server manually
-> for learning purposes.
-> For real-world service deployments, follow the
-> [Getting Started guide](https://buckit.sh/#getting-started).
+> This quickstart runs the server by hand for learning purposes.
+> For real-world deployments, use the
+> [guided deployment wizard](https://buckit.sh/#getting-started).
 
-Build and run a local Buckit server:
+Let's start the object storage server, create a bucket, upload a file into it,
+and verify using the web UI.
+
+### 1. Download the server
 
 ```sh
-make build
-mkdir -p /tmp/buckit-data
+# Linux
+curl -fsSL https://buckit-io.github.io/buckit/install-linux-binary.sh | sh
+
+# macOS
+curl -fsSL https://buckit-io.github.io/buckit/install-mac.sh | sh
+
+# Windows PowerShell
+irm https://buckit-io.github.io/buckit/install-windows.ps1 | iex
+```
+
+### 2. Start the server
+
+```sh
 ./buckit server /tmp/buckit-data --console-address :9001
 ```
 
-The S3 API listens on `http://127.0.0.1:9000`.
-The console listens on `http://127.0.0.1:9001`.
+Objects are stored in `/tmp/buckit-data`. The S3 API listens on port 9000 and
+the console on 9001.
 
-Default development credentials are:
-
-```text
-Access key: buckitadmin
-Secret key: buckitadmin
-```
-
-For any non-throwaway deployment, set explicit root credentials before starting
-the server:
+### 3. Create a bucket and upload a file using CLI
 
 ```sh
-export MINIO_ROOT_USER=myadmin
-export MINIO_ROOT_PASSWORD=mysecretpassword
-./buckit server /data --console-address :9001
+# Install the bm client on Linux or macOS
+curl -fsSL https://buckit-io.github.io/bm/install.sh | sh
+
+# Windows PowerShell
+# irm https://buckit-io.github.io/bm/install.ps1 | iex
+
+# bm installs to ~/.local/bin; skip this if that is already on your PATH
+export PATH="$HOME/.local/bin:$PATH"
+
+# Point bm at the server, naming this connection "local"
+bm alias set local http://localhost:9000 buckitadmin buckitadmin
+
+# Create a bucket called "mydata"
+bm mb local/mydata
+
+# Upload a file into it
+bm cp ./hello.txt local/mydata/
 ```
 
-The root credential environment variable names remain `MINIO_ROOT_USER` and
-`MINIO_ROOT_PASSWORD` for compatibility with the storage engine and existing
-deployment tooling.
+### 4. See it in the web browser
+
+Open <http://127.0.0.1:9001> and sign in with `buckitadmin` / `buckitadmin`,
+then go to **Object Browser**. Your `mydata` bucket is there with the file in
+it.
 
 ## Distributed Server Mode
 
@@ -113,37 +134,17 @@ buckit server \
   --console-address :9001
 ```
 
-For new production clusters, prefer [`bm web`](https://github.com/buckit-io/buckit#buckit-manager-web) so host discovery, disk selection,
-preflight checks, service setup, and generated credentials are handled by the
-manager instead of hand-written shell commands.
+For new production clusters, use the
+[guided deployment wizard](https://buckit.sh/#getting-started) instead of
+hand-written shell commands. It handles node deployment and configuration for
+the cluster.
 
 ## Install Buckit
 
-For detailed installation instructions, see the
+To install a production release, see the
 [Deployment Guide](https://buckit.sh/docs/operations/deployments/baremetal-deploy-server).
 
-### Linux Packages (recommended)
-
-Linux release packages are available as `.deb`, `.rpm`, and `.apk` artifacts.
-The helper script downloads the package for the current system, verifies its
-SHA-256 checksum, and prints the package-manager command to run:
-
-```sh
-curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh
-```
-
-### Linux Standalone Binary
-
-To run the server without a package or a systemd service — for example when
-taking over an existing deployment that is started by hand — download the
-binary on its own. The helper script verifies its SHA-256 checksum and leaves
-an executable `buckit` in the current directory:
-
-```sh
-curl -fsSL https://buckit-io.github.io/buckit/install-linux-binary.sh | sh
-```
-
-### Build From Source
+## Build From Source
 
 Buckit requires Go 1.25 or newer. If Go is not installed, download and install
 it from the official Go installation page: <https://go.dev/doc/install>.
@@ -156,43 +157,36 @@ make build
 
 The build writes `./buckit`.
 
-You can also install directly with Go:
+You can also install directly with Go, though the resulting binary reports
+`DEVELOPMENT.GOGET` rather than a version:
 
 ```sh
 go install github.com/buckit-io/buckit@latest
 ```
 
-When building manually, include the `kqueue` build tag:
-
-```sh
-go build -tags kqueue -trimpath --ldflags "$(go run buildscripts/gen-ldflags.go)" -o buckit
-```
-
-## Build Docker Image
-
-Buckit publishes container images for normal Docker usage. To build a custom
-image, use the release workflow or adapt the root `Dockerfile` for your own
-artifact pipeline.
-
-Run the published image:
+## Run with Docker
 
 ```sh
 docker run -p 9000:9000 -p 9001:9001 \
   -v "$HOME/buckit-data:/data" \
-  ghcr.io/buckit-io/buckit:latest server /data --console-address :9001
+  buckitio/buckit:latest server /data --console-address :9001
 ```
 
-Run with explicit credentials:
+With explicit credentials:
 
 ```sh
 docker run -p 9000:9000 -p 9001:9001 \
   -e MINIO_ROOT_USER=myadmin \
   -e MINIO_ROOT_PASSWORD=mysecretpassword \
   -v "$HOME/buckit-data:/data" \
-  ghcr.io/buckit-io/buckit:latest server /data --console-address :9001
+  buckitio/buckit:latest server /data --console-address :9001
 ```
 
-## Use Buckit With `bm`
+The same image is published to Docker Hub as `buckitio/buckit` and to GitHub
+Container Registry as `ghcr.io/buckit-io/buckit`. For production, pin a release
+tag instead of `latest`.
+
+## Access Buckit with the `bm` CLI
 
 `bm` is the Buckit Manager CLI for Buckit and S3-compatible object storage.
 It provides object commands such as `ls`, `cp`, `cat`, `mirror`, and `rm`, plus
@@ -200,17 +194,19 @@ Buckit administration and cluster-management workflows.
 
 See the [`bm` GitHub repository](https://github.com/buckit-io/bm).
 
-Install `bm` on macOS or Linux:
+Install it:
 
 ```sh
+# Linux or macOS
 curl -fsSL https://buckit-io.github.io/bm/install.sh | sh
-bm --help
-```
 
-Install `bm` on Windows PowerShell:
+# Windows PowerShell
+# irm https://buckit-io.github.io/bm/install.ps1 | iex
 
-```powershell
-irm https://buckit-io.github.io/bm/install.ps1 | iex
+# bm installs to ~/.local/bin; skip this if that is already on your PATH
+export PATH="$HOME/.local/bin:$PATH"
+
+# Confirm the install
 bm --help
 ```
 
@@ -269,6 +265,10 @@ Full `bm` CLI documentation: <https://buckit.sh/docs/reference/bm-cli>
 
 `bm` also ships Buckit Manager Web, a local web UI for deploying and managing
 Buckit clusters.
+
+<p align="center">
+  <img src=".github/buckit-manager-web.png" alt="Buckit Manager Web showing a four-node cluster with health, capacity, and per-node status">
+</p>
 
 Start it with:
 
