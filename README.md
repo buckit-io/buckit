@@ -109,7 +109,7 @@ bm mb local/mydata
 bm cp ./hello.txt local/mydata/
 ```
 
-### 4. See it in the console
+### 4. See it in the web browser
 
 Open <http://127.0.0.1:9001> and sign in with `buckitadmin` / `buckitadmin`.
 Your `mydata` bucket is there with the file in it.
