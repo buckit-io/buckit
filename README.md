@@ -59,7 +59,8 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 
 ## Quickstart
 
-From nothing to a file in object storage.
+Let's start the object storage server, create a bucket, upload a file into it,
+and verify using the web UI.
 
 > [!NOTE]
 > This quickstart runs the server by hand for learning purposes.
