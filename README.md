@@ -186,9 +186,6 @@ The same image is published to Docker Hub as `buckitio/buckit` and to GitHub
 Container Registry as `ghcr.io/buckit-io/buckit`. For production, pin a release
 tag instead of `latest`.
 
-To build a custom image, use the release workflow or adapt the root
-`Dockerfile` for your own artifact pipeline.
-
 ## Use Buckit With `bm`
 
 `bm` is the Buckit Manager CLI for Buckit and S3-compatible object storage.
