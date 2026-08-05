@@ -89,7 +89,7 @@ irm https://buckit-io.github.io/buckit/install-windows.ps1 | iex
 Objects are stored in `/tmp/buckit-data`. The S3 API listens on port 9000 and
 the console on 9001.
 
-### 3. Create a bucket and upload a file
+### 3. Create a bucket and upload a file using CLI
 
 ```sh
 # Install the bm client. On Windows PowerShell:
