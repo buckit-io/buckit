@@ -144,24 +144,6 @@ the cluster.
 For detailed installation instructions, see the
 [Deployment Guide](https://buckit.sh/docs/operations/deployments/baremetal-deploy-server).
 
-### Linux Packages (recommended)
-
-Downloads the `.deb`, `.rpm`, or `.apk` for this host and prints the
-package-manager command to run:
-
-```sh
-curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh
-```
-
-### Linux Standalone Binary
-
-Downloads just the binary, with no package and no systemd service, and leaves
-an executable `buckit` in the current directory:
-
-```sh
-curl -fsSL https://buckit-io.github.io/buckit/install-linux-binary.sh | sh
-```
-
 ### Build From Source
 
 Buckit requires Go 1.25 or newer. If Go is not installed, download and install
