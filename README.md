@@ -96,7 +96,7 @@ the console on 9001.
 curl -fsSL https://buckit-io.github.io/bm/install.sh | sh
 
 # Windows PowerShell
-irm https://buckit-io.github.io/bm/install.ps1 | iex
+# irm https://buckit-io.github.io/bm/install.ps1 | iex
 
 # bm installs to ~/.local/bin; skip this if that is already on your PATH
 export PATH="$HOME/.local/bin:$PATH"
