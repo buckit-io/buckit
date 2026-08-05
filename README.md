@@ -146,9 +146,8 @@ For detailed installation instructions, see the
 
 ### Linux Packages (recommended)
 
-Linux release packages are available as `.deb`, `.rpm`, and `.apk` artifacts.
-The helper script downloads the package for the current system, verifies its
-SHA-256 checksum, and prints the package-manager command to run:
+Downloads the `.deb`, `.rpm`, or `.apk` for this host and prints the
+package-manager command to run:
 
 ```sh
 curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh
@@ -156,9 +155,7 @@ curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh
 
 ### Linux Standalone Binary
 
-To run the server without a package or a systemd service — for example when
-taking over an existing deployment that is started by hand — download the
-binary on its own. The helper script verifies its SHA-256 checksum and leaves
+Downloads just the binary, with no package and no systemd service, and leaves
 an executable `buckit` in the current directory:
 
 ```sh
