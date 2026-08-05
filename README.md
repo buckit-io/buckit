@@ -157,6 +157,13 @@ make build
 
 The build writes `./buckit`.
 
+You can also install directly with Go, though the resulting binary reports
+`DEVELOPMENT.GOGET` rather than a version:
+
+```sh
+go install github.com/buckit-io/buckit@latest
+```
+
 ## Run with Docker
 
 ```sh
