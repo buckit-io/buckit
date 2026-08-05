@@ -63,7 +63,7 @@ From nothing to a file in object storage.
 
 > [!NOTE]
 > This quickstart runs the server by hand for learning purposes.
-> For real-world service deployments, follow the
+> For real-world guided deployments, follow the
 > [Getting Started guide](https://buckit.sh/#getting-started).
 
 ### 1. Download the server
