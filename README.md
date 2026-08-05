@@ -186,7 +186,7 @@ The same image is published to Docker Hub as `buckitio/buckit` and to GitHub
 Container Registry as `ghcr.io/buckit-io/buckit`. For production, pin a release
 tag instead of `latest`.
 
-## Use Buckit With `bm`
+## Access Buckit with the `bm` CLI
 
 `bm` is the Buckit Manager CLI for Buckit and S3-compatible object storage.
 It provides object commands such as `ls`, `cp`, `cat`, `mirror`, and `rm`, plus
