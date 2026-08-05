@@ -169,7 +169,7 @@ go install github.com/buckit-io/buckit@latest
 ```sh
 docker run -p 9000:9000 -p 9001:9001 \
   -v "$HOME/buckit-data:/data" \
-  ghcr.io/buckit-io/buckit:latest server /data --console-address :9001
+  buckitio/buckit:latest server /data --console-address :9001
 ```
 
 With explicit credentials:
@@ -179,12 +179,12 @@ docker run -p 9000:9000 -p 9001:9001 \
   -e MINIO_ROOT_USER=myadmin \
   -e MINIO_ROOT_PASSWORD=mysecretpassword \
   -v "$HOME/buckit-data:/data" \
-  ghcr.io/buckit-io/buckit:latest server /data --console-address :9001
+  buckitio/buckit:latest server /data --console-address :9001
 ```
 
-The same image is published to `ghcr.io/buckit-io/buckit` and
-`docker.io/buckitio/buckit`. For production, pin a release tag instead of
-`latest`.
+The same image is published to Docker Hub as `buckitio/buckit` and to GitHub
+Container Registry as `ghcr.io/buckit-io/buckit`. For production, pin a release
+tag instead of `latest`.
 
 To build a custom image, use the release workflow or adapt the root
 `Dockerfile` for your own artifact pipeline.
