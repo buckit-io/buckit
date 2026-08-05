@@ -117,7 +117,7 @@ Open <http://127.0.0.1:9001> and sign in with `buckitadmin` / `buckitadmin`,
 then go to **Object Browser**. Your `mydata` bucket is there with the file in
 it.
 
-## A Whole Cluster Is One Command Too
+## Distributed Server Mode
 
 ```sh
 buckit server http://node{1...4}.example.com/data{1...4}
