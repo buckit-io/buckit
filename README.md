@@ -59,13 +59,13 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 
 ## Quickstart
 
-Let's start the object storage server, create a bucket, upload a file into it,
-and verify using the web UI.
-
 > [!NOTE]
 > This quickstart runs the server by hand for learning purposes.
 > For real-world guided deployments, follow the
 > [Getting Started guide](https://buckit.sh/#getting-started).
+
+Let's start the object storage server, create a bucket, upload a file into it,
+and verify using the web UI.
 
 ### 1. Download the server
 
