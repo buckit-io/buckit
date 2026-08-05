@@ -61,40 +61,47 @@ sending all data to a public cloud or paying cloud storage bills at scale.
 
 From nothing to a file in object storage.
 
-**1. Download the server.**
+### 1. Download the server
 
 ```sh
+# Linux
 curl -fsSL https://buckit-io.github.io/buckit/install-linux-binary.sh | sh
+
+# macOS
+curl -fsSL https://buckit-io.github.io/buckit/install-mac.sh | sh
+
+# Windows PowerShell
+irm https://buckit-io.github.io/buckit/install-windows.ps1 | iex
 ```
 
-On macOS use `install-mac.sh`, on Windows `install-windows.ps1`.
-
-**2. Start it.** The S3 API listens on port 9000, the console on 9001.
+### 2. Start the server
 
 ```sh
 ./buckit server /tmp/buckit-data --console-address :9001
 ```
 
-**3. Create a bucket and upload a file.** `bm` is the Buckit client, installed
-to `~/.local/bin`:
+The S3 API listens on port 9000 and the console on 9001.
+
+### 3. Create a bucket and upload a file
 
 ```sh
+# Install the bm client. On Windows PowerShell:
+#   irm https://buckit-io.github.io/bm/install.ps1 | iex
 curl -fsSL https://buckit-io.github.io/bm/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 
+# Point it at the server, then create a bucket and upload a file
 bm alias set local http://localhost:9000 buckitadmin buckitadmin
 bm mb local/mydata
 bm cp ./hello.txt local/mydata/
 ```
 
-On Windows PowerShell, install `bm` with
-`irm https://buckit-io.github.io/bm/install.ps1 | iex`.
+### 4. See it in the console
 
-**4. See it in the console.** Open <http://127.0.0.1:9001> and sign in with
-`buckitadmin` / `buckitadmin`. Your `mydata` bucket is there with the file in
-it.
+Open <http://127.0.0.1:9001> and sign in with `buckitadmin` / `buckitadmin`.
+Your `mydata` bucket is there with the file in it.
 
-### A whole cluster is one command too
+## A Whole Cluster Is One Command Too
 
 ```sh
 buckit server http://node{1...4}.example.com/data{1...4}
