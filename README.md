@@ -119,28 +119,24 @@ it.
 
 ## Distributed Server Mode
 
-```sh
-buckit server http://node{1...4}.example.com/data{1...4}
-```
+For distributed deployments, run the same `buckit server` command on every
+participating node with a shared set of drive endpoints and identical root
+credentials.
 
-That single line describes the entire deployment: four servers, four drives
-each, sixteen drives in all. Run it unchanged on every node. There is no
-coordinator process to stand up, no config file to distribute, and no external
-database to operate.
-
-Set root credentials on every node before starting, and keep them identical
-across the cluster:
+Example pattern:
 
 ```sh
 export MINIO_ROOT_USER=myadmin
 export MINIO_ROOT_PASSWORD=mysecretpassword
+
+buckit server \
+  http://node{1...4}.example.com/data{1...4} \
+  --console-address :9001
 ```
 
-The variable names keep the `MINIO_` prefix so existing deployment tooling
-works unchanged.
-
-For production clusters, [`bm web`](#buckit-manager-web) handles host
-discovery, drive selection, preflight checks, and service setup for you.
+For new production clusters, prefer [`bm web`](https://github.com/buckit-io/buckit#buckit-manager-web) so host discovery, disk selection,
+preflight checks, service setup, and generated credentials are handled by the
+manager instead of hand-written shell commands.
 
 ## Install Buckit
 
