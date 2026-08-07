@@ -305,7 +305,7 @@ Counters include:
 
 - `fast_open_attempted_total`
 - `fast_open_hits_total`
-- `fast_open_unsupported_total`
+- `fast_open_fallback_total`
 - `fast_open_replacement_path_total`
 - `fast_open_streams_opened_total`
 - `fast_open_replacement_opens_total`

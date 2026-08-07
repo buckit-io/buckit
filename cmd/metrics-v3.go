@@ -95,7 +95,7 @@ func newMetricGroups(r *prometheus.Registry) *metricsV3Collection {
 			apiRequestsCanceledTotalMD,
 			apiRequestsFastOpenAttemptedMD,
 			apiRequestsFastOpenHitsMD,
-			apiRequestsFastOpenUnsupportedMD,
+			apiRequestsFastOpenFallbackMD,
 			apiRequestsFastOpenReplacementPathMD,
 			apiRequestsFastOpenStreamsOpenedMD,
 			apiRequestsFastOpenReplacementOpenMD,

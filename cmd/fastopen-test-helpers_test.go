@@ -131,7 +131,7 @@ func withFastOpenEnabled(t *testing.T, enabled bool) {
 func resetFastOpenMetrics() {
 	globalFastOpenMetrics.attempted.Store(0)
 	globalFastOpenMetrics.hits.Store(0)
-	globalFastOpenMetrics.unsupported.Store(0)
+	globalFastOpenMetrics.fallbacks.Store(0)
 	globalFastOpenMetrics.replacementPath.Store(0)
 	globalFastOpenMetrics.streamsOpened.Store(0)
 	globalFastOpenMetrics.replacementOpen.Store(0)
@@ -158,7 +158,7 @@ func assertFastOpenCounterDelta(t *testing.T, hitsBefore, fallbacksBefore, wantH
 	t.Helper()
 
 	gotHits := globalFastOpenMetrics.hits.Load() - hitsBefore
-	gotFallbacks := globalFastOpenMetrics.unsupported.Load() - fallbacksBefore
+	gotFallbacks := globalFastOpenMetrics.fallbacks.Load() - fallbacksBefore
 	if gotHits != wantHits || gotFallbacks != wantFallbacks {
 		t.Fatalf("%s counters delta = hits:%d fallbacks:%d, want hits:%d fallbacks:%d", label, gotHits, gotFallbacks, wantHits, wantFallbacks)
 	}

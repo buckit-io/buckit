@@ -200,12 +200,163 @@ func TestFastOpenGETGoldenVersionedDeleteAndZero(t *testing.T) {
 				t.Fatalf("bytes differ: baseline=%d fast=%d want=%d", len(baseline), len(fast), len(test.wantBytes))
 			}
 			assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
-			if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.unsupported.Load() != 0 {
-				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.unsupported.Load())
+			if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.fallbacks.Load() != 0 {
+				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.fallbacks.Load())
 			}
 			assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 		})
 	}
+}
+
+func TestFastOpenGETZeroByteUnlockOwnership(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	obj, fsDirs, err := prepareErasure16(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer obj.Shutdown(t.Context())
+	defer removeRoots(fsDirs)
+
+	z := obj.(*erasureServerPools)
+	xl := z.serverPools[0].sets[0]
+	bucket := "bucket"
+	object := "zero-byte-unlock-object"
+	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(nil), 0, "", ""), ObjectOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	var failedUnlocks atomic.Int64
+	failed := xl.tryFastOpenGET(ctx, bucket, object, nil, http.Header{}, ObjectOptions{
+		FastGetObjInfo: true,
+		CheckPrecondFn: func(ObjectInfo) bool {
+			return true
+		},
+	}, func() {
+		failedUnlocks.Add(1)
+	})
+	if failed.outcome != fastOpenGETTerminalError {
+		t.Fatalf("failed-precondition outcome = %v, want terminal error", failed.outcome)
+	}
+	var preconditionFailed PreConditionFailed
+	if !errors.As(failed.err, &preconditionFailed) {
+		t.Fatalf("failed-precondition error = %T %v, want PreConditionFailed", failed.err, failed.err)
+	}
+	if got := failedUnlocks.Load(); got != 0 {
+		t.Fatalf("failed-precondition unlocks inside FastOpen = %d, want 0", got)
+	}
+	// Simulate GetObjectNInfo's deferred unlock on the terminal-error path.
+	failedUnlocks.Add(1)
+	if got := failedUnlocks.Load(); got != 1 {
+		t.Fatalf("failed-precondition total unlocks = %d, want 1", got)
+	}
+
+	var successUnlocks atomic.Int64
+	succeeded := xl.tryFastOpenGET(ctx, bucket, object, nil, http.Header{}, ObjectOptions{FastGetObjInfo: true}, func() {
+		successUnlocks.Add(1)
+	})
+	if succeeded.outcome != fastOpenGETSuccess || succeeded.reader == nil || succeeded.err != nil {
+		t.Fatalf("successful outcome = %v reader=%v err=%v", succeeded.outcome, succeeded.reader != nil, succeeded.err)
+	}
+	if got := successUnlocks.Load(); got != 0 {
+		t.Fatalf("successful FastOpen unlocks before reader close = %d, want 0", got)
+	}
+	if err = succeeded.reader.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got := successUnlocks.Load(); got != 1 {
+		t.Fatalf("successful FastOpen unlocks after reader close = %d, want 1", got)
+	}
+	if err = succeeded.reader.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got := successUnlocks.Load(); got != 1 {
+		t.Fatalf("successful FastOpen unlocks after second reader close = %d, want 1", got)
+	}
+}
+
+func TestFastOpenGETSplitLocalLatestVersionsFallback(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	obj, fsDirs, err := prepareErasure16(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer obj.Shutdown(t.Context())
+	defer removeRoots(fsDirs)
+
+	z := obj.(*erasureServerPools)
+	sets := z.serverPools[0]
+	xl := sets.sets[0]
+	withFastOpenEnabled(t, false)
+	withFastOpenSpreadSelection(t, false)
+
+	bucket := "bucket"
+	object := "split-local-latest-object"
+	v1Data := makeFastOpenTestData(smallFileThreshold*16, 17)
+	v2Data := makeFastOpenTestData(smallFileThreshold*16, 18)
+	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	v1, err := xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(v1Data), int64(len(v1Data)), "", ""), ObjectOptions{Versioned: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2, err := xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(v2Data), int64(len(v2Data)), "", ""), ObjectOptions{Versioned: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	baseline, baselineInfo, err := readFastOpenTestObjectOptions(t, xl, bucket, object, nil, http.Header{}, ObjectOptions{FastGetObjInfo: true, Versioned: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(baseline, v2Data) || baselineInfo.VersionID != v2.VersionID {
+		t.Fatalf("baseline latest version = %q bytes=%d, want %q bytes=%d", baselineInfo.VersionID, len(baseline), v2.VersionID, len(v2Data))
+	}
+
+	fi, _, _, err := xl.getObjectFileInfo(ctx, bucket, object, ObjectOptions{Versioned: true}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldLatestCount := len(fi.Erasure.Distribution) - fi.Erasure.DataBlocks + 1
+	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+	for diskIndex := 0; diskIndex < oldLatestCount; diskIndex++ {
+		// Simulate disks whose local xl.meta still selects the previous version.
+		// Canonical ReadXL remains untouched and can merge complete histories.
+		countingDisks[diskIndex].fastOpenLatestVersionID = v1.VersionID
+	}
+
+	globalFastGetEnabled = true
+	fast, fastInfo, err := readFastOpenTestObjectOptions(t, xl, bucket, object, nil, http.Header{}, ObjectOptions{FastGetObjInfo: true, Versioned: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(fast, baseline) {
+		t.Fatalf("fallback latest bytes differ: got %d, want %d", len(fast), len(baseline))
+	}
+	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
+	if fastInfo.VersionID != v2.VersionID {
+		t.Fatalf("fallback version = %q, want committed latest %q", fastInfo.VersionID, v2.VersionID)
+	}
+	if got := globalFastOpenMetrics.hits.Load(); got != 0 {
+		t.Fatalf("hits = %d, want 0 for split-version fallback", got)
+	}
+	if got := globalFastOpenMetrics.fallbacks.Load(); got != 1 {
+		t.Fatalf("fallbacks = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.failures[fastOpenFailureNoQuorum].Load(); got != 1 {
+		t.Fatalf("no-quorum failures = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.failures[fastOpenFailureUnsupported].Load(); got != 0 {
+		t.Fatalf("unsupported failures = %d, want 0", got)
+	}
+	assertFastOpenGETOpens(t, xl, countingDisks, len(countingDisks))
 }
 
 func TestFastOpenGETMultipartFallsBack(t *testing.T) {
@@ -261,11 +412,14 @@ func TestFastOpenGETMultipartFallsBack(t *testing.T) {
 		t.Fatalf("multipart bytes differ: fast=%d baseline=%d", len(fast), len(baseline))
 	}
 	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
-	if globalFastOpenMetrics.hits.Load() != 0 || globalFastOpenMetrics.unsupported.Load() == 0 {
-		t.Fatalf("fast counters hits=%d fallbacks=%d, want 0/>0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.unsupported.Load())
+	if globalFastOpenMetrics.hits.Load() != 0 || globalFastOpenMetrics.fallbacks.Load() == 0 {
+		t.Fatalf("fast counters hits=%d fallbacks=%d, want 0/>0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.fallbacks.Load())
 	}
-	if got := globalFastOpenMetrics.unsupported.Load(); got != 1 {
+	if got := globalFastOpenMetrics.fallbacks.Load(); got != 1 {
 		t.Fatalf("fastopen unsupported metric = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.failures[fastOpenFailureUnsupported].Load(); got != 1 {
+		t.Fatalf("fastopen unsupported failures = %d, want 1", got)
 	}
 	if got := globalFastOpenMetrics.streamCancels.Load(); got != 0 {
 		t.Fatalf("fastopen stream cancels = %d, want 0 for metadata-only fallback", got)
@@ -344,8 +498,8 @@ func TestFastOpenGETHandlerChecksumAndLifecycleHeaders(t *testing.T) {
 			t.Fatalf("%s header differs: fast=%v baseline=%v", header, got, want)
 		}
 	}
-	if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.unsupported.Load() != 0 {
-		t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.unsupported.Load())
+	if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.fallbacks.Load() != 0 {
+		t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.fallbacks.Load())
 	}
 	assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 }
@@ -410,8 +564,8 @@ func TestFastOpenGETRemoteTierWithBackend(t *testing.T) {
 	if backend.gets.Load() != 2 {
 		t.Fatalf("warm backend GETs = %d, want 2", backend.gets.Load())
 	}
-	if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.unsupported.Load() != 0 {
-		t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.unsupported.Load())
+	if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.fallbacks.Load() != 0 {
+		t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.fallbacks.Load())
 	}
 	assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 }
@@ -525,8 +679,8 @@ func TestFastOpenGETReplicationConfiguredMetadata(t *testing.T) {
 			}
 			assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 			test.verify(t, fastInfo)
-			if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.unsupported.Load() != 0 {
-				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.unsupported.Load())
+			if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.fallbacks.Load() != 0 {
+				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.fallbacks.Load())
 			}
 			assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 		})
@@ -876,8 +1030,8 @@ func TestFastOpenGETAdditionalGoldenMetadata(t *testing.T) {
 			}
 			assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
 			test.verifyInfo(t, fastInfo)
-			if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.unsupported.Load() != 0 {
-				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.unsupported.Load())
+			if globalFastOpenMetrics.hits.Load() != 1 || globalFastOpenMetrics.fallbacks.Load() != 0 {
+				t.Fatalf("fast counters hits=%d fallbacks=%d, want 1/0", globalFastOpenMetrics.hits.Load(), globalFastOpenMetrics.fallbacks.Load())
 			}
 			assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 		})
@@ -1121,7 +1275,7 @@ func TestFastOpenGETRejectsMismatchedInitialShardIndex(t *testing.T) {
 	}
 }
 
-func TestFastOpenGETMismatchedIndexesBelowQuorumAreRejectedBeforeDecode(t *testing.T) {
+func TestFastOpenGETMismatchedIndexesBelowQuorumFallback(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
@@ -1137,11 +1291,6 @@ func TestFastOpenGETMismatchedIndexesBelowQuorumAreRejectedBeforeDecode(t *testi
 	xl := sets.sets[0]
 	withFastOpenEnabled(t, false)
 	withFastOpenSpreadSelection(t, false)
-	oldNoFallback := globalFastGetNoFallback
-	globalFastGetNoFallback = true
-	t.Cleanup(func() {
-		globalFastGetNoFallback = oldNoFallback
-	})
 
 	bucket := "bucket"
 	object := "mismatched-index-quorum-object"
@@ -1152,6 +1301,7 @@ func TestFastOpenGETMismatchedIndexesBelowQuorumAreRejectedBeforeDecode(t *testi
 	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
 		t.Fatal(err)
 	}
+	baseline, baselineInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
 
 	fi, _, _, err := xl.getObjectFileInfo(ctx, bucket, object, ObjectOptions{}, false)
 	if err != nil {
@@ -1171,18 +1321,56 @@ func TestFastOpenGETMismatchedIndexesBelowQuorumAreRejectedBeforeDecode(t *testi
 	}
 
 	globalFastGetEnabled = true
-	gr, err := xl.GetObjectNInfo(ctx, bucket, object, nil, http.Header{}, ObjectOptions{FastGetObjInfo: true})
-	if gr != nil {
-		gr.Close()
-		t.Fatal("GetObjectNInfo returned a reader after mismatched disks reduced valid readers below quorum")
+	fast, fastInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
+	if !bytes.Equal(fast, baseline) {
+		t.Fatalf("fallback bytes differ from baseline: got %d bytes, want %d", len(fast), len(baseline))
 	}
-	if err == nil {
-		t.Fatal("GetObjectNInfo returned nil error after mismatched disks reduced valid readers below quorum")
+	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
+	if got := globalFastOpenMetrics.hits.Load(); got != 0 {
+		t.Fatalf("hits = %d, want 0 for canonical fallback", got)
+	}
+	if got := globalFastOpenMetrics.fallbacks.Load(); got != 1 {
+		t.Fatalf("fallbacks = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.failures[fastOpenFailureNoQuorum].Load(); got != 1 {
+		t.Fatalf("no-quorum failures = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.failures[fastOpenFailureUnsupported].Load(); got != 0 {
+		t.Fatalf("unsupported failures = %d, want 0 for a no-quorum fallback", got)
 	}
 	for diskIndex := 0; diskIndex < badCount; diskIndex++ {
 		if got := countingDisks[diskIndex].bodyBytesRead.Load(); got != 0 {
 			t.Fatalf("mismatched-index disk %d contributed %d body bytes, want 0", diskIndex, got)
 		}
+	}
+
+	resetFastOpenGETOpenCounts(countingDisks)
+	resetFastOpenMetrics()
+	oldNoFallback := globalFastGetNoFallback
+	globalFastGetNoFallback = true
+	t.Cleanup(func() {
+		globalFastGetNoFallback = oldNoFallback
+	})
+
+	gr, err := xl.GetObjectNInfo(ctx, bucket, object, nil, http.Header{}, ObjectOptions{FastGetObjInfo: true})
+	if gr != nil {
+		gr.Close()
+		t.Fatal("GetObjectNInfo returned a reader with FastOpen fallback disabled")
+	}
+	if !errors.Is(err, errFastGetNoFallback) {
+		t.Fatalf("GetObjectNInfo error = %T %v, want %v", err, err, errFastGetNoFallback)
+	}
+	if !errors.Is(err, errErasureReadQuorum) {
+		t.Fatalf("GetObjectNInfo error = %v, want preserved read-quorum cause", err)
+	}
+	if got := globalFastOpenMetrics.fallbacks.Load(); got != 1 {
+		t.Fatalf("no-fallback attempts = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.failures[fastOpenFailureNoQuorum].Load(); got != 1 {
+		t.Fatalf("no-fallback no-quorum failures = %d, want 1", got)
+	}
+	if got := globalFastOpenMetrics.failures[fastOpenFailureUnsupported].Load(); got != 0 {
+		t.Fatalf("no-fallback unsupported failures = %d, want 0", got)
 	}
 }
 
@@ -1568,7 +1756,7 @@ func TestFastOpenGETMetrics(t *testing.T) {
 	if got := globalFastOpenMetrics.hits.Load(); got != 1 {
 		t.Fatalf("hits = %d, want 1", got)
 	}
-	if got := globalFastOpenMetrics.unsupported.Load(); got != 0 {
+	if got := globalFastOpenMetrics.fallbacks.Load(); got != 0 {
 		t.Fatalf("unsupported = %d, want 0", got)
 	}
 	if got := globalFastOpenMetrics.tryCount.Load(); got != 1 {
@@ -1832,16 +2020,19 @@ func firstByteDiff(a, b []byte) int {
 
 type fastOpenCountingDisk struct {
 	StorageAPI
-	opens            atomic.Int64
-	bodyBytesRead    atomic.Int64
-	mu               sync.Mutex
-	offsets          []int64
-	bodyModes        []FastOpenBodyMode
-	fastOpenErr      error
-	mutateFrame      func(*CoalescedMetadataFrame)
-	corruptBody      bool
-	corruptBodyAt    int64
-	corruptBodyAtSet bool
+	opens         atomic.Int64
+	bodyBytesRead atomic.Int64
+	mu            sync.Mutex
+	offsets       []int64
+	bodyModes     []FastOpenBodyMode
+	fastOpenErr   error
+	// fastOpenLatestVersionID overrides latest-version selection only for
+	// FastOpenPart. Canonical metadata reads still see the complete history.
+	fastOpenLatestVersionID string
+	mutateFrame             func(*CoalescedMetadataFrame)
+	corruptBody             bool
+	corruptBodyAt           int64
+	corruptBodyAtSet        bool
 }
 
 func (d *fastOpenCountingDisk) FastOpenPart(ctx context.Context, volume, path string, req FastOpenPartRequest) (io.ReadCloser, error) {
@@ -1851,6 +2042,9 @@ func (d *fastOpenCountingDisk) FastOpenPart(ctx context.Context, volume, path st
 	d.mu.Unlock()
 	if d.fastOpenErr != nil {
 		return nil, d.fastOpenErr
+	}
+	if req.VersionID == "" && d.fastOpenLatestVersionID != "" {
+		req.VersionID = d.fastOpenLatestVersionID
 	}
 	rc, err := d.StorageAPI.FastOpenPart(ctx, volume, path, req)
 	if err != nil || (!d.corruptBody && d.mutateFrame == nil) {
