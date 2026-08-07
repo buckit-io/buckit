@@ -523,7 +523,7 @@ func buildFastOpenGETReaders(ctx context.Context, bucket, object, versionID stri
 	readers := make([]io.ReaderAt, len(fi.Erasure.Distribution))
 	prefer := make([]bool, len(readers))
 	used := make(map[int]bool)
-	usedDisks := make(map[int]bool)
+	unavailableDisks := make(map[int]bool)
 	hasInline := false
 	for diskIndex := range metaArr {
 		if onlineDisks[diskIndex] == nil || !metaArr[diskIndex].IsValid() {
@@ -537,28 +537,35 @@ func buildFastOpenGETReaders(ctx context.Context, bucket, object, versionID stri
 		if mode != FastOpenBodyShard && mode != FastOpenBodyInline {
 			continue
 		}
+		// Bind the per-disk shard index to the winning distribution before the
+		// stream can contribute data. Bitrot protects the shard bytes, but it does
+		// not prove that those bytes belong in the claimed erasure slot.
+		if diskIndex >= len(fi.Erasure.Distribution) {
+			unavailableDisks[diskIndex] = true
+			continue
+		}
+		expectedIndex := fi.Erasure.Distribution[diskIndex]
+		pos := expectedIndex - 1
+		if metaArr[diskIndex].Erasure.Index != expectedIndex || pos < 0 || pos >= len(readers) || readers[pos] != nil {
+			// Exclude a known-invalid disk from the replacement capacity gate and
+			// pool. Otherwise it can make FastOpen commit before the replacement
+			// frame rejects the same mismatch during body decode.
+			unavailableDisks[diskIndex] = true
+			continue
+		}
 		if mode == FastOpenBodyInline {
 			hasInline = true
-		}
-		// The stream and its compact metadata come from the same disk, so
-		// Erasure.Index identifies the shard position directly. Canonical GET
-		// also checks distribution[diskIndex] because it builds readers from a
-		// full disk array; FastOpen has already paired this disk's index with
-		// this disk's body stream before reaching this point.
-		pos := metaArr[diskIndex].Erasure.Index - 1
-		if pos < 0 || pos >= len(readers) || readers[pos] != nil {
-			continue
 		}
 		readers[pos] = newFastOpenStreamingBitrotReader(ctx, reads[readIndex].rc, checksumInfo.Algorithm, fi.Erasure.ShardSize(), fi.Erasure.ShardFileSize(fi.Parts[0].Size))
 		prefer[pos] = true
 		used[readIndex] = true
-		usedDisks[diskIndex] = true
+		unavailableDisks[diskIndex] = true
 	}
 
-	candidates := fastOpenReplacementCandidates(disks, usedDisks)
+	candidates := fastOpenReplacementCandidates(disks, unavailableDisks)
 	inlineReplacement := !hasInline || fastOpenInlineReplacementSafe(fi)
 	if inlineReplacement && len(used)+len(candidates) >= fi.Erasure.DataBlocks {
-		pool := newFastOpenReplacementPool(ctx, disks, usedDisks, bucket, object, versionID, fi, checksumInfo.Algorithm)
+		pool := newFastOpenReplacementPool(ctx, disks, unavailableDisks, bucket, object, versionID, fi, checksumInfo.Algorithm)
 		for pos := range readers {
 			if readers[pos] == nil {
 				readers[pos] = &fastOpenLazyReplacementReader{pool: pool, slot: pos}

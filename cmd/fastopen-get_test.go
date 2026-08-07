@@ -1052,6 +1052,140 @@ func TestFastOpenGETNotFoundCountsAsHit(t *testing.T) {
 	assertFastOpenGETOpens(t, xl, countingDisks, xl.fastOpenInitialOpenCount())
 }
 
+func TestFastOpenGETRejectsMismatchedInitialShardIndex(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	obj, fsDirs, err := prepareErasure16(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer obj.Shutdown(t.Context())
+	defer removeRoots(fsDirs)
+
+	z := obj.(*erasureServerPools)
+	sets := z.serverPools[0]
+	xl := sets.sets[0]
+	withFastOpenEnabled(t, false)
+	withFastOpenSpreadSelection(t, false)
+
+	bucket := "bucket"
+	object := "mismatched-initial-index-object"
+	data := makeFastOpenTestData(smallFileThreshold*16, 29)
+	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	baseline, baselineInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
+	fi, _, _, err := xl.getObjectFileInfo(ctx, bucket, object, ObjectOptions{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialOpenCount := xl.fastOpenInitialOpenCount()
+	if initialOpenCount >= len(fi.Erasure.Distribution) {
+		t.Fatalf("initial open count = %d, want fewer than %d disks for replacement coverage", initialOpenCount, len(fi.Erasure.Distribution))
+	}
+	selected := selectFastOpenGETDisks(xl.getDisks(), initialOpenCount, bucket, object)
+	if len(selected) != initialOpenCount {
+		t.Fatalf("selected disks = %v, want %d initial disks", selected, initialOpenCount)
+	}
+	for i, diskIndex := range selected {
+		if diskIndex != i {
+			t.Fatalf("selected disks = %v, want deterministic indexes 0..%d with spread disabled", selected, initialOpenCount-1)
+		}
+	}
+
+	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+	badDisk := 0
+	wrongIndex := fi.Erasure.Distribution[initialOpenCount]
+	countingDisks[badDisk].mutateFrame = func(frame *CoalescedMetadataFrame) {
+		// Change only metadata. The shard body and its bitrot hashes remain valid,
+		// so decoding this stream in the claimed slot would silently corrupt data.
+		frame.Meta.Erasure.Index = wrongIndex
+	}
+
+	globalFastGetEnabled = true
+	fast, fastInfo := readFastOpenTestObject(t, xl, bucket, object, nil)
+	if !bytes.Equal(fast, baseline) {
+		t.Fatalf("mismatched-index bytes differ from baseline: got %d bytes, want %d, first diff at %d", len(fast), len(baseline), firstByteDiff(fast, baseline))
+	}
+	assertFastOpenGETObjectInfoEqual(t, fastInfo, baselineInfo)
+	if got := countingDisks[badDisk].bodyBytesRead.Load(); got != 0 {
+		t.Fatalf("mismatched-index disk contributed %d body bytes, want 0", got)
+	}
+	if got := countingDisks[badDisk].opens.Load(); got != 1 {
+		t.Fatalf("mismatched-index disk opens = %d, want exactly the rejected initial open", got)
+	}
+}
+
+func TestFastOpenGETMismatchedIndexesBelowQuorumAreRejectedBeforeDecode(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	obj, fsDirs, err := prepareErasure16(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer obj.Shutdown(t.Context())
+	defer removeRoots(fsDirs)
+
+	z := obj.(*erasureServerPools)
+	sets := z.serverPools[0]
+	xl := sets.sets[0]
+	withFastOpenEnabled(t, false)
+	withFastOpenSpreadSelection(t, false)
+	oldNoFallback := globalFastGetNoFallback
+	globalFastGetNoFallback = true
+	t.Cleanup(func() {
+		globalFastGetNoFallback = oldNoFallback
+	})
+
+	bucket := "bucket"
+	object := "mismatched-index-quorum-object"
+	data := makeFastOpenTestData(smallFileThreshold*16, 30)
+	if err = obj.MakeBucket(ctx, bucket, MakeBucketOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = xl.PutObject(ctx, bucket, object, mustGetPutObjReader(t, bytes.NewReader(data), int64(len(data)), "", ""), ObjectOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	fi, _, _, err := xl.getObjectFileInfo(ctx, bucket, object, ObjectOptions{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	badCount := len(fi.Erasure.Distribution) - fi.Erasure.DataBlocks + 1
+	if badCount < 2 || badCount > xl.fastOpenInitialOpenCount() {
+		t.Fatalf("bad disk count = %d, want 2..%d", badCount, xl.fastOpenInitialOpenCount())
+	}
+
+	countingDisks := wrapFastOpenCountingDisks(t, sets, xl)
+	for diskIndex := 0; diskIndex < badCount; diskIndex++ {
+		wrongIndex := fi.Erasure.Distribution[(diskIndex+1)%badCount]
+		countingDisks[diskIndex].mutateFrame = func(frame *CoalescedMetadataFrame) {
+			frame.Meta.Erasure.Index = wrongIndex
+		}
+	}
+
+	globalFastGetEnabled = true
+	gr, err := xl.GetObjectNInfo(ctx, bucket, object, nil, http.Header{}, ObjectOptions{FastGetObjInfo: true})
+	if gr != nil {
+		gr.Close()
+		t.Fatal("GetObjectNInfo returned a reader after mismatched disks reduced valid readers below quorum")
+	}
+	if err == nil {
+		t.Fatal("GetObjectNInfo returned nil error after mismatched disks reduced valid readers below quorum")
+	}
+	for diskIndex := 0; diskIndex < badCount; diskIndex++ {
+		if got := countingDisks[diskIndex].bodyBytesRead.Load(); got != 0 {
+			t.Fatalf("mismatched-index disk %d contributed %d body bytes, want 0", diskIndex, got)
+		}
+	}
+}
+
 func TestFastOpenGETReplacementOnInitialOpenFailure(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -1699,10 +1833,12 @@ func firstByteDiff(a, b []byte) int {
 type fastOpenCountingDisk struct {
 	StorageAPI
 	opens            atomic.Int64
+	bodyBytesRead    atomic.Int64
 	mu               sync.Mutex
 	offsets          []int64
 	bodyModes        []FastOpenBodyMode
 	fastOpenErr      error
+	mutateFrame      func(*CoalescedMetadataFrame)
 	corruptBody      bool
 	corruptBodyAt    int64
 	corruptBodyAtSet bool
@@ -1717,7 +1853,7 @@ func (d *fastOpenCountingDisk) FastOpenPart(ctx context.Context, volume, path st
 		return nil, d.fastOpenErr
 	}
 	rc, err := d.StorageAPI.FastOpenPart(ctx, volume, path, req)
-	if err != nil || !d.corruptBody {
+	if err != nil || (!d.corruptBody && d.mutateFrame == nil) {
 		return rc, err
 	}
 	_, frame, err := readFastOpenFrame(rc)
@@ -1728,10 +1864,23 @@ func (d *fastOpenCountingDisk) FastOpenPart(ctx context.Context, volume, path st
 	d.mu.Lock()
 	d.bodyModes = append(d.bodyModes, frame.BodyMode)
 	d.mu.Unlock()
+	if d.mutateFrame != nil {
+		d.mutateFrame(&frame)
+	}
 	frameBytes, err := encodeFastOpenFrame(frame)
 	if err != nil {
 		rc.Close()
 		return nil, err
+	}
+	body := io.Reader(rc)
+	if d.mutateFrame != nil {
+		body = &fastOpenCountingReader{r: body, n: &d.bodyBytesRead}
+	}
+	if !d.corruptBody {
+		return &fastOpenTestReadCloser{
+			r: io.MultiReader(bytes.NewReader(frameBytes), body),
+			c: rc,
+		}, nil
 	}
 	corruptAt := int64(0)
 	if d.corruptBodyAtSet {
@@ -1740,14 +1889,25 @@ func (d *fastOpenCountingDisk) FastOpenPart(ctx context.Context, volume, path st
 	relativeCorruptAt := corruptAt - req.Offset
 	if relativeCorruptAt < 0 {
 		return &fastOpenTestReadCloser{
-			r: io.MultiReader(bytes.NewReader(frameBytes), rc),
+			r: io.MultiReader(bytes.NewReader(frameBytes), body),
 			c: rc,
 		}, nil
 	}
 	return &fastOpenTestReadCloser{
-		r: io.MultiReader(bytes.NewReader(frameBytes), &fastOpenCorruptAtReader{r: rc, offset: relativeCorruptAt}),
+		r: io.MultiReader(bytes.NewReader(frameBytes), &fastOpenCorruptAtReader{r: body, offset: relativeCorruptAt}),
 		c: rc,
 	}, nil
+}
+
+type fastOpenCountingReader struct {
+	r io.Reader
+	n *atomic.Int64
+}
+
+func (r *fastOpenCountingReader) Read(p []byte) (int, error) {
+	n, err := r.r.Read(p)
+	r.n.Add(int64(n))
+	return n, err
 }
 
 type fastOpenGetObjectNInfo interface {
@@ -1814,6 +1974,7 @@ func withFastOpenSpreadSelection(t *testing.T, enabled bool) {
 func resetFastOpenGETOpenCounts(disks []*fastOpenCountingDisk) {
 	for _, disk := range disks {
 		disk.opens.Store(0)
+		disk.bodyBytesRead.Store(0)
 		disk.mu.Lock()
 		disk.offsets = nil
 		disk.bodyModes = nil
