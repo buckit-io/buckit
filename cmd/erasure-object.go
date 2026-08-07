@@ -35,6 +35,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/buckit-io/buckit-go/v7/pkg/tags"
 	"github.com/buckit-io/buckit/internal/bucket/lifecycle"
 	"github.com/buckit-io/buckit/internal/bucket/object/lock"
 	"github.com/buckit-io/buckit/internal/bucket/replication"
@@ -47,7 +48,6 @@ import (
 	xioutil "github.com/buckit-io/buckit/internal/ioutil"
 	"github.com/buckit-io/buckit/internal/logger"
 	"github.com/buckit-io/madmin-go/v3"
-	"github.com/buckit-io/buckit-go/v7/pkg/tags"
 	"github.com/klauspost/readahead"
 	"github.com/minio/pkg/v3/mimedb"
 	"github.com/minio/pkg/v3/sync/errgroup"
@@ -237,23 +237,20 @@ func (er erasureObjects) GetObjectNInfo(ctx context.Context, bucket, object stri
 
 	if fastOpenGETRequestEligible(bucket, h, rs, opts) {
 		globalFastOpenMetrics.attempted.Add(1)
-		gr, ok, err := er.tryFastOpenGET(ctx, bucket, object, rs, h, opts, nsUnlocker)
-		if err != nil {
-			if ok {
-				globalFastOpenMetrics.hits.Add(1)
-				fastOpenRecordFinalError(ctx, err)
-			}
-			return gr, err
-		}
-		if ok {
+		result := er.tryFastOpenGET(ctx, bucket, object, rs, h, opts, nsUnlocker)
+		switch result.outcome {
+		case fastOpenGETSuccess:
 			unlockOnDefer = false
 			globalFastOpenMetrics.hits.Add(1)
-			return gr, nil
-		}
-		globalFastOpenMetrics.unsupported.Add(1)
-		globalFastOpenMetrics.failures[fastOpenFailureUnsupported].Add(1)
-		if globalFastGetNoFallback {
-			return nil, toObjectErr(errFastGetNoFallback, bucket, object)
+			return result.reader, nil
+		case fastOpenGETTerminalError:
+			globalFastOpenMetrics.hits.Add(1)
+			fastOpenRecordFinalError(ctx, result.err)
+			return result.reader, result.err
+		case fastOpenGETFallback:
+			if globalFastGetNoFallback {
+				return nil, toObjectErr(fastOpenNoFallbackError{cause: result.err}, bucket, object)
+			}
 		}
 	}
 	fi, metaArr, onlineDisks, err := er.getObjectFileInfo(ctx, bucket, object, opts, true)

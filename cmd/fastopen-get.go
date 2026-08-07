@@ -49,6 +49,26 @@ type fastOpenGETInfo struct {
 	prefer  []bool
 }
 
+type fastOpenGETOutcome uint8
+
+const (
+	fastOpenGETFallback fastOpenGETOutcome = iota
+	fastOpenGETSuccess
+	fastOpenGETTerminalError
+)
+
+type fastOpenGETResult struct {
+	reader  *GetObjectReader
+	outcome fastOpenGETOutcome
+	err     error
+}
+
+type fastOpenGETInfoResult struct {
+	info    fastOpenGETInfo
+	outcome fastOpenGETOutcome
+	err     error
+}
+
 type fastOpenFailureReason uint8
 
 const (
@@ -98,7 +118,7 @@ func (c fastOpenFinalErrorCategory) String() string {
 type fastOpenMetrics struct {
 	attempted       atomic.Uint64
 	hits            atomic.Uint64
-	unsupported     atomic.Uint64
+	fallbacks       atomic.Uint64
 	replacementPath atomic.Uint64
 	streamsOpened   atomic.Uint64
 	replacementOpen atomic.Uint64
@@ -172,6 +192,39 @@ func (t *fastOpenGETMetricsTracker) recordFailure(err error) {
 	t.failureRecorded = true
 }
 
+func (t *fastOpenGETMetricsTracker) recordFallback(err error) {
+	globalFastOpenMetrics.fallbacks.Add(1)
+	if t == nil || t.failureRecorded {
+		return
+	}
+	if err != nil {
+		t.recordFailure(err)
+		return
+	}
+	globalFastOpenMetrics.failures[fastOpenFailureUnsupported].Add(1)
+	t.failureRecorded = true
+}
+
+type fastOpenNoFallbackError struct {
+	cause error
+}
+
+func (e fastOpenNoFallbackError) Error() string {
+	if e.cause == nil {
+		return errFastGetNoFallback.Error()
+	}
+	return errFastGetNoFallback.Error() + ": " + e.cause.Error()
+}
+
+func (e fastOpenNoFallbackError) Unwrap() []error {
+	// Keep this as a multi-error so toObjectErr's single-error unwrap leaves the
+	// diagnostic wrapper intact while errors.Is can match both values.
+	if e.cause == nil {
+		return []error{errFastGetNoFallback}
+	}
+	return []error{errFastGetNoFallback, e.cause}
+}
+
 // fastOpenGETRequestEligible keeps FastOpen on the plain full-object GET path.
 // The compact frame does not carry range/part metadata, SSE-C material, or
 // replication/proxy request context, so those requests must use canonical GET.
@@ -197,28 +250,25 @@ func fastOpenGETRequestEligible(bucket string, h http.Header, rs *HTTPRangeSpec,
 	return true
 }
 
-// tryFastOpenGET returns ok=false when FastOpen should be abandoned before the
-// client response is committed. An ok=true result means FastOpen selected the
-// object-level outcome, even when that outcome is an S3 error such as a delete
-// marker or quorum not found.
-func (er erasureObjects) tryFastOpenGET(ctx context.Context, bucket, object string, rs *HTTPRangeSpec, h http.Header, opts ObjectOptions, nsUnlocker func()) (*GetObjectReader, bool, error) {
+// tryFastOpenGET returns an explicit outcome so fallback causes can be retained
+// for diagnostics without being mistaken for terminal GET errors by the caller.
+func (er erasureObjects) tryFastOpenGET(ctx context.Context, bucket, object string, rs *HTTPRangeSpec, h http.Header, opts ObjectOptions, nsUnlocker func()) fastOpenGETResult {
 	start := time.Now()
 	defer func() {
 		fastOpenRecordDuration(&globalFastOpenMetrics.tryNS, &globalFastOpenMetrics.tryCount, start)
 	}()
 	var metrics fastOpenGETMetricsTracker
 	openStart := time.Now()
-	info, ok, err := er.openFastOpenGETInfo(ctx, bucket, object, opts, false, &metrics)
+	infoResult := er.openFastOpenGETInfo(ctx, bucket, object, opts, &metrics)
 	fastOpenRecordDuration(&globalFastOpenMetrics.openInfoNS, &globalFastOpenMetrics.openInfoCount, openStart)
-	if err != nil {
-		if ok {
-			return nil, true, toObjectErr(err, bucket, object)
-		}
-		return nil, false, err
+	switch infoResult.outcome {
+	case fastOpenGETFallback:
+		metrics.recordFallback(infoResult.err)
+		return fastOpenGETResult{outcome: fastOpenGETFallback, err: infoResult.err}
+	case fastOpenGETTerminalError:
+		return fastOpenGETResult{outcome: fastOpenGETTerminalError, err: toObjectErr(infoResult.err, bucket, object)}
 	}
-	if !ok {
-		return nil, false, nil
-	}
+	info := infoResult.info
 
 	objInfo := info.fi.ToObjectInfo(bucket, object, opts.Versioned || opts.VersionSuspended)
 	// Metadata-only outcomes do not need shard readers. Close any streams opened
@@ -226,13 +276,17 @@ func (er erasureObjects) tryFastOpenGET(ctx context.Context, bucket, object stri
 	if objInfo.DeleteMarker {
 		closeBitrotReaders(info.readers)
 		if opts.VersionID == "" {
-			return &GetObjectReader{
-				ObjInfo: objInfo,
-			}, true, toObjectErr(errFileNotFound, bucket, object)
+			return fastOpenGETResult{
+				reader:  &GetObjectReader{ObjInfo: objInfo},
+				outcome: fastOpenGETTerminalError,
+				err:     toObjectErr(errFileNotFound, bucket, object),
+			}
 		}
-		return &GetObjectReader{
-			ObjInfo: objInfo,
-		}, true, toObjectErr(errMethodNotAllowed, bucket, object)
+		return fastOpenGETResult{
+			reader:  &GetObjectReader{ObjInfo: objInfo},
+			outcome: fastOpenGETTerminalError,
+			err:     toObjectErr(errMethodNotAllowed, bucket, object),
+		}
 	}
 
 	if crypto.SSEC.IsEncrypted(objInfo.UserDefined) && opts.ReplicationRequest {
@@ -241,27 +295,34 @@ func (er erasureObjects) tryFastOpenGET(ctx context.Context, bucket, object stri
 
 	if objInfo.Size == 0 {
 		closeBitrotReaders(info.readers)
-		gr, err := NewGetObjectReaderFromReader(bytes.NewReader(nil), objInfo, opts, nsUnlocker)
-		return gr, true, err
+		// The constructor evaluates preconditions and runs any cleanup functions
+		// itself on failure. Attach the namespace unlock only after it succeeds so
+		// an error leaves ownership with GetObjectNInfo's defer.
+		gr, err := NewGetObjectReaderFromReader(bytes.NewReader(nil), objInfo, opts)
+		if err != nil {
+			return fastOpenGETResult{reader: gr, outcome: fastOpenGETTerminalError, err: err}
+		}
+		return fastOpenGETResult{reader: gr.WithCleanupFuncs(nsUnlocker), outcome: fastOpenGETSuccess}
 	}
 
 	if objInfo.IsRemote() {
 		closeBitrotReaders(info.readers)
 		gr, err := getTransitionedObjectReader(ctx, bucket, object, rs, h, objInfo, opts)
 		if err != nil {
-			return nil, true, err
+			return fastOpenGETResult{outcome: fastOpenGETTerminalError, err: err}
 		}
-		return gr.WithCleanupFuncs(nsUnlocker), true, nil
+		return fastOpenGETResult{reader: gr.WithCleanupFuncs(nsUnlocker), outcome: fastOpenGETSuccess}
 	}
 
 	fn, off, length, err := NewGetObjectReader(rs, objInfo, opts, h)
 	if err != nil {
 		closeBitrotReaders(info.readers)
-		return nil, true, err
+		return fastOpenGETResult{outcome: fastOpenGETTerminalError, err: err}
 	}
 	if off != 0 {
 		closeBitrotReaders(info.readers)
-		return nil, false, nil
+		metrics.recordFallback(nil)
+		return fastOpenGETResult{outcome: fastOpenGETFallback}
 	}
 
 	pr, pw := xioutil.WaitPipe()
@@ -277,23 +338,22 @@ func (er erasureObjects) tryFastOpenGET(ctx context.Context, bucket, object stri
 		pr.CloseWithError(nil)
 	}
 	gr, err := fn(pr, h, pipeCloser, nsUnlocker)
-	return gr, true, err
+	if err != nil {
+		return fastOpenGETResult{reader: gr, outcome: fastOpenGETTerminalError, err: err}
+	}
+	return fastOpenGETResult{reader: gr, outcome: fastOpenGETSuccess}
 }
 
 // openFastOpenGETInfo consumes only the FastOpen frame from each opened stream.
 // Body streams are left positioned immediately after their frame and are either
-// selected for decode or closed. A normal call opens the first wave and then any
-// remaining online disks needed to recover from pre-commit FastOpen failures;
-// allOnline skips the first wave and opens every online disk from scratch.
-func (er erasureObjects) openFastOpenGETInfo(ctx context.Context, bucket, object string, opts ObjectOptions, allOnline bool, metrics *fastOpenGETMetricsTracker) (fastOpenGETInfo, bool, error) {
+// selected for decode or closed. It opens the first wave and then any remaining
+// online disks needed to recover from pre-commit FastOpen failures.
+func (er erasureObjects) openFastOpenGETInfo(ctx context.Context, bucket, object string, opts ObjectOptions, metrics *fastOpenGETMetricsTracker) fastOpenGETInfoResult {
 	disks := er.getDisks()
 	openCount := er.fastOpenInitialOpenCount()
 	selected := selectFastOpenGETDisks(disks, openCount, bucket, object)
-	if allOnline {
-		selected = selectRemainingFastOpenGETDisks(disks, nil)
-	}
 	if len(selected) == 0 {
-		return fastOpenGETInfo{}, false, nil
+		return fastOpenGETInfoResult{outcome: fastOpenGETFallback}
 	}
 
 	reads := openFastOpenGETReads(ctx, disks, selected, bucket, object, opts.VersionID)
@@ -302,12 +362,12 @@ func (er erasureObjects) openFastOpenGETInfo(ctx context.Context, bucket, object
 	if ok {
 		if err != nil {
 			closeFastOpenGETReadsExcept(ctx, reads, nil)
+			return fastOpenGETInfoResult{info: info, outcome: fastOpenGETTerminalError, err: err}
 		}
-		return info, true, err
+		return fastOpenGETInfoResult{info: info, outcome: fastOpenGETSuccess}
 	}
 
-	exhausted := allOnline
-	if err != nil && !allOnline {
+	if err != nil {
 		remaining := selectRemainingFastOpenGETDisks(disks, selected)
 		if len(remaining) > 0 {
 			metrics.recordReplacement()
@@ -317,19 +377,18 @@ func (er erasureObjects) openFastOpenGETInfo(ctx context.Context, bucket, object
 			if ok {
 				if err != nil {
 					closeFastOpenGETReadsExcept(ctx, reads, nil)
+					return fastOpenGETInfoResult{info: info, outcome: fastOpenGETTerminalError, err: err}
 				}
-				return info, true, err
+				return fastOpenGETInfoResult{info: info, outcome: fastOpenGETSuccess}
 			}
 		}
-		exhausted = true
 	}
 
 	closeFastOpenGETReadsExcept(ctx, reads, nil)
-	if err != nil && exhausted {
+	if err != nil {
 		metrics.recordFailure(err)
-		return info, true, err
 	}
-	return info, false, nil
+	return fastOpenGETInfoResult{outcome: fastOpenGETFallback, err: err}
 }
 
 func openFastOpenGETReads(ctx context.Context, disks []StorageAPI, selected []int, bucket, object, versionID string) []fastOpenGETRead {

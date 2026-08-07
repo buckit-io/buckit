@@ -41,7 +41,7 @@ const (
 	apiRequestsCanceledTotal             MetricName = "canceled_total"
 	apiRequestsFastOpenAttempted         MetricName = "fast_open_attempted_total"
 	apiRequestsFastOpenHits              MetricName = "fast_open_hits_total"
-	apiRequestsFastOpenUnsupported       MetricName = "fast_open_unsupported_total"
+	apiRequestsFastOpenFallback          MetricName = "fast_open_fallback_total"
 	apiRequestsFastOpenReplacementPath   MetricName = "fast_open_replacement_path_total"
 	apiRequestsFastOpenStreamsOpened     MetricName = "fast_open_streams_opened_total"
 	apiRequestsFastOpenReplacementOpen   MetricName = "fast_open_replacement_opens_total"
@@ -96,7 +96,7 @@ var (
 		"Total number of GET requests attempted on the FastOpen path", "type")
 	apiRequestsFastOpenHitsMD = NewCounterMD(apiRequestsFastOpenHits,
 		"Total number of GET requests decided by the FastOpen path, including object-level errors", "type")
-	apiRequestsFastOpenUnsupportedMD = NewCounterMD(apiRequestsFastOpenUnsupported,
+	apiRequestsFastOpenFallbackMD = NewCounterMD(apiRequestsFastOpenFallback,
 		"Total number of FastOpen-eligible requests that fell back before response commit", "type")
 	apiRequestsFastOpenReplacementPathMD = NewCounterMD(apiRequestsFastOpenReplacementPath,
 		"Total number of FastOpen GET requests that used the replacement path", "type")
@@ -181,7 +181,7 @@ func loadAPIRequestsHTTPMetrics(ctx context.Context, m MetricValues, _ *metricsC
 	}
 	m.Set(apiRequestsFastOpenAttempted, float64(globalFastOpenMetrics.attempted.Load()), "type", "s3")
 	m.Set(apiRequestsFastOpenHits, float64(globalFastOpenMetrics.hits.Load()), "type", "s3")
-	m.Set(apiRequestsFastOpenUnsupported, float64(globalFastOpenMetrics.unsupported.Load()), "type", "s3")
+	m.Set(apiRequestsFastOpenFallback, float64(globalFastOpenMetrics.fallbacks.Load()), "type", "s3")
 	m.Set(apiRequestsFastOpenReplacementPath, float64(globalFastOpenMetrics.replacementPath.Load()), "type", "s3")
 	m.Set(apiRequestsFastOpenStreamsOpened, float64(globalFastOpenMetrics.streamsOpened.Load()), "type", "s3")
 	m.Set(apiRequestsFastOpenReplacementOpen, float64(globalFastOpenMetrics.replacementOpen.Load()), "type", "s3")
