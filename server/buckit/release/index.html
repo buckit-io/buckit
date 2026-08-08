@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Buckit RELEASE.2026-08-08T00-55-02Z</title>
+  <style>
+    :root { color-scheme: light; --bg: #f3f5f9; --surface: #ffffff; --surface-alt: #f8fafc; --border: #d8dee9; --text: #0f172a; --muted: #475569; --link: #0f766e; --link-hover: #115e59; --accent: #dcfce7; --accent-text: #166534; --shadow: 0 18px 40px rgba(15, 23, 42, 0.08); }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+    .page { max-width: 1080px; margin: 0 auto; padding: 40px 20px 64px; }
+    .hero, .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
+    .hero { padding: 28px; margin-bottom: 24px; }
+    .eyebrow { display: inline-block; padding: 6px 10px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: uppercase; }
+    h1 { margin: 14px 0 10px; font-size: 34px; line-height: 1.1; }
+    .subhead { margin: 0 0 20px; max-width: 760px; color: var(--muted); font-size: 16px; line-height: 1.6; }
+    .hero-actions, .meta { display: flex; flex-wrap: wrap; gap: 12px; }
+    .meta { margin-top: 18px; }
+    .meta-item { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-alt); min-width: 160px; }
+    .meta-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .meta-value { font-size: 14px; font-weight: 600; }
+    .button, .text-link { color: var(--link); text-decoration: none; font-weight: 600; }
+    .button { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 0 16px; border-radius: 10px; border: 1px solid #99f6e4; background: #f0fdfa; }
+    .button:hover, .text-link:hover { color: var(--link-hover); }
+    .panel { padding: 24px; margin-bottom: 24px; }
+    .panel:last-child { margin-bottom: 0; }
+    .section-title { margin: 0 0 8px; font-size: 24px; }
+    .section-copy { margin: 0 0 20px; color: var(--muted); line-height: 1.6; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface-alt); padding: 18px; }
+    .card h3 { margin: 0 0 8px; font-size: 18px; }
+    .card p { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .card-links { display: grid; gap: 10px; }
+    .download { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 14px; border-radius: 10px; background: #0f172a; color: #ffffff; text-decoration: none; font-weight: 600; }
+    .download:hover { background: #1e293b; }
+    .aux-links { display: flex; flex-wrap: wrap; gap: 12px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-alt); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { font-size: 12px; text-transform: uppercase; color: var(--muted); background: #eef2f7; letter-spacing: 0.04em; }
+    tbody tr:last-child td { border-bottom: 0; }
+    td strong { display: block; margin-bottom: 4px; }
+    .footer-note { margin-top: 18px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    @media (max-width: 720px) {
+      .page { padding: 24px 16px 48px; }
+      .hero, .panel { padding: 20px; }
+      h1 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <span class="eyebrow">Latest Stable Release</span>
+      <h1>Buckit</h1>
+      <p class="subhead">Signed release binaries for the Buckit S3-compatible object storage server.</p>
+      <div class="hero-actions">
+        <a class="button" href="../archives/">Browse release archive</a>
+      </div>
+      <div class="meta">
+        <div class="meta-item">
+          <span class="meta-label">Release tag</span>
+          <span class="meta-value">RELEASE.2026-08-08T00-55-02Z</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Repository</span>
+          <span class="meta-value">buckit-io/buckit</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 class="section-title">Install</h2>
+      <p class="section-copy">One-line installers that download the right artifact for your platform, verify its SHA-256 checksum, and print the command to finish. They do not install for you — the privileged step is yours to review and run.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Platform</th><th>Command</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Linux</strong>rpm / deb / apk</td>
+              <td><code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px">curl -fsSL https://buckit-io.github.io/buckit/install-linux.sh | sh</code></td>
+            </tr>
+            <tr>
+              <td><strong>Linux</strong>standalone binary</td>
+              <td><code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px">curl -fsSL https://buckit-io.github.io/buckit/install-linux-binary.sh | sh</code></td>
+            </tr>
+            <tr>
+              <td><strong>macOS</strong>Apple Silicon</td>
+              <td><code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px">curl -fsSL https://buckit-io.github.io/buckit/install-mac.sh | sh</code></td>
+            </tr>
+            <tr>
+              <td><strong>Windows</strong>x86_64</td>
+              <td><code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px">irm https://buckit-io.github.io/buckit/install-windows.ps1 | iex</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 class="section-title">Downloads</h2>
+      <p class="section-copy">Choose the binary for your OS and architecture. Each platform card includes the signed artifact, checksum, and minisign signature.</p>
+      <div class="cards">
+        <article class="card">
+          <h3>Linux x86_64</h3>
+          <p>Standard Linux build for x86_64 hosts.</p>
+          <div class="card-links">
+            <a class="download" href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-linux-amd64.RELEASE.2026-08-08T00-55-02Z">Download binary</a>
+            <div class="aux-links">
+              <a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-linux-amd64.RELEASE.2026-08-08T00-55-02Z.sha256sum">Checksum</a>
+              <a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-linux-amd64.RELEASE.2026-08-08T00-55-02Z.minisig">Signature</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <h3>Linux arm64</h3>
+          <p>Linux build for ARM64 systems and cloud hosts.</p>
+          <div class="card-links">
+            <a class="download" href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-linux-arm64.RELEASE.2026-08-08T00-55-02Z">Download binary</a>
+            <div class="aux-links">
+              <a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-linux-arm64.RELEASE.2026-08-08T00-55-02Z.sha256sum">Checksum</a>
+              <a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-linux-arm64.RELEASE.2026-08-08T00-55-02Z.minisig">Signature</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <h3>macOS arm64</h3>
+          <p>Native Apple Silicon build for modern Macs.</p>
+          <div class="card-links">
+            <a class="download" href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-darwin-arm64.RELEASE.2026-08-08T00-55-02Z">Download binary</a>
+            <div class="aux-links">
+              <a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-darwin-arm64.RELEASE.2026-08-08T00-55-02Z.sha256sum">Checksum</a>
+              <a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-darwin-arm64.RELEASE.2026-08-08T00-55-02Z.minisig">Signature</a>
+            </div>
+          </div>
+        </article>
+        <article class="card">
+          <h3>Windows x86_64</h3>
+          <p>Windows build for 64-bit desktop and server environments.</p>
+          <div class="card-links">
+            <a class="download" href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-windows-amd64.exe.RELEASE.2026-08-08T00-55-02Z">Download binary</a>
+            <div class="aux-links">
+              <a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-windows-amd64.exe.RELEASE.2026-08-08T00-55-02Z.sha256sum">Checksum</a>
+              <a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-windows-amd64.exe.RELEASE.2026-08-08T00-55-02Z.minisig">Signature</a>
+            </div>
+          </div>
+        </article>
+      </div>
+      <p class="footer-note">Need the raw artifact names for automation or mirrors? The manifest below keeps the exact filenames and verification links in one place.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Platform</th><th>Binary</th><th>Checksum</th><th>Signature</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Linux x86_64</strong>Standard Linux</td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-linux-amd64.RELEASE.2026-08-08T00-55-02Z">buckit-linux-amd64.RELEASE.2026-08-08T00-55-02Z</a></td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-linux-amd64.RELEASE.2026-08-08T00-55-02Z.sha256sum">.sha256sum</a></td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-linux-amd64.RELEASE.2026-08-08T00-55-02Z.minisig">.minisig</a></td>
+            </tr>
+            <tr>
+              <td><strong>Linux arm64</strong>ARM64 Linux</td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-linux-arm64.RELEASE.2026-08-08T00-55-02Z">buckit-linux-arm64.RELEASE.2026-08-08T00-55-02Z</a></td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-linux-arm64.RELEASE.2026-08-08T00-55-02Z.sha256sum">.sha256sum</a></td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-linux-arm64.RELEASE.2026-08-08T00-55-02Z.minisig">.minisig</a></td>
+            </tr>
+            <tr>
+              <td><strong>macOS arm64</strong>Apple Silicon</td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-darwin-arm64.RELEASE.2026-08-08T00-55-02Z">buckit-darwin-arm64.RELEASE.2026-08-08T00-55-02Z</a></td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-darwin-arm64.RELEASE.2026-08-08T00-55-02Z.sha256sum">.sha256sum</a></td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-darwin-arm64.RELEASE.2026-08-08T00-55-02Z.minisig">.minisig</a></td>
+            </tr>
+            <tr>
+              <td><strong>Windows x86_64</strong>64-bit Windows</td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-windows-amd64.exe.RELEASE.2026-08-08T00-55-02Z">buckit-windows-amd64.exe.RELEASE.2026-08-08T00-55-02Z</a></td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-windows-amd64.exe.RELEASE.2026-08-08T00-55-02Z.sha256sum">.sha256sum</a></td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-windows-amd64.exe.RELEASE.2026-08-08T00-55-02Z.minisig">.minisig</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 class="section-title">Linux packages</h2>
+      <p class="section-copy">Native packages for Debian/Ubuntu, RPM, and Alpine distributions.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Format</th><th>amd64</th><th>arm64</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Debian/Ubuntu</strong>.deb</td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit_20260808005502.0.0_amd64.deb">buckit_20260808005502.0.0_amd64.deb</a></td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit_20260808005502.0.0_arm64.deb">buckit_20260808005502.0.0_arm64.deb</a></td>
+            </tr>
+            <tr>
+              <td><strong>RPM</strong>.rpm</td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-20260808005502.0.0.x86_64.rpm">buckit-20260808005502.0.0.x86_64.rpm</a></td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit-20260808005502.0.0.aarch64.rpm">buckit-20260808005502.0.0.aarch64.rpm</a></td>
+            </tr>
+            <tr>
+              <td><strong>Alpine</strong>.apk</td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit_20260808005502.0.0_x86_64.apk">buckit_20260808005502.0.0_x86_64.apk</a></td>
+              <td><a href="https://github.com/buckit-io/buckit/releases/download/RELEASE.2026-08-08T00-55-02Z/buckit_20260808005502.0.0_aarch64.apk">buckit_20260808005502.0.0_aarch64.apk</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
