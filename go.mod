@@ -126,7 +126,7 @@ require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/antithesishq/antithesis-sdk-go v0.6.0-default-no-op // indirect
-	github.com/apache/thrift v0.23.1-0.20260613095333-983c813c9a1a // indirect
+	github.com/apache/thrift v0.24.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/charmbracelet/bubbles v0.20.0 // indirect
